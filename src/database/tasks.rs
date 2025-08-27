@@ -489,6 +489,7 @@ impl LiveSetDatabase {
 }
 
 // Task Analytics struct for the database layer
+#[derive(serde::Serialize)]
 pub struct TaskAnalytics {
     pub total_tasks: i32,
     pub completed_tasks: i32,
