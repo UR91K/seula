@@ -170,7 +170,16 @@ impl InteractiveCli {
         println!("{}", "Command Examples:".bold().underline());
         println!("  {}", "scan [--force] [PATH ...]".italic());
         println!("  {}", "search <query> [--limit N] [--offset N]".italic());
-        println!("  {}", "project list".italic());
+        println!("  {}", "project list [--deleted] [--limit=50]".italic());
+        println!("  {}", "project show <id>".italic());
+        println!("  {}", "sample list [--limit=50] [--offset=0]".italic());
+        println!("  {}", "sample search <query> [--limit=50]".italic());
+        println!("  {}", "collection list".italic());
+        println!("  {}", "collection create <name> [description]".italic());
+        println!("  {}", "tag list".italic());
+        println!("  {}", "tag create <name> [--color=hex]".italic());
+        println!("  {}", "task list [--project=id] [--completed]".italic());
+        println!("  {}", "config show".italic());
         println!("  {}", "system info".italic());
         println!("  {}", "status".italic());
         println!();
@@ -290,7 +299,273 @@ impl InteractiveCli {
                 cmd.execute(&self.context).await?;
             }
             "project" => {
-                println!("{}", "Project management commands not yet implemented".yellow());
+                if args.len() < 2 {
+                    println!("{}", "Usage: project <list|show|update|delete|restore|rescan|stats> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{ProjectCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => {
+                        let mut deleted = false;
+                        let mut limit = 50;
+                        let mut offset = 0;
+                        
+                        // Parse additional flags
+                        for &arg in &args[2..] {
+                            if arg == "--deleted" {
+                                deleted = true;
+                            } else if arg.starts_with("--limit=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    limit = v;
+                                }
+                            } else if arg.starts_with("--offset=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    offset = v;
+                                }
+                            }
+                        }
+                        
+                        ProjectCommands::List { deleted, limit, offset }
+                    }
+                    "show" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: project show <id>".red());
+                            return Ok(());
+                        }
+                        ProjectCommands::Show { id: args[2].to_string() }
+                    }
+                    "stats" => ProjectCommands::Stats,
+                    _ => {
+                        println!("{}", format!("Unknown project subcommand: {}. Available: list, show, stats", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "sample" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: sample <list|search|stats|check-presence> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{SampleCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => {
+                        let mut limit = 50;
+                        let mut offset = 0;
+                        
+                        for &arg in &args[2..] {
+                            if arg.starts_with("--limit=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    limit = v;
+                                }
+                            } else if arg.starts_with("--offset=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    offset = v;
+                                }
+                            }
+                        }
+                        
+                        SampleCommands::List { limit, offset }
+                    }
+                    "search" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: sample search <query> [--limit=N]".red());
+                            return Ok(());
+                        }
+                        
+                        let mut limit = 50;
+                        let mut query_parts = Vec::new();
+                        
+                        for &arg in &args[2..] {
+                            if arg.starts_with("--limit=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    limit = v;
+                                }
+                            } else {
+                                query_parts.push(arg);
+                            }
+                        }
+                        
+                        let query = query_parts.join(" ");
+                        SampleCommands::Search { query, limit }
+                    }
+                    "stats" => SampleCommands::Stats,
+                    "check-presence" => SampleCommands::CheckPresence,
+                    _ => {
+                        println!("{}", format!("Unknown sample subcommand: {}. Available: list, search, stats, check-presence", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "collection" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: collection <list|show|create|add|remove> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{CollectionCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => CollectionCommands::List,
+                    "show" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: collection show <id>".red());
+                            return Ok(());
+                        }
+                        CollectionCommands::Show { id: args[2].to_string() }
+                    }
+                    "create" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: collection create <name> [description]".red());
+                            return Ok(());
+                        }
+                        let name = args[2].to_string();
+                        let description = if args.len() > 3 {
+                            Some(args[3..].join(" "))
+                        } else {
+                            None
+                        };
+                        CollectionCommands::Create { name, description }
+                    }
+                    _ => {
+                        println!("{}", format!("Unknown collection subcommand: {}. Available: list, show, create", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "tag" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: tag <list|create|assign|remove|search> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{TagCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => TagCommands::List,
+                    "create" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: tag create <name> [--color=hex]".red());
+                            return Ok(());
+                        }
+                        let name = args[2].to_string();
+                        let mut color = None;
+                        
+                        for &arg in &args[3..] {
+                            if arg.starts_with("--color=") {
+                                color = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            }
+                        }
+                        
+                        TagCommands::Create { name, color }
+                    }
+                    "search" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: tag search <tag>".red());
+                            return Ok(());
+                        }
+                        TagCommands::Search { tag: args[2].to_string() }
+                    }
+                    _ => {
+                        println!("{}", format!("Unknown tag subcommand: {}. Available: list, create, search", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "task" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: task <list|create|complete|delete> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{TaskCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => {
+                        let mut project_id = None;
+                        let mut completed = false;
+                        
+                        for &arg in &args[2..] {
+                            if arg == "--completed" {
+                                completed = true;
+                            } else if arg.starts_with("--project=") {
+                                project_id = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            }
+                        }
+                        
+                        TaskCommands::List { project_id, completed }
+                    }
+                    "create" => {
+                        if args.len() < 4 {
+                            println!("{}", "Usage: task create <project_id> <description> [--priority=1-5]".red());
+                            return Ok(());
+                        }
+                        let project_id = args[2].to_string();
+                        let description = args[3].to_string();
+                        let mut priority = 3u8; // Default priority
+                        
+                        for &arg in &args[4..] {
+                            if arg.starts_with("--priority=") {
+                                if let Ok(p) = arg.split('=').nth(1).unwrap_or("").parse::<u8>() {
+                                    priority = p.clamp(1, 5);
+                                }
+                            }
+                        }
+                        
+                        TaskCommands::Create { project_id, description, priority }
+                    }
+                    "complete" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: task complete <id>".red());
+                            return Ok(());
+                        }
+                        TaskCommands::Complete { id: args[2].to_string() }
+                    }
+                    "delete" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: task delete <id>".red());
+                            return Ok(());
+                        }
+                        TaskCommands::Delete { id: args[2].to_string() }
+                    }
+                    _ => {
+                        println!("{}", format!("Unknown task subcommand: {}. Available: list, create, complete, delete", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "config" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: config <show|validate|edit>".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{ConfigCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "show" => ConfigCommands::Show,
+                    "validate" => ConfigCommands::Validate,
+                    "edit" => ConfigCommands::Edit,
+                    _ => {
+                        println!("{}", format!("Unknown config subcommand: {}. Available: show, validate, edit", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
             }
             "system" => {
                 if args.len() > 1 && args[1] == "info" {
