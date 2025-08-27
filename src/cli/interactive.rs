@@ -4,8 +4,8 @@ use crate::cli::commands::CliCommand;
 use crate::cli::CliError;
 use colored::Colorize;
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
-use rustyline::config::Configurer;
+use rustyline::{Editor, Config};
+use rustyline::config::EditMode;
 use std::collections::HashMap;
 
 /// Interactive CLI mode
@@ -19,13 +19,17 @@ impl InteractiveCli {
     pub async fn new(output_format: OutputFormat, no_color: bool) -> Result<Self, CliError> {
         let context = CliContext::new(output_format, no_color).await?;
 
-        let mut editor = Editor::<()>::new().map_err(|e| -> CliError {
+        // Create editor with configuration to handle colored prompts properly
+        let config = Config::builder()
+            .edit_mode(EditMode::Emacs)
+            .auto_add_history(true)
+            .max_history_size(1000)
+            .build();
+            
+        let mut editor = Editor::<()>::with_config(config).map_err(|e| -> CliError {
             std::io::Error::new(std::io::ErrorKind::Other, format!("{e}"))
                 .into()
         })?;
-
-        // Configure the editor
-        editor.set_max_history_size(1000);
 
         // Load command history if it exists
         let _ = editor.load_history(&Self::history_file());
@@ -85,6 +89,10 @@ impl InteractiveCli {
             if let Err(e) = self.execute_command(line).await {
                 println!("{}", format!("Error: {}", e).red());
             }
+            
+            // Ensure proper line separation after command execution
+            // This helps prevent prompt duplication issues
+            println!();
         }
 
         // Save history
@@ -104,7 +112,23 @@ impl InteractiveCli {
     }
 
     fn prompt(&self) -> String {
-        format!("{} ", "seula>".bold().green())
+        // Use a plain prompt to avoid cursor alignment issues with colored output in terminals
+        // Colors in prompts can cause rustyline to miscalculate prompt width, especially on Windows
+        if self.context.no_color || Self::is_problematic_terminal() {
+            "seula> ".to_string()
+        } else {
+            // For terminals that handle colors properly, we still use plain text
+            // to ensure consistent behavior across all environments
+            "seula> ".to_string()
+        }
+    }
+
+    /// Detect if we're running in a terminal that has issues with colored prompts
+    fn is_problematic_terminal() -> bool {
+        // Check for Git Bash on Windows, which commonly has cursor alignment issues
+        std::env::var("TERM").unwrap_or_default().contains("cygwin") ||
+        std::env::var("MSYSTEM").is_ok() || // Git Bash/MSYS2
+        cfg!(target_os = "windows")
     }
 
     fn history_file() -> std::path::PathBuf {
@@ -154,6 +178,8 @@ impl InteractiveCli {
 
     fn clear_screen(&self) {
         print!("\x1B[2J\x1B[1;1H");
+        use std::io::{self, Write};
+        let _ = io::stdout().flush();
     }
 
     async fn show_status(&self) -> Result<(), CliError> {
