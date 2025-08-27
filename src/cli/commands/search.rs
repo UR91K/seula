@@ -18,7 +18,7 @@ impl crate::cli::commands::CliCommand for SearchCommand {
 
         let mut db = ctx.db.lock().await;
         let parsed = DbSearchQuery::parse(&self.query);
-        let mut results: Vec<DbSearchResult> = db.search_fts(&parsed)?;
+        let results: Vec<DbSearchResult> = db.search_fts(&parsed)?;
 
         if results.is_empty() {
             formatter.print_message("No results found", crate::cli::output::MessageType::Info);
