@@ -60,7 +60,7 @@ use crate::error::LiveSetError;
 use crate::models::{
     AbletonVersion, KeySignature, Plugin, PluginInfo, Sample, Scale, TimeSignature, Tonic,
 };
-use crate::utils::plugins::get_most_recent_db_file;
+use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
 use crate::utils::plugins::LineTrackingBuffer;
 use crate::utils::{EventExt, StringResultExt};
 #[allow(unused_imports)]
@@ -858,7 +858,8 @@ impl Parser {
             .as_ref()
             .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
         let db_dir = &config.live_database_dir;
-        let db_path_result = get_most_recent_db_file(&PathBuf::from(db_dir));
+        let db_path_result = get_most_recent_plugins_db_file(&PathBuf::from(db_dir))
+            .or_else(|_| get_most_recent_db_file(&PathBuf::from(db_dir)));
         if let Ok(db_path) = db_path_result {
             if let Ok(ableton_db) = AbletonDatabase::new(db_path) {
                 for (dev_identifier, info) in &self.plugin_info_tags {

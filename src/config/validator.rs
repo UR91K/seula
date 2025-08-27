@@ -1,5 +1,6 @@
 use crate::config::{Config, paths};
 use crate::error::ConfigError;
+use crate::utils::plugins::get_most_recent_plugins_db_file;
 use std::path::PathBuf;
 
 impl Config {
@@ -77,6 +78,13 @@ impl Config {
         if !live_db_path.exists() {
             warnings.push(format!(
                 "Live database directory does not exist: {}",
+                self.live_database_dir
+            ));
+        }
+        // Check that a plugins DB exists; warn if not found
+        else if get_most_recent_plugins_db_file(&live_db_path).is_err() {
+            warnings.push(format!(
+                "No Ableton plugins database found in '{}'. Plugin installation status will be unavailable.",
                 self.live_database_dir
             ));
         }

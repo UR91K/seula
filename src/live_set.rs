@@ -10,7 +10,7 @@ use crate::error::LiveSetError;
 use crate::models::{AbletonVersion, KeySignature, Plugin, Sample, TimeSignature};
 use crate::scan::{ParseOptions, Parser};
 use crate::utils::metadata::{load_file_hash, load_file_name, load_file_timestamps};
-use crate::utils::plugins::get_most_recent_db_file;
+use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
 use crate::utils::{decompress_gzip_file, validate_ableton_file};
 
 #[derive(Debug)]
@@ -136,7 +136,9 @@ impl LiveSet {
             .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
         let db_dir = &config.live_database_dir;
         let ableton_db = AbletonDatabase::new(
-            get_most_recent_db_file(&PathBuf::from(db_dir)).map_err(LiveSetError::DatabaseError)?,
+            get_most_recent_plugins_db_file(&PathBuf::from(db_dir))
+                .or_else(|_| get_most_recent_db_file(&PathBuf::from(db_dir)))
+                .map_err(LiveSetError::DatabaseError)?,
         )
         .map_err(LiveSetError::DatabaseError)?;
 

@@ -36,7 +36,7 @@ use once_cell::sync::Lazy;
 use crate::ableton_db::AbletonDatabase;
 use crate::config::CONFIG;
 use crate::error::{DatabaseError, SampleError, TimeSignatureError};
-use crate::utils::plugins::get_most_recent_db_file;
+use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
 
 /// Unique identifier type for database entities.
 ///
@@ -751,7 +751,8 @@ static INSTALLED_PLUGINS: Lazy<Arc<Result<HashSet<(String, PluginFormat)>, Datab
                     .as_ref()
                     .map_err(|e| DatabaseError::ConfigError(e.clone()))?;
                 let db_dir = PathBuf::from(&config.live_database_dir);
-                let db_path = get_most_recent_db_file(&db_dir)?;
+                let db_path = get_most_recent_plugins_db_file(&db_dir)
+                    .or_else(|_| get_most_recent_db_file(&db_dir))?;
 
                 let db = AbletonDatabase::new(db_path)?;
 
