@@ -760,6 +760,7 @@ impl LiveSetDatabase {
 }
 
 // Database structs for tag analytics
+#[derive(serde::Serialize)]
 pub struct TagStatistics {
     pub total_tags: i32,
     pub tags_in_use: i32,
@@ -771,6 +772,7 @@ pub struct TagStatistics {
     pub projects_with_tags: i32,
 }
 
+#[derive(serde::Serialize)]
 pub struct TagUsageInfo {
     pub tag_id: String,
     pub name: String,
