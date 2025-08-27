@@ -4,15 +4,13 @@ use crate::cli::CliError;
 use crate::database::LiveSetDatabase;
 use crate::error::LiveSetError;
 use crate::live_set::LiveSet;
+use crate::process_projects_with_progress;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::project_scanner::ProjectPathScanner;
-use colored::Colorize;
 use comfy_table::Table;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use tokio::sync::Mutex as TokioMutex;
 
 pub struct ScanCommand {
@@ -24,7 +22,47 @@ pub struct ScanCommand {
 impl crate::cli::commands::CliCommand for ScanCommand {
     async fn execute(&self, ctx: &CliContext) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
+        // If no explicit paths provided, use the shared scanning logic (same as gRPC)
+        if self.paths.is_empty() {
+            formatter.print_message(
+                "Starting scan using configured paths",
+                MessageType::Info,
+            );
 
+            let progress_callback = move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
+                let phase_label = match phase {
+                    "starting" => "Starting",
+                    "discovering" => "Discovering",
+                    "preprocessing" => "Preprocessing",
+                    "parsing" => "Parsing",
+                    "inserting" => "Saving",
+                    "completed" => "Completed",
+                    _ => phase,
+                };
+
+                // Simple progress output suitable for CLI
+                if total > 0 {
+                    println!(
+                        "[{}] {:.1}% - {} ({}/{})",
+                        phase_label,
+                        progress * 100.0,
+                        message,
+                        completed,
+                        total
+                    );
+                } else {
+                    println!("[{}] {}", phase_label, message);
+                }
+            };
+
+            process_projects_with_progress(Some(progress_callback))
+                .map_err(|e| -> CliError { Box::new(e) })?;
+
+            formatter.print_message("\nScan Complete", MessageType::Success);
+            return Ok(());
+        }
+
+        // Legacy path-specific scanning flow (when explicit paths are provided)
         formatter.print_message(
             &format!("Starting scan of {} path(s)", self.paths.len()),
             MessageType::Info,
