@@ -95,7 +95,10 @@ macro_rules! table_row {
 macro_rules! colored_cell {
     ($value:expr, $color:ident) => {
         if $crate::cli::output::should_use_color() {
-            $value.to_string().$color().to_string()
+            {
+                use colored::Colorize;
+                $value.to_string().$color().to_string()
+            }
         } else {
             $value.to_string()
         }

@@ -688,6 +688,7 @@ impl LiveSetDatabase {
     }
 }
 
+#[derive(serde::Serialize)]
 pub struct SampleStats {
     pub total_samples: i32,
     pub present_samples: i32,
@@ -697,6 +698,7 @@ pub struct SampleStats {
     pub total_estimated_size_bytes: i64,
 }
 
+#[derive(serde::Serialize)]
 pub struct SampleUsageInfo {
     pub sample_id: String,
     pub name: String,
@@ -705,6 +707,7 @@ pub struct SampleUsageInfo {
     pub project_count: i32,
 }
 
+#[derive(serde::Serialize)]
 pub struct SampleRefreshResult {
     pub total_samples_checked: i32,
     pub samples_now_present: i32,
@@ -712,6 +715,7 @@ pub struct SampleRefreshResult {
     pub samples_unchanged: i32,
 }
 
+#[derive(serde::Serialize)]
 pub struct SampleAnalytics {
     pub most_used_samples_count: i32,
     pub moderately_used_samples_count: i32,
@@ -734,6 +738,7 @@ pub struct UsageDistribution {
     pub unused: i32,
 }
 
+#[derive(serde::Serialize)]
 pub struct ExtensionAnalytics {
     pub count: i32,
     pub total_size_bytes: i64,
