@@ -13,7 +13,7 @@ use seula::utils::decompress_gzip_file;
 
 #[test]
 fn test_load_real_project() {
-    setup("error");
+    setup("debug");
 
     let project_path = Path::new(
         r"C:\Users\judee\Documents\Projects\band with joel\Forkspan Project\Forkspan.als",
