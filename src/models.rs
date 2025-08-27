@@ -23,6 +23,7 @@
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::fmt;
 use std::path::PathBuf;
@@ -1017,7 +1018,7 @@ impl Default for Id {
 }
 
 /// Statistics for a collection (for status bar display)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CollectionStatistics {
     /// Number of projects in the collection
     pub project_count: i32,
