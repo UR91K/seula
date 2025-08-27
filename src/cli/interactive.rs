@@ -220,12 +220,9 @@ impl InteractiveCli {
             return Ok(());
         }
 
-        // Convert the command line arguments back to a string for clap parsing
-        #[allow(unused_variables)] // TODO: Remove this once we have implemented the commands that use this
-        let full_command = format!("seula {}", args.join(" "));
-
-        // This is a simplified approach - in a real implementation, you'd want to
-        // properly parse the arguments and route to the appropriate command handlers
+        // We handle command parsing manually in interactive mode rather than using clap
+        // This gives us more control over the interactive experience and error handling
+        // Each command has its own argument parser that matches the clap-based CLI interface
         match args[0] {
             "scan" => {
                 use crate::cli::commands::{CliCommand, ScanCommand};
