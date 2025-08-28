@@ -47,6 +47,7 @@ impl InteractiveCli {
         commands.insert("collection", "Collection management commands");
         commands.insert("tag", "Tag management commands");
         commands.insert("task", "Task management commands");
+        commands.insert("plugin", "Plugin management commands");
         commands.insert("system", "System operations");
         commands.insert("config", "Configuration management");
 
@@ -179,6 +180,8 @@ impl InteractiveCli {
         println!("  {}", "tag list".italic());
         println!("  {}", "tag create <name> [--color=hex]".italic());
         println!("  {}", "task list [--project=id] [--completed]".italic());
+        println!("  {}", "plugin list [--vendor=name] [--installed]".italic());
+        println!("  {}", "plugin search <query> [--format=VST3]".italic());
         println!("  {}", "config show".italic());
         println!("  {}", "system info".italic());
         println!("  {}", "status".italic());
@@ -538,6 +541,103 @@ impl InteractiveCli {
                     }
                     _ => {
                         println!("{}", format!("Unknown task subcommand: {}. Available: list, create, complete, delete", args[1]).red());
+                        return Ok(());
+                    }
+                };
+                
+                subcommand.execute(&self.context).await?;
+            }
+            "plugin" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: plugin <list|search|show|stats|refresh|vendors|formats> [OPTIONS]".red());
+                    return Ok(());
+                }
+                
+                use crate::cli::{PluginCommands, CliCommand};
+                
+                let subcommand = match args[1] {
+                    "list" => {
+                        let mut vendor = None;
+                        let mut format = None;
+                        let mut installed = None;
+                        let mut limit = 50;
+                        let mut offset = 0;
+                        let mut sort_by = None;
+                        let mut sort_desc = false;
+                        
+                        for &arg in &args[2..] {
+                            if arg.starts_with("--vendor=") {
+                                vendor = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            } else if arg.starts_with("--format=") {
+                                format = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            } else if arg == "--installed" {
+                                installed = Some(true);
+                            } else if arg.starts_with("--limit=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    limit = v;
+                                }
+                            } else if arg.starts_with("--offset=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    offset = v;
+                                }
+                            } else if arg.starts_with("--sort-by=") {
+                                sort_by = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            } else if arg == "--sort-desc" {
+                                sort_desc = true;
+                            }
+                        }
+                        
+                        PluginCommands::List { vendor, format, installed, limit, offset, sort_by, sort_desc }
+                    }
+                    "search" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed] [--limit=N]".red());
+                            return Ok(());
+                        }
+                        
+                        let mut vendor = None;
+                        let mut format = None;
+                        let mut installed = None;
+                        let mut limit = 50;
+                        let mut query_parts = Vec::new();
+                        
+                        for &arg in &args[2..] {
+                            if arg.starts_with("--vendor=") {
+                                vendor = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            } else if arg.starts_with("--format=") {
+                                format = Some(arg.split('=').nth(1).unwrap_or("").to_string());
+                            } else if arg == "--installed" {
+                                installed = Some(true);
+                            } else if arg.starts_with("--limit=") {
+                                if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
+                                    limit = v;
+                                }
+                            } else {
+                                query_parts.push(arg);
+                            }
+                        }
+                        
+                        if query_parts.is_empty() {
+                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed] [--limit=N]".red());
+                            return Ok(());
+                        }
+                        
+                        let query = query_parts.join(" ");
+                        PluginCommands::Search { query, vendor, format, installed, limit }
+                    }
+                    "show" => {
+                        if args.len() < 3 {
+                            println!("{}", "Usage: plugin show <id>".red());
+                            return Ok(());
+                        }
+                        PluginCommands::Show { id: args[2].to_string() }
+                    }
+                    "stats" => PluginCommands::Stats,
+                    "refresh" => PluginCommands::Refresh,
+                    "vendors" => PluginCommands::Vendors,
+                    "formats" => PluginCommands::Formats,
+                    _ => {
+                        println!("{}", format!("Unknown plugin subcommand: {}. Available: list, search, show, stats, refresh, vendors, formats", args[1]).red());
                         return Ok(());
                     }
                 };

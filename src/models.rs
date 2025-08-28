@@ -23,7 +23,7 @@
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashSet;
 use std::fmt;
 use std::path::PathBuf;
@@ -481,7 +481,7 @@ impl fmt::Display for KeySignature {
 /// assert_eq!(dev_type, "vst3");
 /// assert_eq!(category, "instr");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PluginFormat {
     /// VST2 instrument plugin
     VST2Instrument,
@@ -583,7 +583,7 @@ impl fmt::Display for PluginFormat {
 ///     println!("Plugin {} is installed", plugin.name);
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Plugin {
     /// Unique identifier for our database
     pub id: Uuid,

@@ -119,6 +119,12 @@ pub enum Commands {
         subcommand: TaskCommands,
     },
 
+    /// Plugin management commands
+    Plugin {
+        #[command(subcommand)]
+        subcommand: PluginCommands,
+    },
+
     /// System operations and information
     System {
         #[command(subcommand)]
@@ -384,6 +390,80 @@ pub enum ConfigCommands {
 
     /// Edit configuration
     Edit,
+}
+
+#[derive(Subcommand)]
+pub enum PluginCommands {
+    /// List all plugins
+    List {
+        /// Filter by vendor
+        #[arg(long)]
+        vendor: Option<String>,
+
+        /// Filter by plugin format
+        #[arg(long)]
+        format: Option<String>,
+
+        /// Show only installed plugins
+        #[arg(long)]
+        installed: Option<bool>,
+
+        /// Limit number of results
+        #[arg(long, default_value = "50")]
+        limit: usize,
+
+        /// Offset for pagination
+        #[arg(long, default_value = "0")]
+        offset: usize,
+
+        /// Sort by field (name, vendor, format, usage_count)
+        #[arg(long)]
+        sort_by: Option<String>,
+
+        /// Sort in descending order
+        #[arg(long)]
+        sort_desc: bool,
+    },
+
+    /// Search plugins by name, vendor, or format
+    Search {
+        /// Search query
+        query: String,
+
+        /// Filter by vendor
+        #[arg(long)]
+        vendor: Option<String>,
+
+        /// Filter by plugin format
+        #[arg(long)]
+        format: Option<String>,
+
+        /// Show only installed plugins
+        #[arg(long)]
+        installed: Option<bool>,
+
+        /// Limit number of results
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
+
+    /// Show detailed information about a specific plugin
+    Show {
+        /// Plugin ID
+        id: String,
+    },
+
+    /// Show plugin statistics
+    Stats,
+
+    /// Refresh plugin installation status
+    Refresh,
+
+    /// List plugin vendors with statistics
+    Vendors,
+
+    /// List plugin formats with statistics
+    Formats,
 }
 
 pub use commands::*;

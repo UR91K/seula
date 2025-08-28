@@ -751,6 +751,7 @@ impl LiveSetDatabase {
 
 }
 
+#[derive(serde::Serialize)]
 pub struct PluginStats {
     pub total_plugins: i32,
     pub installed_plugins: i32,
@@ -760,6 +761,7 @@ pub struct PluginStats {
     pub plugins_by_vendor: std::collections::HashMap<String, i32>,
 }
 
+#[derive(serde::Serialize)]
 pub struct PluginRefreshResult {
     pub total_plugins_checked: i32,
     pub plugins_now_installed: i32,
@@ -767,6 +769,7 @@ pub struct PluginRefreshResult {
     pub plugins_unchanged: i32,
 }
 
+#[derive(serde::Serialize)]
 pub struct VendorInfo {
     pub vendor: String,
     pub plugin_count: i32,
@@ -777,6 +780,7 @@ pub struct VendorInfo {
     pub plugins_by_format: std::collections::HashMap<String, i32>,
 }
 
+#[derive(serde::Serialize)]
 pub struct FormatInfo {
     pub format: String,
     pub plugin_count: i32,

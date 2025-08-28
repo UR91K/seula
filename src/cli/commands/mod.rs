@@ -8,6 +8,7 @@ pub mod system;
 pub mod config;
 pub mod search;
 pub mod scan;
+pub mod plugin;
 
 use crate::grpc::handlers::*;
 use crate::config::CONFIG;
@@ -69,6 +70,7 @@ pub use sample::*;
 pub use collection::*;
 pub use tag::*;
 pub use task::*;
+pub use plugin::*;
 pub use system::*;
 pub use config::*;
 pub use search::*;

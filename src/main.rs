@@ -196,6 +196,13 @@ async fn run_direct_command(command: &Commands, format: seula::cli::OutputFormat
                 .map_err(|e| -> Box<dyn std::error::Error> { e })?;
             subcommand.execute(&ctx).await.map_err(|e| e as Box<dyn std::error::Error>)
         }
+        Commands::Plugin { subcommand } => {
+            use seula::cli::commands::CliCommand;
+            let ctx = seula::cli::commands::CliContext::new(format, no_color)
+                .await
+                .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+            subcommand.execute(&ctx).await.map_err(|e| e as Box<dyn std::error::Error>)
+        }
         Commands::System { subcommand } => {
             use seula::cli::commands::CliCommand;
             let ctx = seula::cli::commands::CliContext::new(format, no_color)
