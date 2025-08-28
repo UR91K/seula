@@ -1,8 +1,8 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::ProjectCommands;
 use crate::cli::CliError;
-use crate::cli::output::{OutputFormatter, TableDisplay};
-use comfy_table::Table;
+use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
+
 use serde::Serialize;
 use uuid::Uuid;
 use chrono::Utc;
@@ -181,9 +181,15 @@ struct ProjectsList {
 }
 
 impl TableDisplay for ProjectsList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Path", "Tempo", "Key", "Time Sig"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Path".to_string(),
+            "Tempo".to_string(),
+            "Key".to_string(),
+            "Time Sig".to_string(),
+        ]);
         for row in &self.displayed {
             table.add_row(vec![
                 row.id.clone(),
@@ -249,9 +255,8 @@ impl ProjectDetails {
 }
 
 impl TableDisplay for ProjectDetails {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Field", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Field".to_string(), "Value".to_string()]);
         table.add_row(vec!["ID".to_string(), self.id.clone()]);
         table.add_row(vec!["Name".to_string(), self.name.clone()]);
         table.add_row(vec!["Path".to_string(), self.path.clone()]);
@@ -319,9 +324,8 @@ impl ProjectStatisticsDisplay {
 }
 
 impl TableDisplay for ProjectStatisticsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Metric", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Metric".to_string(), "Value".to_string()]);
         table.add_row(vec!["Total Projects".to_string(), self.total_projects.to_string()]);
         table.add_row(vec!["Projects with Audio".to_string(), self.projects_with_audio_files.to_string()]);
         table.add_row(vec!["Projects without Audio".to_string(), self.projects_without_audio_files.to_string()]);

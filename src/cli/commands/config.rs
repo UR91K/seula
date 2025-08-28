@@ -1,10 +1,9 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, ConfigCommands};
 use crate::config::{Config, CONFIG};
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
-use comfy_table::Table;
 use serde::Serialize;
 use std::process::Command;
 
@@ -160,9 +159,8 @@ pub struct ConfigDisplay {
 }
 
 impl TableDisplay for ConfigDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Setting", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Setting".to_string(), "Value".to_string()]);
 
         // Status
         let status_cell = if self.is_ready {
@@ -170,25 +168,25 @@ impl TableDisplay for ConfigDisplay {
         } else {
             colored_cell!("Setup Required", yellow)
         };
-        table_row!(table, "Status", status_cell);
-        table_row!(table, "Status Message", self.status_message);
+        simple_table_row!(table, "Status", status_cell);
+        simple_table_row!(table, "Status Message", self.status_message);
 
         // Basic settings
-        table_row!(table, "gRPC Port", self.grpc_port);
-        table_row!(table, "Log Level", self.log_level);
+        simple_table_row!(table, "gRPC Port", self.grpc_port);
+        simple_table_row!(table, "Log Level", self.log_level);
 
         // Paths
-        table_row!(table, "Database Path", self.database_path);
-        table_row!(table, "Live Database Dir", self.live_database_dir);
-        table_row!(table, "Media Storage Dir", self.media_storage_dir);
+        simple_table_row!(table, "Database Path", self.database_path);
+        simple_table_row!(table, "Live Database Dir", self.live_database_dir);
+        simple_table_row!(table, "Media Storage Dir", self.media_storage_dir);
 
         // Project paths
         if self.paths.is_empty() {
-            table_row!(table, "Project Paths", colored_cell!("None configured", red));
+            simple_table_row!(table, "Project Paths", colored_cell!("None configured", red));
         } else {
-            table_row!(table, "Project Paths", format!("{} configured", self.paths.len()));
+            simple_table_row!(table, "Project Paths", format!("{} configured", self.paths.len()));
             for (i, path) in self.paths.iter().enumerate() {
-                table_row!(table, format!("  Path {}", i + 1), path);
+                simple_table_row!(table, format!("  Path {}", i + 1), path);
             }
         }
 
@@ -196,12 +194,12 @@ impl TableDisplay for ConfigDisplay {
         let cover_art_limit = self.max_cover_art_size_mb
             .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
             .unwrap_or_else(|| "Default".to_string());
-        table_row!(table, "Max Cover Art Size", cover_art_limit);
+        simple_table_row!(table, "Max Cover Art Size", cover_art_limit);
 
         let audio_limit = self.max_audio_file_size_mb
             .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
             .unwrap_or_else(|| "Default".to_string());
-        table_row!(table, "Max Audio File Size", audio_limit);
+        simple_table_row!(table, "Max Audio File Size", audio_limit);
 
         table
     }
@@ -245,37 +243,36 @@ pub struct ConfigValidationResult {
 }
 
 impl TableDisplay for ConfigValidationResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Validation Result", "Details"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Validation Result".to_string(), "Details".to_string()]);
 
         let status_cell = if self.is_valid {
             colored_cell!("Valid", green)
         } else {
             colored_cell!("Invalid", red)
         };
-        table_row!(table, "Status", status_cell);
+        simple_table_row!(table, "Status", status_cell);
 
         // Errors
         if !self.errors.is_empty() {
-            table.add_row(vec!["", ""]);
-            table_row!(table, colored_cell!("Errors", red), "");
+            table.add_row(vec!["".to_string(), "".to_string()]);
+            simple_table_row!(table, colored_cell!("Errors", red), "");
             for error in &self.errors {
-                table_row!(table, "  •", error);
+                simple_table_row!(table, "  •", error);
             }
         }
 
         // Warnings
         if !self.warnings.is_empty() {
-            table.add_row(vec!["", ""]);
-            table_row!(table, colored_cell!("Warnings", yellow), "");
+            table.add_row(vec!["".to_string(), "".to_string()]);
+            simple_table_row!(table, colored_cell!("Warnings", yellow), "");
             for warning in &self.warnings {
-                table_row!(table, "  •", warning);
+                simple_table_row!(table, "  •", warning);
             }
         }
 
         if self.errors.is_empty() && self.warnings.is_empty() {
-            table_row!(table, "Result", "Configuration is valid with no issues");
+            simple_table_row!(table, "Result", "Configuration is valid with no issues");
         }
 
         table
@@ -306,22 +303,21 @@ pub struct ConfigEditResult {
 }
 
 impl TableDisplay for ConfigEditResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let status_cell = if self.success {
             colored_cell!("Success", green)
         } else {
             colored_cell!("Failed", red)
         };
-        table_row!(table, "Result", status_cell);
-        table_row!(table, "Message", self.message);
-        table_row!(table, "Config Path", self.config_path);
+        simple_table_row!(table, "Result", status_cell);
+        simple_table_row!(table, "Message", self.message);
+        simple_table_row!(table, "Config Path", self.config_path);
 
         if self.success {
-            table.add_row(vec!["", ""]);
-            table_row!(table, "Note", "After editing, run 'seula config validate' to check your changes");
+            table.add_row(vec!["".to_string(), "".to_string()]);
+            simple_table_row!(table, "Note", "After editing, run 'seula config validate' to check your changes");
         }
 
         table

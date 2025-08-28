@@ -1,12 +1,11 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, CollectionCommands};
 use crate::database::LiveSetDatabase;
 use crate::live_set::LiveSet;
 use crate::models::CollectionStatistics;
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
-use comfy_table::Table;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
@@ -209,24 +208,23 @@ pub struct CollectionsList {
 }
 
 impl TableDisplay for CollectionsList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Description"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["ID".to_string(), "Name".to_string(), "Description".to_string()]);
 
         for row in &self.displayed {
-            table.add_row(vec![
+            simple_table_row!(table, 
                 &row.id,
                 &row.name,
                 &row.description,
-            ]);
+            );
         }
 
         // Add summary row
-        table.add_row(vec![
-            "",
-            &format!("Total: {} collections", self.total_count),
-            "",
-        ]);
+        simple_table_row!(table,
+            "".to_string(),
+            format!("Total: {} collections", self.total_count),
+            "".to_string()
+        );
 
         table
     }
@@ -267,49 +265,48 @@ pub struct CollectionDetails {
 }
 
 impl TableDisplay for CollectionDetails {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         // Basic info
-        table_row!(table, "ID", self.id);
-        table_row!(table, "Name", self.name);
-        table_row!(table, "Description", self.description);
-        table_row!(table, "Notes", self.notes);
+        simple_table_row!(table, "ID", self.id);
+        simple_table_row!(table, "Name", self.name);
+        simple_table_row!(table, "Description", self.description);
+        simple_table_row!(table, "Notes", self.notes);
         
         // Statistics
-        table_row!(table, "Project Count", self.stats.project_count);
+        simple_table_row!(table, "Project Count", self.stats.project_count);
         if let Some(duration) = self.stats.total_duration_seconds {
-            table_row!(table, "Total Duration", format!("{:.1} seconds", duration));
+            simple_table_row!(table, "Total Duration", format!("{:.1} seconds", duration));
         }
         if let Some(tempo) = self.stats.average_tempo {
-            table_row!(table, "Average Tempo", format!("{:.1} BPM", tempo));
+            simple_table_row!(table, "Average Tempo", format!("{:.1} BPM", tempo));
         }
-        table_row!(table, "Total Plugins", self.stats.total_plugins);
-        table_row!(table, "Total Samples", self.stats.total_samples);
-        table_row!(table, "Total Tags", self.stats.total_tags);
+        simple_table_row!(table, "Total Plugins", self.stats.total_plugins);
+        simple_table_row!(table, "Total Samples", self.stats.total_samples);
+        simple_table_row!(table, "Total Tags", self.stats.total_tags);
         
         if let Some(key) = &self.stats.most_common_key {
-            table_row!(table, "Most Common Key", key);
+            simple_table_row!(table, "Most Common Key", key);
         }
         if let Some(time_sig) = &self.stats.most_common_time_signature {
-            table_row!(table, "Most Common Time Signature", time_sig);
+            simple_table_row!(table, "Most Common Time Signature", time_sig);
         }
 
         // Add separator
-        table.add_row(vec!["", ""]);
-        table.add_row(vec!["Projects in Collection", ""]);
-        table.add_row(vec!["", ""]);
+        table.add_row(vec!["".to_string(), "".to_string()]);
+        table.add_row(vec!["Projects in Collection".to_string(), "".to_string()]);
+        table.add_row(vec!["".to_string(), "".to_string()]);
         
         // Projects header
-        table.add_row(vec!["Project ID", "Name", "Tempo", "Duration"]);
+        table.add_row(vec!["Project ID".to_string(), "Name".to_string(), "Tempo".to_string(), "Duration".to_string()]);
         
         for project in &self.projects {
             table.add_row(vec![
-                &project.id,
-                &project.name,
-                &project.tempo.to_string(),
-                &project.duration,
+                project.id.clone(),
+                project.name.clone(),
+                project.tempo.to_string(),
+                project.duration.clone(),
             ]);
         }
 
@@ -348,14 +345,13 @@ pub struct CollectionCreateResult {
 }
 
 impl TableDisplay for CollectionCreateResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
-        table_row!(table, "Result", colored_cell!("Collection Created", green));
-        table_row!(table, "ID", self.id);
-        table_row!(table, "Name", self.name);
-        table_row!(table, "Description", self.description);
+        simple_table_row!(table, "Result", colored_cell!("Collection Created", green));
+        simple_table_row!(table, "ID", self.id);
+        simple_table_row!(table, "Name", self.name);
+        simple_table_row!(table, "Description", self.description);
 
         table
     }
@@ -379,9 +375,8 @@ pub struct CollectionProjectResult {
 }
 
 impl TableDisplay for CollectionProjectResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let result_text = if self.success {
             format!("{} Successfully", self.action)
@@ -395,10 +390,10 @@ impl TableDisplay for CollectionProjectResult {
             colored_cell!(result_text, red)
         };
 
-        table_row!(table, "Result", result_cell);
-        table_row!(table, "Collection ID", self.collection_id);
-        table_row!(table, "Project ID", self.project_id);
-        table_row!(table, "Action", self.action);
+        simple_table_row!(table, "Result", result_cell);
+        simple_table_row!(table, "Collection ID", self.collection_id);
+        simple_table_row!(table, "Project ID", self.project_id);
+        simple_table_row!(table, "Action", self.action);
 
         table
     }

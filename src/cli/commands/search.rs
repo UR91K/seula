@@ -1,8 +1,7 @@
 use crate::cli::commands::CliContext;
 use crate::cli::CliError;
-use crate::cli::output::{OutputFormatter, TableDisplay};
+use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
 use crate::database::search::{SearchQuery as DbSearchQuery, SearchResult as DbSearchResult};
-use comfy_table::Table;
 use serde::Serialize;
 
 pub struct SearchCommand {
@@ -93,17 +92,16 @@ struct SearchResultsDisplay {
 }
 
 impl TableDisplay for SearchResultsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec![
-            "ID",
-            "Name",
-            "Path",
-            "Tempo",
-            "Key",
-            "Time Sig",
-            "Rank",
-            "Reason",
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Path".to_string(),
+            "Tempo".to_string(),
+            "Key".to_string(),
+            "Time Sig".to_string(),
+            "Rank".to_string(),
+            "Reason".to_string(),
         ]);
         for row in &self.displayed {
             table.add_row(vec![

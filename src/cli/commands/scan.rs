@@ -1,5 +1,27 @@
 use crate::cli::commands::CliContext;
-use crate::cli::output::{OutputFormatter, MessageType};
+use crate::cli::output::{OutputFormatter, MessageType, SimpleTable, TableDisplay};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct ScanResults {
+    table: SimpleTable,
+}
+
+impl TableDisplay for ScanResults {
+    fn to_simple_table(&self) -> SimpleTable {
+        self.table.clone()
+    }
+    
+    fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), crate::cli::CliError> {
+        writer.write_record(["metric", "value"]).map_err(|e| -> crate::cli::CliError { e.into() })?;
+        for row in &self.table.rows {
+            if row.len() >= 2 {
+                writer.write_record([&row[0], &row[1]]).map_err(|e| -> crate::cli::CliError { e.into() })?;
+            }
+        }
+        Ok(())
+    }
+}
 use crate::cli::CliError;
 use crate::database::LiveSetDatabase;
 use crate::error::LiveSetError;
@@ -7,10 +29,10 @@ use crate::live_set::LiveSet;
 use crate::process_projects_with_progress;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::project_scanner::ProjectPathScanner;
-use comfy_table::Table;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
 use tokio::sync::Mutex as TokioMutex;
 
 pub struct ScanCommand {
@@ -222,10 +244,7 @@ impl ScanCommand {
     fn display_scan_results(&self, formatter: &OutputFormatter, success_count: usize, error_count: usize) {
         let total_processed = success_count + error_count;
 
-        let mut table = Table::new();
-        table
-            .set_header(vec!["Scan Results", "Count"])
-            .load_preset(comfy_table::presets::UTF8_FULL);
+        let mut table = SimpleTable::new(vec!["Scan Results".to_string(), "Count".to_string()]);
 
         table.add_row(vec![
             "Projects Processed".to_string(),
@@ -245,7 +264,8 @@ impl ScanCommand {
         }
 
         formatter.print_message("\nScan Complete", MessageType::Success);
-        println!("{}", table);
+        let results = ScanResults { table };
+        let _ = formatter.print(&results);
 
         if success_count > 0 {
             formatter.print_message(

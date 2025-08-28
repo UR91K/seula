@@ -1,9 +1,31 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::{SystemCommands, WatchAction};
 use crate::cli::CliError;
+use crate::cli::output::{SimpleTable, TableDisplay, OutputFormatter};
 use colored::Colorize;
-use comfy_table::Table;
+use serde::Serialize;
 use std::path::PathBuf;
+
+#[derive(Serialize)]
+struct SystemInfo {
+    table: SimpleTable,
+}
+
+impl TableDisplay for SystemInfo {
+    fn to_simple_table(&self) -> SimpleTable {
+        self.table.clone()
+    }
+    
+    fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
+        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
+        for row in &self.table.rows {
+            if row.len() >= 2 {
+                writer.write_record([&row[0], &row[1]]).map_err(|e| -> CliError { e.into() })?;
+            }
+        }
+        Ok(())
+    }
+}
 
 #[async_trait::async_trait]
 impl CliCommand for SystemCommands {
@@ -22,33 +44,32 @@ impl SystemCommands {
     async fn show_info(&self, ctx: &CliContext) -> Result<(), CliError> {
         println!("{}", "System Information".bold().underline());
 
-        let mut table = Table::new();
-        table
-            .set_header(vec!["Property", "Value"])
-            .load_preset(comfy_table::presets::UTF8_FULL);
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         // Add configuration info
         table.add_row(vec![
-            "Database Path",
-            &ctx.config.database_path.clone().unwrap_or_else(|| "<default>".to_string()),
+            "Database Path".to_string(),
+            ctx.config.database_path.clone().unwrap_or_else(|| "<default>".to_string()),
         ]);
 
         table.add_row(vec![
-            "Project Paths",
-            &ctx.config.paths.len().to_string(),
+            "Project Paths".to_string(),
+            ctx.config.paths.len().to_string(),
         ]);
 
         table.add_row(vec![
-            "gRPC Port",
-            &ctx.config.grpc_port.to_string(),
+            "gRPC Port".to_string(),
+            ctx.config.grpc_port.to_string(),
         ]);
 
         table.add_row(vec![
-            "Log Level",
-            &ctx.config.log_level,
+            "Log Level".to_string(),
+            ctx.config.log_level.clone(),
         ]);
 
-        println!("{}", table);
+        let info = SystemInfo { table };
+        let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
+        formatter.print(&info)?;
         Ok(())
     }
 
@@ -57,26 +78,25 @@ impl SystemCommands {
 
         let db = ctx.db.lock().await;
 
-        let mut table = Table::new();
-        table
-            .set_header(vec!["Statistic", "Value"])
-            .load_preset(comfy_table::presets::UTF8_FULL);
+        let mut table = SimpleTable::new(vec!["Statistic".to_string(), "Value".to_string()]);
 
         let (projects, _plugins, samples, collections, tags, tasks) =
             db.get_basic_counts().unwrap_or((0, 0, 0, 0, 0, 0));
-        table.add_row(vec!["Total Projects", &projects.to_string()]);
-        table.add_row(vec!["Total Samples", &samples.to_string()]);
-        table.add_row(vec!["Total Collections", &collections.to_string()]);
-        table.add_row(vec!["Total Tags", &tags.to_string()]);
-        table.add_row(vec!["Total Tasks", &tasks.to_string()]);
+        table.add_row(vec!["Total Projects".to_string(), projects.to_string()]);
+        table.add_row(vec!["Total Samples".to_string(), samples.to_string()]);
+        table.add_row(vec!["Total Collections".to_string(), collections.to_string()]);
+        table.add_row(vec!["Total Tags".to_string(), tags.to_string()]);
+        table.add_row(vec!["Total Tasks".to_string(), tasks.to_string()]);
 
         // Add more statistics as needed
         table.add_row(vec![
-            "Database Path",
-            &ctx.config.database_path.clone().unwrap_or_else(|| "<default>".to_string()),
+            "Database Path".to_string(),
+            ctx.config.database_path.clone().unwrap_or_else(|| "<default>".to_string()),
         ]);
 
-        println!("{}", table);
+        let stats = SystemInfo { table };
+        let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
+        formatter.print(&stats)?;
         Ok(())
     }
 

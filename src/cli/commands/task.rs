@@ -1,11 +1,10 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TaskCommands};
 use crate::database::tasks::TaskAnalytics;
 use crate::database::LiveSetDatabase;
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
-use comfy_table::Table;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
@@ -202,9 +201,8 @@ pub struct TasksList {
 }
 
 impl TableDisplay for TasksList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Description", "Status", "Created"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["ID".to_string(), "Description".to_string(), "Status".to_string(), "Created".to_string()]);
 
         for row in &self.displayed {
             let status_cell = match row.status {
@@ -219,10 +217,10 @@ impl TableDisplay for TasksList {
                 .unwrap_or_else(|| "Unknown".to_string());
 
             table.add_row(vec![
-                &row.id,
-                &row.description,
-                &status_cell,
-                &created_date,
+                row.id.clone(),
+                row.description.clone(),
+                status_cell,
+                created_date,
             ]);
         }
 
@@ -240,10 +238,10 @@ impl TableDisplay for TasksList {
         };
 
         table.add_row(vec![
-            "",
-            &format!("Total: {} tasks", self.total_count),
-            &format!("{} | {}", project_info, status_info),
-            "",
+            "".to_string(),
+            format!("Total: {} tasks", self.total_count),
+            format!("{} | {}", project_info, status_info),
+            "".to_string(),
         ]);
 
         table
@@ -275,9 +273,8 @@ pub struct TaskCreateResult {
 }
 
 impl TableDisplay for TaskCreateResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let result_cell = if self.success {
             colored_cell!("Task Created", green)
@@ -285,10 +282,10 @@ impl TableDisplay for TaskCreateResult {
             colored_cell!("Failed", red)
         };
 
-        table_row!(table, "Result", result_cell);
-        table_row!(table, "Task ID", self.id);
-        table_row!(table, "Project ID", self.project_id);
-        table_row!(table, "Description", self.description);
+        simple_table_row!(table, "Result", result_cell);
+        simple_table_row!(table, "Task ID", self.id);
+        simple_table_row!(table, "Project ID", self.project_id);
+        simple_table_row!(table, "Description", self.description);
 
         table
     }
@@ -314,9 +311,8 @@ pub struct TaskActionResult {
 }
 
 impl TableDisplay for TaskActionResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let result_text = if self.success {
             format!("{} Successful", self.action)
@@ -330,12 +326,12 @@ impl TableDisplay for TaskActionResult {
             colored_cell!(result_text, red)
         };
 
-        table_row!(table, "Result", result_cell);
-        table_row!(table, "Task ID", self.id);
-        table_row!(table, "Project ID", self.project_id);
-        table_row!(table, "Description", self.description);
-        table_row!(table, "Action", self.action);
-        table_row!(table, "Message", self.message);
+        simple_table_row!(table, "Result", result_cell);
+        simple_table_row!(table, "Task ID", self.id);
+        simple_table_row!(table, "Project ID", self.project_id);
+        simple_table_row!(table, "Description", self.description);
+        simple_table_row!(table, "Action", self.action);
+        simple_table_row!(table, "Message", self.message);
 
         table
     }

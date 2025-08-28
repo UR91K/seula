@@ -1,10 +1,10 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TagCommands};
 use crate::database::tags::{TagStatistics, TagUsageInfo};
 use crate::database::LiveSetDatabase;
 use crate::live_set::LiveSet;
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use comfy_table::Table;
 use serde::Serialize;
@@ -224,9 +224,8 @@ pub struct TagsList {
 }
 
 impl TableDisplay for TagsList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Projects", "Usage %"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["ID".to_string(), "Name".to_string(), "Projects".to_string(), "Usage %".to_string()]);
 
         for row in &self.displayed {
             let usage_cell = if row.project_count > 0 {
@@ -236,19 +235,19 @@ impl TableDisplay for TagsList {
             };
 
             table.add_row(vec![
-                &row.id,
-                &row.name,
-                &row.project_count.to_string(),
-                &usage_cell,
+                row.id.clone(),
+                row.name.clone(),
+                row.project_count.to_string(),
+                usage_cell,
             ]);
         }
 
         // Add summary row
         table.add_row(vec![
-            "",
-            &format!("Total: {} tags", self.total_count),
-            "",
-            "",
+            "".to_string(),
+            format!("Total: {} tags", self.total_count),
+            "".to_string(),
+            "".to_string(),
         ]);
 
         table
@@ -278,9 +277,8 @@ pub struct TagCreateResult {
 }
 
 impl TableDisplay for TagCreateResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let result_cell = if self.success {
             colored_cell!("Tag Created", green)
@@ -288,9 +286,9 @@ impl TableDisplay for TagCreateResult {
             colored_cell!("Failed", red)
         };
 
-        table_row!(table, "Result", result_cell);
-        table_row!(table, "ID", self.id);
-        table_row!(table, "Name", self.name);
+        simple_table_row!(table, "Result", result_cell);
+        simple_table_row!(table, "ID", self.id);
+        simple_table_row!(table, "Name", self.name);
 
         table
     }
@@ -314,9 +312,8 @@ pub struct TagAssignResult {
 }
 
 impl TableDisplay for TagAssignResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
         let result_text = if self.success {
             format!("{} Successfully", self.action)
@@ -330,11 +327,11 @@ impl TableDisplay for TagAssignResult {
             colored_cell!(result_text, red)
         };
 
-        table_row!(table, "Result", result_cell);
-        table_row!(table, "Project ID", self.project_id);
-        table_row!(table, "Tag ID", self.tag_id);
-        table_row!(table, "Tag Name", self.tag_name);
-        table_row!(table, "Action", self.action);
+        simple_table_row!(table, "Result", result_cell);
+        simple_table_row!(table, "Project ID", self.project_id);
+        simple_table_row!(table, "Tag ID", self.tag_id);
+        simple_table_row!(table, "Tag Name", self.tag_name);
+        simple_table_row!(table, "Action", self.action);
 
         table
     }
@@ -368,38 +365,43 @@ pub struct TagSearchResults {
 }
 
 impl TableDisplay for TagSearchResults {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        
+    fn to_simple_table(&self) -> SimpleTable {
         if let Some(ref tag_name) = self.tag_name {
-            table.set_header(vec!["Project ID", "Name", "Tempo", "Key", "Path"]);
+            let mut table = SimpleTable::new(vec![
+                "Project ID".to_string(),
+                "Name".to_string(),
+                "Tempo".to_string(),
+                "Key".to_string(),
+                "Path".to_string(),
+            ]);
             
             // Add tag info header
             table.add_row(vec![
-                &format!("Tag: {}", tag_name),
-                &format!("{} projects found", self.total_count),
-                "",
-                "",
-                "",
+                format!("Tag: {}", tag_name),
+                format!("{} projects found", self.total_count),
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
             ]);
-            table.add_row(vec!["", "", "", "", ""]); // Separator
+            table.add_row(vec!["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()]); // Separator
 
             for project in &self.projects {
                 table.add_row(vec![
-                    &project.id,
-                    &project.name,
-                    &project.tempo.to_string(),
-                    &project.key,
-                    &project.path,
+                    project.id.clone(),
+                    project.name.clone(),
+                    project.tempo.to_string(),
+                    project.key.clone(),
+                    project.path.clone(),
                 ]);
             }
+            
+            table
         } else {
-            table.set_header(vec!["Search Result", "Details"]);
-            table_row!(table, "Query", self.query);
-            table_row!(table, colored_cell!("Result", red), "No tag found matching query");
+            let mut table = SimpleTable::new(vec!["Search Result".to_string(), "Details".to_string()]);
+            simple_table_row!(table, "Query", self.query);
+            simple_table_row!(table, colored_cell!("Result", red), "No tag found matching query");
+            table
         }
-
-        table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {

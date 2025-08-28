@@ -1,11 +1,11 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, SampleCommands};
 use crate::database::LiveSetDatabase;
 use crate::models::Sample;
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
-use comfy_table::Table;
+
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
@@ -160,9 +160,13 @@ pub struct SamplesList {
 }
 
 impl TableDisplay for SamplesList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Path", "Status"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Path".to_string(),
+            "Status".to_string(),
+        ]);
 
         for row in &self.displayed {
             let status_cell = match row.status {
@@ -171,21 +175,21 @@ impl TableDisplay for SamplesList {
                 _ => row.status.to_string(),
             };
 
-            table.add_row(vec![
+            simple_table_row!(table,
                 &row.id[..8], // Show only first 8 chars of UUID
                 &row.name,
                 &row.path,
-                &status_cell,
-            ]);
+                &status_cell
+            );
         }
 
         // Add summary row
-        table.add_row(vec![
+        simple_table_row!(table,
             "",
             &format!("Total: {} samples", self.total_count),
             &format!("Showing {}-{} of {}", self.offset + 1, self.offset + self.displayed.len(), self.total_count),
-            "",
-        ]);
+            ""
+        );
 
         table
     }
@@ -214,9 +218,13 @@ pub struct SamplesSearchResults {
 }
 
 impl TableDisplay for SamplesSearchResults {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Path", "Status"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Path".to_string(),
+            "Status".to_string(),
+        ]);
 
         for row in &self.displayed {
             let status_cell = match row.status {
@@ -225,21 +233,21 @@ impl TableDisplay for SamplesSearchResults {
                 _ => row.status.to_string(),
             };
 
-            table.add_row(vec![
+            simple_table_row!(table,
                 &row.id[..8],
                 &row.name,
                 &row.path,
-                &status_cell,
-            ]);
+                &status_cell
+            );
         }
 
         // Add search summary
-        table.add_row(vec![
+        simple_table_row!(table,
             "",
             &format!("Search: '{}' - {} results", self.query, self.total_count),
             "",
-            "",
-        ]);
+            ""
+        );
 
         table
     }
@@ -268,33 +276,32 @@ pub struct SampleStatsDisplay {
 }
 
 impl TableDisplay for SampleStatsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Category", "Metric", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Category".to_string(), "Metric".to_string(), "Value".to_string()]);
 
         // Basic stats
-        table_row!(table, "Overview", "Total Samples", self.stats.total_samples);
-        table_row!(table, "Overview", "Present Samples", self.stats.present_samples);
-        table_row!(table, "Overview", "Missing Samples", self.stats.missing_samples);
-        table_row!(table, "Overview", "Unique Paths", self.stats.unique_paths);
+        simple_table_row!(table, "Overview", "Total Samples", self.stats.total_samples);
+        simple_table_row!(table, "Overview", "Present Samples", self.stats.present_samples);
+        simple_table_row!(table, "Overview", "Missing Samples", self.stats.missing_samples);
+        simple_table_row!(table, "Overview", "Unique Paths", self.stats.unique_paths);
 
         // Storage info
         let total_gb = self.stats.total_estimated_size_bytes as f64 / 1_000_000_000.0;
-        table_row!(table, "Storage", "Estimated Total Size", format!("{:.2} GB", total_gb));
+        simple_table_row!(table, "Storage", "Estimated Total Size", format!("{:.2} GB", total_gb));
 
         // Usage distribution
-        table_row!(table, "Usage", "Most Used (≥5)", self.analytics.most_used_samples_count);
-        table_row!(table, "Usage", "Moderately Used (2-4)", self.analytics.moderately_used_samples_count);
-        table_row!(table, "Usage", "Rarely Used (=1)", self.analytics.rarely_used_samples_count);
-        table_row!(table, "Usage", "Unused (=0)", self.analytics.unused_samples_count);
+        simple_table_row!(table, "Usage", "Most Used (≥5)", self.analytics.most_used_samples_count);
+        simple_table_row!(table, "Usage", "Moderately Used (2-4)", self.analytics.moderately_used_samples_count);
+        simple_table_row!(table, "Usage", "Rarely Used (=1)", self.analytics.rarely_used_samples_count);
+        simple_table_row!(table, "Usage", "Unused (=0)", self.analytics.unused_samples_count);
 
         // Presence percentages
-        table_row!(table, "Presence", "Present %", format!("{}%", self.analytics.present_samples_percentage));
-        table_row!(table, "Presence", "Missing %", format!("{}%", self.analytics.missing_samples_percentage));
+        simple_table_row!(table, "Presence", "Present %", format!("{}%", self.analytics.present_samples_percentage));
+        simple_table_row!(table, "Presence", "Missing %", format!("{}%", self.analytics.missing_samples_percentage));
 
         // Extension breakdown
         for (ext, analytics) in &self.analytics.extensions {
-            table_row!(table, "Extensions", format!("{} files", ext), analytics.count);
+            simple_table_row!(table, "Extensions", format!("{} files", ext), analytics.count);
         }
 
         table
@@ -328,14 +335,13 @@ pub struct SamplePresenceCheckResult {
 }
 
 impl TableDisplay for SamplePresenceCheckResult {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Check Result", "Count"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Check Result".to_string(), "Count".to_string()]);
 
-        table_row!(table, "Total Checked", self.total_checked);
-        table_row!(table, colored_cell!("Now Present", green), self.now_present);
-        table_row!(table, colored_cell!("Now Missing", red), self.now_missing);
-        table_row!(table, "Unchanged", self.unchanged);
+        simple_table_row!(table, "Total Checked", self.total_checked);
+        simple_table_row!(table, colored_cell!("Now Present", green), self.now_present);
+        simple_table_row!(table, colored_cell!("Now Missing", red), self.now_missing);
+        simple_table_row!(table, "Unchanged", self.unchanged);
 
         table
     }

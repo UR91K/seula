@@ -1,12 +1,12 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, PluginCommands};
 use crate::database::LiveSetDatabase;
 use crate::database::plugins::{PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
 use crate::models::{Plugin, GrpcPlugin};
-use crate::{colored_cell, table_row};
+use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
-use comfy_table::Table;
+
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
@@ -229,9 +229,16 @@ pub struct PluginsList {
 }
 
 impl TableDisplay for PluginsList {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Vendor", "Format", "Status", "Usage", "Projects"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Vendor".to_string(),
+            "Format".to_string(),
+            "Status".to_string(),
+            "Usage".to_string(),
+            "Projects".to_string(),
+        ]);
 
         for row in &self.displayed {
             let status_cell = if row.installed {
@@ -240,27 +247,27 @@ impl TableDisplay for PluginsList {
                 colored_cell!("Missing", red)
             };
 
-            table.add_row(vec![
+            simple_table_row!(table,
                 &row.id[..8], // Show only first 8 chars of UUID
                 &row.name,
                 &row.vendor,
                 &row.format,
                 &status_cell,
                 &row.usage_count.to_string(),
-                &row.project_count.to_string(),
-            ]);
+                &row.project_count.to_string()
+            );
         }
 
         // Add summary row
-        table.add_row(vec![
+        simple_table_row!(table,
             "",
             &format!("Total: {} plugins", self.total_count),
             &format!("Showing {}-{} of {}", self.offset + 1, self.offset + self.displayed.len(), self.total_count),
             "",
             "",
             "",
-            "",
-        ]);
+            ""
+        );
 
         table
     }
@@ -292,9 +299,14 @@ pub struct PluginsSearchResults {
 }
 
 impl TableDisplay for PluginsSearchResults {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["ID", "Name", "Vendor", "Format", "Status"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Vendor".to_string(),
+            "Format".to_string(),
+            "Status".to_string(),
+        ]);
 
         for row in &self.displayed {
             let status_cell = if row.installed {
@@ -303,23 +315,23 @@ impl TableDisplay for PluginsSearchResults {
                 colored_cell!("Missing", red)
             };
 
-            table.add_row(vec![
+            simple_table_row!(table,
                 &row.id[..8],
                 &row.name,
                 &row.vendor,
                 &row.format,
-                &status_cell,
-            ]);
+                &status_cell
+            );
         }
 
         // Add search summary
-        table.add_row(vec![
+        simple_table_row!(table,
             "",
             &format!("Search: '{}' - {} results", self.query, self.total_count),
             "",
             "",
-            "",
-        ]);
+            ""
+        );
 
         table
     }
@@ -350,27 +362,26 @@ pub struct PluginDetails {
 }
 
 impl TableDisplay for PluginDetails {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Property", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()]);
 
-        table_row!(table, "ID", self.plugin.id);
-        table_row!(table, "Name", self.plugin.name);
-        table_row!(table, "Vendor", self.plugin.vendor.as_deref().unwrap_or("Unknown"));
-        table_row!(table, "Format", self.plugin.plugin_format.to_string());
-        table_row!(table, "Dev Identifier", self.plugin.dev_identifier);
+        simple_table_row!(table, "ID", self.plugin.id);
+        simple_table_row!(table, "Name", self.plugin.name);
+        simple_table_row!(table, "Vendor", self.plugin.vendor.as_deref().unwrap_or("Unknown"));
+        simple_table_row!(table, "Format", self.plugin.plugin_format.to_string());
+        simple_table_row!(table, "Dev Identifier", self.plugin.dev_identifier);
         
         let status = if self.plugin.installed {
             colored_cell!("Installed", green)
         } else {
             colored_cell!("Missing", red)
         };
-        table_row!(table, "Status", status);
+        simple_table_row!(table, "Status", status);
         
-        table_row!(table, "Version", self.plugin.version.as_deref().unwrap_or("Unknown"));
-        table_row!(table, "SDK Version", self.plugin.sdk_version.as_deref().unwrap_or("Unknown"));
-        table_row!(table, "Usage Count", self.usage_count);
-        table_row!(table, "Used in Projects", self.project_count);
+        simple_table_row!(table, "Version", self.plugin.version.as_deref().unwrap_or("Unknown"));
+        simple_table_row!(table, "SDK Version", self.plugin.sdk_version.as_deref().unwrap_or("Unknown"));
+        simple_table_row!(table, "Usage Count", self.usage_count);
+        simple_table_row!(table, "Used in Projects", self.project_count);
 
         table
     }
@@ -397,24 +408,23 @@ pub struct PluginStatsDisplay {
 }
 
 impl TableDisplay for PluginStatsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Category", "Metric", "Value"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Category".to_string(), "Metric".to_string(), "Value".to_string()]);
 
         // Basic stats
-        table_row!(table, "Overview", "Total Plugins", self.stats.total_plugins);
-        table_row!(table, "Overview", "Installed Plugins", self.stats.installed_plugins);
-        table_row!(table, "Overview", "Missing Plugins", self.stats.missing_plugins);
-        table_row!(table, "Overview", "Unique Vendors", self.stats.unique_vendors);
+        simple_table_row!(table, "Overview", "Total Plugins", self.stats.total_plugins);
+        simple_table_row!(table, "Overview", "Installed Plugins", self.stats.installed_plugins);
+        simple_table_row!(table, "Overview", "Missing Plugins", self.stats.missing_plugins);
+        simple_table_row!(table, "Overview", "Unique Vendors", self.stats.unique_vendors);
 
         // Format breakdown
         for (format, count) in &self.stats.plugins_by_format {
-            table_row!(table, "Formats", format, count);
+            simple_table_row!(table, "Formats", format, count);
         }
 
         // Top vendors
         for (vendor, count) in &self.stats.plugins_by_vendor {
-            table_row!(table, "Top Vendors", vendor, count);
+            simple_table_row!(table, "Top Vendors", vendor, count);
         }
 
         table
@@ -436,14 +446,13 @@ pub struct PluginRefreshDisplay {
 }
 
 impl TableDisplay for PluginRefreshDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Refresh Result", "Count"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec!["Refresh Result".to_string(), "Count".to_string()]);
 
-        table_row!(table, "Total Checked", self.result.total_plugins_checked);
-        table_row!(table, colored_cell!("Now Installed", green), self.result.plugins_now_installed);
-        table_row!(table, colored_cell!("Now Missing", red), self.result.plugins_now_missing);
-        table_row!(table, "Unchanged", self.result.plugins_unchanged);
+        simple_table_row!(table, "Total Checked", self.result.total_plugins_checked);
+        simple_table_row!(table, colored_cell!("Now Installed", green), self.result.plugins_now_installed);
+        simple_table_row!(table, colored_cell!("Now Missing", red), self.result.plugins_now_missing);
+        simple_table_row!(table, "Unchanged", self.result.plugins_unchanged);
 
         table
     }
@@ -465,19 +474,25 @@ pub struct PluginVendorsDisplay {
 }
 
 impl TableDisplay for PluginVendorsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Vendor", "Total", "Installed", "Missing", "Usage", "Projects"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "Vendor".to_string(),
+            "Total".to_string(),
+            "Installed".to_string(),
+            "Missing".to_string(),
+            "Usage".to_string(),
+            "Projects".to_string(),
+        ]);
 
         for vendor in &self.vendors {
-            table.add_row(vec![
+            simple_table_row!(table,
                 vendor.vendor.as_str(),
                 &vendor.plugin_count.to_string(),
                 &vendor.installed_plugins.to_string(),
                 &vendor.missing_plugins.to_string(),
                 &vendor.total_usage_count.to_string(),
-                &vendor.unique_projects_using.to_string(),
-            ]);
+                &vendor.unique_projects_using.to_string()
+            );
         }
 
         table
@@ -506,19 +521,25 @@ pub struct PluginFormatsDisplay {
 }
 
 impl TableDisplay for PluginFormatsDisplay {
-    fn to_table(&self) -> Table {
-        let mut table = Table::new();
-        table.set_header(vec!["Format", "Total", "Installed", "Missing", "Usage", "Projects"]);
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "Format".to_string(),
+            "Total".to_string(),
+            "Installed".to_string(),
+            "Missing".to_string(),
+            "Usage".to_string(),
+            "Projects".to_string(),
+        ]);
 
         for format in &self.formats {
-            table.add_row(vec![
+            simple_table_row!(table,
                 format.format.as_str(),
                 &format.plugin_count.to_string(),
                 &format.installed_plugins.to_string(),
                 &format.missing_plugins.to_string(),
                 &format.total_usage_count.to_string(),
-                &format.unique_projects_using.to_string(),
-            ]);
+                &format.unique_projects_using.to_string()
+            );
         }
 
         table
