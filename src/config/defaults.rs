@@ -5,7 +5,7 @@ use dirs;
 pub const DEFAULT_GRPC_PORT: u16 = 50051;
 
 /// Default log level
-pub const DEFAULT_LOG_LEVEL: &str = "info";
+pub const DEFAULT_LOG_LEVEL: &str = "error";
 
 /// Default maximum cover art size in MB
 pub const DEFAULT_MAX_COVER_ART_SIZE_MB: u32 = 10;
