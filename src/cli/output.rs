@@ -4,6 +4,7 @@ use colored::Colorize;
 use serde::Serialize;
 use std::cmp;
 use terminal_size::{Width, terminal_size};
+use unicode_width::{UnicodeWidthStr, UnicodeWidthChar};
 
 /// Output formatter for CLI results
 pub struct OutputFormatter {
@@ -62,17 +63,17 @@ impl OutputFormatter {
         let num_cols = table_data.headers.len();
         let mut col_widths = vec![0; num_cols];
 
-        // Find max width for each column
+        // Find max width for each column using Unicode-aware width calculation
         for (i, header) in table_data.headers.iter().enumerate() {
-            col_widths[i] = cmp::max(col_widths[i], header.len());
+            col_widths[i] = cmp::max(col_widths[i], header.width());
         }
 
         for row in &table_data.rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < col_widths.len() {
-                    // Strip color codes for width calculation
+                    // Strip color codes for width calculation and use Unicode-aware width
                     let plain_text = strip_ansi_codes(cell);
-                    col_widths[i] = cmp::max(col_widths[i], plain_text.len());
+                    col_widths[i] = cmp::max(col_widths[i], plain_text.width());
                 }
             }
         }
@@ -125,12 +126,13 @@ impl OutputFormatter {
                 let width = col_widths[i];
                 let plain_text = strip_ansi_codes(cell);
                 
-                if plain_text.len() > width {
-                    // Truncate with ellipsis
+                if plain_text.width() > width {
+                    // Truncate with ellipsis using Unicode-aware truncation
                     let truncated = if width > 3 {
-                        format!("{}...", &plain_text[..width-3])
+                        let truncated_text = truncate_to_width(&plain_text, width - 3);
+                        format!("{}...", truncated_text)
                     } else {
-                        plain_text[..width].to_string()
+                        truncate_to_width(&plain_text, width)
                     };
                     
                     if self.no_color || !cell.contains('\x1b') {
@@ -144,8 +146,8 @@ impl OutputFormatter {
                     if self.no_color || !cell.contains('\x1b') {
                         output.push_str(&format!("{:<width$}", plain_text, width = width));
                     } else {
-                        // For colored text, we need to pad manually
-                        let padding = width - plain_text.len();
+                        // For colored text, we need to pad manually using Unicode-aware width
+                        let padding = width - plain_text.width();
                         output.push_str(cell);
                         output.push_str(&" ".repeat(padding));
                     }
@@ -254,6 +256,34 @@ macro_rules! colored_cell {
 /// Check if colors should be used
 pub fn should_use_color() -> bool {
     !std::env::var("NO_COLOR").is_ok() && colored::control::SHOULD_COLORIZE.should_colorize()
+}
+
+/// Truncate a string to a maximum display width, respecting Unicode character boundaries
+/// 
+/// This function properly handles Unicode characters that may have different display widths:
+/// - Regular ASCII characters: 1 column each
+/// - CJK characters (Chinese, Japanese, Korean): 2 columns each  
+/// - Emojis: typically 2 columns each
+/// - Combining characters: 0 columns (they combine with the previous character)
+/// - Full-width characters: 2 columns each
+fn truncate_to_width(text: &str, max_width: usize) -> String {
+    if text.width() <= max_width {
+        return text.to_string();
+    }
+    
+    let mut result = String::new();
+    let mut current_width = 0;
+    
+    for ch in text.chars() {
+        let char_width = ch.width().unwrap_or(0);
+        if current_width + char_width > max_width {
+            break;
+        }
+        result.push(ch);
+        current_width += char_width;
+    }
+    
+    result
 }
 
 /// Strip ANSI escape codes from a string to get plain text length
