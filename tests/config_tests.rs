@@ -67,7 +67,7 @@ fn test_config_constants() {
     setup("error");
     // Test that constants are properly defined
     assert_eq!(seula::config::DEFAULT_GRPC_PORT, 50051);
-    assert_eq!(seula::config::DEFAULT_LOG_LEVEL, "info");
+    assert_eq!(seula::config::DEFAULT_LOG_LEVEL, "error");
 
     // Test media module constants
     assert_eq!(

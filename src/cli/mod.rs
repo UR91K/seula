@@ -464,6 +464,27 @@ pub enum PluginCommands {
 
     /// List plugin formats with statistics
     Formats,
+
+    /// Scan the plugins installed on this system by loading their binaries
+    ///
+    /// Runs the out-of-process scanner. Results are printed, not persisted.
+    ScanSystem {
+        /// Directories to search. Defaults to the configured vst_search_paths.
+        #[arg(long, value_name = "DIR")]
+        paths: Vec<String>,
+
+        /// Seconds a single plugin may take before the scanner gives up on it
+        #[arg(long)]
+        timeout: Option<u64>,
+
+        /// Show only the plugins that failed to scan
+        #[arg(long)]
+        failures_only: bool,
+
+        /// Limit the number of rows displayed
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
 }
 
 pub use commands::*;

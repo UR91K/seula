@@ -1,14 +1,21 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
-use crate::cli::{CliError, PluginCommands};
+use crate::cli::{CliError, OutputFormat, PluginCommands};
 use crate::database::LiveSetDatabase;
 use crate::database::plugins::{PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
 use crate::models::{Plugin, GrpcPlugin};
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 
+use crate::config::CONFIG;
+use crate::scan::plugins::{ScanReport, scan_system};
+use vst_meta::protocol::Outcome;
+
 use serde::Serialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex as TokioMutex;
 
 pub struct PluginCommand;
@@ -55,6 +62,24 @@ impl CliCommand for PluginCommands {
             PluginCommands::Formats => {
                 let formats = self.get_plugin_formats(&ctx.db).await?;
                 formatter.print(&formats)?;
+            }
+            PluginCommands::ScanSystem { paths, timeout, failures_only, limit } => {
+                let scan = self.scan_system(paths, *timeout, *failures_only, *limit)?;
+                formatter.print(&scan)?;
+                // The summary would be truncated as a table row, and JSON/CSV already
+                // carry these counts as fields.
+                if matches!(ctx.output_format, OutputFormat::Table) {
+                    if scan.truncated {
+                        formatter.print_message(
+                            &format!("Showing {} of {} rows -- raise --limit to see the rest.", scan.displayed.len(), scan.total_rows),
+                            MessageType::Info,
+                        );
+                    }
+                    formatter.print_message(
+                        &scan.summary(),
+                        if scan.failed > 0 { MessageType::Warning } else { MessageType::Success },
+                    );
+                }
             }
         }
 
@@ -206,6 +231,205 @@ impl PluginCommands {
             formats,
             total_count: total_count as usize,
         })
+    }
+}
+
+impl PluginCommands {
+    /// Run the out-of-process scanner over the system's plugin directories.
+    fn scan_system(
+        &self,
+        paths: &[String],
+        timeout: Option<u64>,
+        failures_only: bool,
+        limit: usize,
+    ) -> Result<SystemScanDisplay, CliError> {
+        let config = CONFIG
+            .as_ref()
+            .map_err(|e| -> CliError { format!("Failed to load config: {}", e).into() })?;
+
+        let roots: Vec<PathBuf> = if paths.is_empty() {
+            config.vst_search_paths.iter().map(PathBuf::from).collect()
+        } else {
+            paths.iter().map(PathBuf::from).collect()
+        };
+
+        let timeout = Duration::from_secs(timeout.unwrap_or(config.vst_scan_timeout_secs));
+
+        let report =
+            scan_system(&roots, timeout).map_err(|e| -> CliError { Box::new(e) })?;
+
+        Ok(SystemScanDisplay::new(report, failures_only, limit))
+    }
+}
+
+#[derive(Serialize)]
+pub struct SystemScanRow {
+    pub path: String,
+    pub name: String,
+    pub vendor: String,
+    pub format: String,
+    /// Failure classification, or `None` when the scan succeeded.
+    pub error_type: Option<String>,
+    pub detail: String,
+}
+
+/// Result of `plugin scan-system`.
+#[derive(Serialize)]
+pub struct SystemScanDisplay {
+    pub displayed: Vec<SystemScanRow>,
+    /// Paths attempted.
+    pub scanned: usize,
+    /// Plugin records extracted. Exceeds `succeeded` when VST2 shells expand.
+    pub plugin_count: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    /// Worker restarts. Non-zero means plugins here crashed or hung the scanner --
+    /// which is the whole reason it runs out of process.
+    pub restarts: usize,
+    pub budget_exhausted: bool,
+    /// Failure counts by kind, most common first.
+    pub failures_by_type: Vec<(String, usize)>,
+    /// Rows before `--limit` was applied.
+    pub total_rows: usize,
+    pub truncated: bool,
+}
+
+impl SystemScanDisplay {
+    fn new(report: ScanReport, failures_only: bool, limit: usize) -> Self {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for result in &report.results {
+            if let Some(error_type) = result.error_type() {
+                *counts.entry(error_type.to_string()).or_insert(0) += 1;
+            }
+        }
+        let mut failures_by_type: Vec<(String, usize)> = counts.into_iter().collect();
+        failures_by_type.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+        let mut rows = Vec::new();
+        for result in &report.results {
+            let path = result.path.display().to_string();
+            match &result.outcome {
+                Outcome::Success { plugins } => {
+                    if failures_only {
+                        continue;
+                    }
+                    // A shell binary yields several records; show each on its own row.
+                    for plugin in plugins {
+                        rows.push(SystemScanRow {
+                            path: path.clone(),
+                            name: plugin.name.clone(),
+                            vendor: plugin.vendor.clone(),
+                            format: plugin.format.as_str().to_string(),
+                            error_type: None,
+                            detail: plugin.uid.clone(),
+                        });
+                    }
+                }
+                Outcome::Error { error_type, error } => {
+                    rows.push(SystemScanRow {
+                        path: path.clone(),
+                        name: file_label(&result.path),
+                        vendor: String::new(),
+                        format: String::new(),
+                        error_type: Some(error_type.to_string()),
+                        detail: error.clone(),
+                    });
+                }
+            }
+        }
+
+        let total_rows = rows.len();
+        let truncated = total_rows > limit;
+        rows.truncate(limit);
+
+        SystemScanDisplay {
+            displayed: rows,
+            scanned: report.results.len(),
+            plugin_count: report.plugin_count(),
+            succeeded: report.succeeded(),
+            failed: report.failed(),
+            restarts: report.restarts,
+            budget_exhausted: report.budget_exhausted,
+            failures_by_type,
+            total_rows,
+            truncated,
+        }
+    }
+
+    /// One-line summary printed under the table.
+    pub fn summary(&self) -> String {
+        let mut summary = format!(
+            "{} scanned, {} ok, {} failed, {} plugin records, {} restart(s)",
+            self.scanned, self.succeeded, self.failed, self.plugin_count, self.restarts
+        );
+        if !self.failures_by_type.is_empty() {
+            let breakdown: Vec<String> = self
+                .failures_by_type
+                .iter()
+                .map(|(kind, count)| format!("{} {}", count, kind))
+                .collect();
+            summary.push_str(&format!(" [{}]", breakdown.join(", ")));
+        }
+        if self.budget_exhausted {
+            summary.push_str(" -- restart budget exhausted, scan incomplete");
+        }
+        summary
+    }
+}
+
+/// Best-effort display name for a path that failed before yielding any metadata.
+fn file_label(path: &std::path::Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+impl TableDisplay for SystemScanDisplay {
+    fn to_simple_table(&self) -> SimpleTable {
+        let mut table = SimpleTable::new(vec![
+            "Name".to_string(),
+            "Vendor".to_string(),
+            "Format".to_string(),
+            "Status".to_string(),
+            "Detail".to_string(),
+        ]);
+
+        for row in &self.displayed {
+            let status_cell = match &row.error_type {
+                None => colored_cell!("ok", green),
+                Some(kind) => colored_cell!(kind, red),
+            };
+
+            simple_table_row!(
+                table,
+                &row.name,
+                &row.vendor,
+                &row.format,
+                &status_cell,
+                &row.detail
+            );
+        }
+
+        table
+    }
+
+    fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
+        writer
+            .write_record(["path", "name", "vendor", "format", "error_type", "detail"])
+            .map_err(|e| -> CliError { e.into() })?;
+        for row in &self.displayed {
+            writer
+                .write_record([
+                    row.path.as_str(),
+                    row.name.as_str(),
+                    row.vendor.as_str(),
+                    row.format.as_str(),
+                    row.error_type.as_deref().unwrap_or(""),
+                    row.detail.as_str(),
+                ])
+                .map_err(|e| -> CliError { e.into() })?;
+        }
+        Ok(())
     }
 }
 

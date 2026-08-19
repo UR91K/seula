@@ -1,5 +1,6 @@
 pub mod parallel;
 pub mod parser;
+pub mod plugins;
 pub mod project_scanner;
 
 // Re-export all public items from scanner

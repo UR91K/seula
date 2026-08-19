@@ -67,6 +67,15 @@ pub struct Config {
     /// Maximum audio file size in MB (0 = no limit, None = use media module default)
     #[serde(default = "defaults::default_max_audio_file_size")]
     pub max_audio_file_size_mb: Option<u32>,
+    /// Directories to search for installed VST plugins. Empty means "use the platform
+    /// defaults" -- see `defaults::default_vst_search_paths`.
+    #[serde(default)]
+    pub vst_search_paths: Vec<String>,
+    /// How long the plugin scanner may go without producing output before the worker
+    /// is treated as hung and killed. Generous by default: some legitimate plugins
+    /// take ten seconds or more on a cold first load.
+    #[serde(default = "defaults::default_vst_scan_timeout_secs")]
+    pub vst_scan_timeout_secs: u64,
 }
 
 impl Config {
