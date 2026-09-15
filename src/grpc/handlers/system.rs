@@ -77,6 +77,7 @@ impl SystemHandler {
                 move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
                     let status = match phase {
                         "starting" => ScanStatus::ScanStarting,
+                        "scanning_plugins" => ScanStatus::ScanScanningPlugins,
                         "discovering" => ScanStatus::ScanDiscovering,
                         "preprocessing" | "parsing" => ScanStatus::ScanParsing,
                         "inserting" => ScanStatus::ScanInserting,

@@ -1,36 +1,129 @@
+use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::live_set::LiveSet;
-use crate::models::{AbletonVersion, KeySignature, Plugin, Sample, TimeSignature};
+use crate::models::{AbletonVersion, KeySignature, Plugin, PluginKey, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
-use rusqlite::{params, Row, Transaction};
+use rusqlite::{params, OptionalExtension, Row, Transaction};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-/// Insert a plugin into the database
-pub fn insert_plugin(tx: &Transaction, plugin: &Plugin) -> Result<(), DatabaseError> {
+/// Insert or update a single plugin reference, returning the id of the row it maps to.
+///
+/// Returns `None` when the `dev_identifier` is not a plugin reference at all, in which
+/// case the caller must not link a project to it.
+///
+/// This upserts rather than using `INSERT OR REPLACE`. The difference matters: replace
+/// deletes the conflicting row first, which under `PRAGMA foreign_keys = ON` cascades
+/// into `project_plugins` and silently unlinks the plugin from every *other* project
+/// that uses it.
+pub fn insert_plugin(tx: &Transaction, plugin: &Plugin) -> Result<Option<String>, DatabaseError> {
+    let Some(ref_key) = PluginKey::from_dev_identifier(&plugin.dev_identifier) else {
+        log::warn!(
+            "Skipping plugin reference with unparseable dev_identifier: {}",
+            plugin.dev_identifier
+        );
+        return Ok(None);
+    };
+
+    // A reference may name one of a bundle's exported classes rather than the bundle
+    // itself, so fall back to the class index before concluding this is a new plugin.
+    let resolved: Option<(String, &'static str)> = tx
+        .query_row(
+            "SELECT id FROM plugins WHERE plugin_kind = ? AND uid = ?",
+            params![ref_key.kind(), ref_key.uid_hex()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .map(|id| (id, "uid"))
+        .or_else(|| {
+            tx.query_row(
+                "SELECT plugin_id FROM plugin_classes WHERE class_id = ?",
+                params![ref_key.uid_hex()],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+            .map(|id| (id, "class_id"))
+        });
+
+    let (plugin_id, resolved_via) =
+        resolved.unwrap_or_else(|| (plugin.id.to_string(), "created"));
+
     tx.execute(
-        "INSERT OR REPLACE INTO plugins (
-            id, ableton_plugin_id, ableton_module_id, dev_identifier, name, format,
-            installed, vendor, version, sdk_version, flags, scanstate, enabled
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO plugins (
+            id, plugin_kind, uid, dev_identifier, name, format, vendor, version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(plugin_kind, uid) DO UPDATE SET
+            name = CASE WHEN plugins.installed IS 1 THEN plugins.name ELSE EXCLUDED.name END,
+            format = CASE WHEN plugins.installed IS 1 THEN plugins.format ELSE EXCLUDED.format END,
+            vendor = COALESCE(plugins.vendor, EXCLUDED.vendor),
+            version = COALESCE(plugins.version, EXCLUDED.version),
+            dev_identifier = COALESCE(plugins.dev_identifier, EXCLUDED.dev_identifier)
+            -- `installed` is untouched: only a plugin scan may write it.
+        ",
         params![
-            plugin.id.to_string(),
-            plugin.plugin_id,
-            plugin.module_id,
+            plugin_id,
+            ref_key.kind(),
+            ref_key.uid_hex(),
             plugin.dev_identifier,
             plugin.name,
             plugin.plugin_format.to_string(),
-            plugin.installed,
             plugin.vendor,
             plugin.version,
-            plugin.sdk_version,
-            plugin.flags,
-            plugin.scanstate,
-            plugin.enabled,
         ],
     )?;
-    Ok(())
+
+    tx.execute(
+        "INSERT INTO plugin_refs (
+            dev_identifier, plugin_id, ableton_name, ableton_format, resolved_via, first_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(dev_identifier) DO UPDATE SET
+            plugin_id = EXCLUDED.plugin_id,
+            ableton_name = EXCLUDED.ableton_name,
+            ableton_format = EXCLUDED.ableton_format,
+            resolved_via = EXCLUDED.resolved_via",
+        params![
+            plugin.dev_identifier,
+            plugin_id,
+            // Fall back to the identifier's own display name when the project file's
+            // <Name> was blank.
+            if plugin.name.trim().is_empty() {
+                crate::models::dev_identifier_display_name(&plugin.dev_identifier)
+                    .unwrap_or_default()
+            } else {
+                plugin.name.clone()
+            },
+            plugin.plugin_format.to_string(),
+            resolved_via,
+            SqlDateTime::from(Local::now()),
+        ],
+    )?;
+
+    Ok(Some(plugin_id))
+}
+
+/// Build a [`Plugin`] from a `plugins` row.
+///
+/// Reads by column name rather than position: the table's column order is not a
+/// contract, and every schema change used to silently reassign the indices that ten
+/// separate copies of this code depended on.
+pub fn row_to_plugin(row: &Row) -> rusqlite::Result<Plugin> {
+    Ok(Plugin {
+        id: Uuid::parse_str(&row.get::<_, String>("id")?).unwrap_or_else(|_| Uuid::new_v4()),
+        dev_identifier: row
+            .get::<_, Option<String>>("dev_identifier")?
+            .unwrap_or_default(),
+        name: row.get("name")?,
+        plugin_format: row
+            .get::<_, String>("format")?
+            .parse()
+            .map_err(rusqlite::Error::InvalidParameterName)?,
+        installed: row.get("installed")?,
+        vendor: row.get("vendor")?,
+        version: row.get("version")?,
+    })
 }
 
 /// Insert a sample into the database

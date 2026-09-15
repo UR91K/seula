@@ -54,6 +54,7 @@ impl crate::cli::commands::CliCommand for ScanCommand {
             let progress_callback = move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
                 let phase_label = match phase {
                     "starting" => "Starting",
+                    "scanning_plugins" => "Plugins",
                     "discovering" => "Discovering",
                     "preprocessing" => "Preprocessing",
                     "parsing" => "Parsing",

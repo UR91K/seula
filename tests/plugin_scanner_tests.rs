@@ -160,3 +160,55 @@ fn shell_expansion_counts_records_not_just_paths() {
     assert_eq!(report.plugin_count(), 2);
     assert_eq!(report.succeeded(), 2);
 }
+
+#[test]
+fn progress_is_reported_once_per_plugin_before_it_is_attempted() {
+    let candidates = paths(&["a.vst3", "b.vst3", "c.vst3"]);
+
+    let mut seen: Vec<(usize, usize, String)> = Vec::new();
+    spawner(30).scan_with_progress(&candidates, &mut |index, total, path| {
+        seen.push((index, total, path.display().to_string()));
+    });
+
+    assert_eq!(
+        seen,
+        vec![
+            (0, 3, "a.vst3".to_string()),
+            (1, 3, "b.vst3".to_string()),
+            (2, 3, "c.vst3".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn progress_names_the_plugin_that_kills_the_worker() {
+    // The reason progress fires on `begin` rather than on a result: the plugin a user
+    // most needs named is the one that never produces one.
+    let candidates = paths(&["before.vst3", "CRASH.vst3", "after.vst3"]);
+
+    let mut seen: Vec<String> = Vec::new();
+    spawner(30).scan_with_progress(&candidates, &mut |_, _, path| {
+        seen.push(path.display().to_string());
+    });
+
+    assert!(
+        seen.contains(&"CRASH.vst3".to_string()),
+        "the crashing plugin should have been announced: {:?}",
+        seen
+    );
+}
+
+#[test]
+fn progress_indices_stay_absolute_across_a_restart() {
+    // Each restart hands the supervisor a fresh batch starting at the resume point.
+    // Reporting batch-relative indices would make the counter jump backwards.
+    let candidates = paths(&["ok1.vst3", "CRASH.vst3", "ok2.vst3", "ok3.vst3"]);
+
+    let mut indices: Vec<usize> = Vec::new();
+    spawner(30).scan_with_progress(&candidates, &mut |index, total, _| {
+        assert_eq!(total, 4, "total is the whole scan, not the current batch");
+        indices.push(index);
+    });
+
+    assert_eq!(indices, vec![0, 1, 2, 3]);
+}

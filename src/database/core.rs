@@ -4,6 +4,13 @@ use log::{debug, info};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
 
+/// The schema this build writes and understands.
+///
+/// Stamped into `PRAGMA user_version`. Bump it for any breaking schema change; a
+/// database at an older version is discarded and rebuilt (ADR-0011), and one at a newer
+/// version is refused rather than destroyed.
+pub const SCHEMA_VERSION: i32 = 2;
+
 pub struct LiveSetDatabase {
     pub conn: Connection,
 }
@@ -11,15 +18,105 @@ pub struct LiveSetDatabase {
 impl LiveSetDatabase {
     pub fn new(db_path: PathBuf) -> Result<Self, DatabaseError> {
         debug!("Opening database at {:?}", db_path);
-        let conn = Connection::open(&db_path)?;
+
+        let conn = Self::open_at_current_schema(&db_path)?;
         let mut db = Self { conn };
         db.initialize()?;
+        db.conn
+            .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+
         info!("Database initialized successfully at {:?}", db_path);
         Ok(db)
     }
 
+    /// Open the database, discarding it first if it was written by an older schema.
+    ///
+    /// Seula has no migrations. Backwards compatibility is explicitly not required
+    /// (ADR-0011), so a stale database is deleted and rebuilt — which destroys
+    /// user-authored data that no rescan can recover, hence the loud warning.
+    ///
+    /// A *newer* database is a different matter: a downgrade must not silently wipe
+    /// work done by a later build, so that case fails instead.
+    fn open_at_current_schema(db_path: &Path) -> Result<Connection, DatabaseError> {
+        let conn = Connection::open(db_path)?;
+        let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+        if version == SCHEMA_VERSION {
+            return Ok(conn);
+        }
+
+        if version > SCHEMA_VERSION {
+            return Err(DatabaseError::ConnectionError(format!(
+                "The database at {} was written by a newer version of Seula (schema {}, \
+                 this build understands {}). Refusing to open it, because doing so would \
+                 mean discarding it.",
+                db_path.display(),
+                version,
+                SCHEMA_VERSION
+            )));
+        }
+
+        // Version 0 is both "brand new file" and "written before user_version existed".
+        // Only the latter has anything to discard.
+        let has_tables: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        if has_tables == 0 {
+            debug!("New database file, nothing to discard");
+            return Ok(conn);
+        }
+
+        log::warn!(
+            "The database at {} uses an older schema and cannot be migrated. Deleting and \
+             rebuilding it. Projects will be recovered by the next scan; tags, collections, \
+             tasks, notes and stored media are lost.",
+            db_path.display()
+        );
+
+        // Windows will not remove a file whose handle is still open.
+        drop(conn);
+        Self::remove_database_files(db_path)?;
+
+        Ok(Connection::open(db_path)?)
+    }
+
+    /// Remove the database and the write-ahead log files that belong to it.
+    ///
+    /// Leaving `-wal` or `-shm` behind next to a fresh database confuses SQLite.
+    fn remove_database_files(db_path: &Path) -> Result<(), DatabaseError> {
+        for suffix in ["", "-wal", "-shm"] {
+            let path = if suffix.is_empty() {
+                db_path.to_path_buf()
+            } else {
+                PathBuf::from(format!("{}{}", db_path.display(), suffix))
+            };
+
+            match std::fs::remove_file(&path) {
+                Ok(()) => debug!("Removed {}", path.display()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    return Err(DatabaseError::ConnectionError(format!(
+                        "Failed to remove the stale database file {}: {}",
+                        path.display(),
+                        e
+                    )))
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn initialize(&mut self) -> Result<(), DatabaseError> {
         debug!("Initializing database tables and indexes");
+
+        // Never set historically, so the ON DELETE CASCADE declarations below were
+        // inert. The plugin child tables depend on real cascade, and every write path
+        // upserts rather than INSERT OR REPLACE, so enabling it is safe.
+        self.conn.pragma_update(None, "foreign_keys", "ON")?;
+
         self.conn.execute_batch(
             r#"--sql
             -- Core tables
@@ -51,21 +148,99 @@ impl LiveSetDatabase {
                 FOREIGN KEY (audio_file_id) REFERENCES media_files(id) ON DELETE SET NULL
             );
 
+            -- A row means the plugin exists on this machine and/or in a project
+            -- (ADR-0007). Usage is expressed by project_plugins, exactly as before.
             CREATE TABLE IF NOT EXISTS plugins (
                 id TEXT PRIMARY KEY,
-                ableton_plugin_id INTEGER,
-                ableton_module_id INTEGER,
-                dev_identifier TEXT NOT NULL,
+
+                -- Identity (ADR-0005). plugin_kind is 'VST2' or 'VST3'; uid is
+                -- lowercase hex, normalised through PluginKey::uid_hex(). Deliberately
+                -- NOT `format`, which bakes in Ableton's instr/audiofx classification.
+                plugin_kind TEXT NOT NULL,
+                uid TEXT NOT NULL,
+
                 name TEXT NOT NULL,
-                format TEXT NOT NULL,
-                installed BOOLEAN NOT NULL,
+                format TEXT NOT NULL,        -- four-variant PluginFormat, display only
                 vendor TEXT,
                 version TEXT,
-                sdk_version TEXT,
-                flags INTEGER,
-                scanstate INTEGER,
-                enabled INTEGER,
-                UNIQUE(dev_identifier)
+
+                -- NULL means no plugin scan has looked yet. 1 the last scan found it,
+                -- 0 the last scan looked and did not.
+                installed BOOLEAN,
+                last_scanned_at DATETIME,
+
+                -- A representative reference, kept for display. plugin_refs is the
+                -- authoritative and exhaustive mapping (ADR-0009).
+                dev_identifier TEXT,
+
+                -- Scanner data. NULL when the plugin is referenced but not installed.
+                path TEXT,                   -- one location of possibly several (ADR-0010)
+                category TEXT,
+                is_instrument BOOLEAN,
+                audio_in_channels INTEGER,
+                audio_out_channels INTEGER,
+                audio_in_buses INTEGER,
+                audio_out_buses INTEGER,
+                has_midi_input BOOLEAN,
+                has_midi_output BOOLEAN,
+                presets INTEGER,
+                parameters INTEGER,
+                latency_samples INTEGER,
+                has_gui BOOLEAN,
+                vendor_url TEXT,
+                vendor_email TEXT,
+                is_shell BOOLEAN NOT NULL DEFAULT 0,
+                shell_parent_uid TEXT,       -- plain column; uid alone is not a unique key
+
+                -- VST2 extras
+                fourcc TEXT,
+                preset_chunks BOOLEAN,
+                f64_precision BOOLEAN,
+                silent_when_stopped BOOLEAN,
+                midi_in_channels INTEGER,
+                midi_out_channels INTEGER,
+
+                -- VST3 extras
+                factory_flags INTEGER,
+
+                UNIQUE(plugin_kind, uid)
+            );
+
+            -- One row per distinct dev_identifier seen in any project, and the plugin
+            -- it resolves to. A scalar column cannot hold this: a multi-class VST3
+            -- bundle is referenced by whichever processor class the user instantiated,
+            -- so one plugin can answer to several identifiers (ADR-0009).
+            CREATE TABLE IF NOT EXISTS plugin_refs (
+                dev_identifier TEXT PRIMARY KEY,
+                plugin_id TEXT NOT NULL,
+                ableton_name TEXT,           -- <Name>/<PlugName> from the .als
+                ableton_format TEXT,         -- Ableton's instr/audiofx call; never identity
+                resolved_via TEXT NOT NULL,  -- 'uid' | 'class_id' | 'created'
+                first_seen_at DATETIME NOT NULL,
+                FOREIGN KEY (plugin_id) REFERENCES plugins(id) ON DELETE CASCADE
+            );
+
+            -- Every class a VST3 bundle's factory exports. class_id is normalised the
+            -- same way as plugins.uid so the matching fallback can join on it.
+            CREATE TABLE IF NOT EXISTS plugin_classes (
+                plugin_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                class_id TEXT NOT NULL,
+                cardinality INTEGER NOT NULL,
+                version TEXT NOT NULL,
+                FOREIGN KEY (plugin_id) REFERENCES plugins(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS plugin_buses (
+                plugin_id TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                media TEXT NOT NULL,
+                name TEXT NOT NULL,
+                channel_count INTEGER NOT NULL,
+                bus_type INTEGER NOT NULL,
+                flags INTEGER NOT NULL,
+                FOREIGN KEY (plugin_id) REFERENCES plugins(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS samples (
@@ -139,6 +314,18 @@ impl LiveSetDatabase {
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
 
+            -- State belonging to the application rather than to any entity.
+            --
+            -- Additive: `CREATE TABLE IF NOT EXISTS` means an existing database gains
+            -- this on its next open, so it needs no SCHEMA_VERSION bump. Bumping the
+            -- version would discard the user's data (ADR-0011), which would be an
+            -- absurd price for one new table.
+            CREATE TABLE IF NOT EXISTS app_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at DATETIME NOT NULL
+            );
+
             -- Additional features
             CREATE TABLE IF NOT EXISTS project_tasks (
                 id TEXT PRIMARY KEY,
@@ -152,6 +339,11 @@ impl LiveSetDatabase {
             -- Basic indexes for performance
             CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
             CREATE INDEX IF NOT EXISTS idx_plugins_name ON plugins(name);
+            CREATE INDEX IF NOT EXISTS idx_plugins_installed ON plugins(installed);
+            CREATE INDEX IF NOT EXISTS idx_plugin_refs_plugin ON plugin_refs(plugin_id);
+            CREATE INDEX IF NOT EXISTS idx_plugin_classes_class_id ON plugin_classes(class_id);
+            CREATE INDEX IF NOT EXISTS idx_plugin_classes_plugin ON plugin_classes(plugin_id);
+            CREATE INDEX IF NOT EXISTS idx_plugin_buses_plugin ON plugin_buses(plugin_id);
             CREATE INDEX IF NOT EXISTS idx_samples_path ON samples(path);
             CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
             CREATE INDEX IF NOT EXISTS idx_collection_projects_position ON collection_projects(collection_id, position);
@@ -276,6 +468,28 @@ impl LiveSetDatabase {
         // Rebuild FTS5 table to fix any NULL values in existing data
         self.rebuild_fts5_table()?;
 
+        Ok(())
+    }
+
+    /// Read a value from the application state store.
+    pub fn get_app_state(&self, key: &str) -> Result<Option<String>, DatabaseError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?",
+                params![key],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
+    /// Write a value into the application state store.
+    pub fn set_app_state(&self, key: &str, value: &str) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at",
+            params![key, value, Local::now().timestamp()],
+        )?;
         Ok(())
     }
 

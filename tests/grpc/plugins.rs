@@ -23,25 +23,39 @@ async fn test_refresh_plugin_installation_status() {
             assert!(response.success);
             assert!(response.error_message.is_none());
             
-            // Should have checked some plugins (even if 0 in test database)
-            assert!(response.total_plugins_checked >= 0);
-            assert!(response.plugins_now_installed >= 0);
-            assert!(response.plugins_now_missing >= 0);
-            assert!(response.plugins_unchanged >= 0);
-            
-            // Total should add up
-            assert_eq!(
-                response.total_plugins_checked,
-                response.plugins_now_installed + response.plugins_now_missing + response.plugins_unchanged
+            // Refresh now runs a real plugin scan, so the counts describe binaries
+            // on this machine rather than rows in Ableton's database.
+            assert!(response.candidates_scanned >= 0);
+            assert!(response.plugins_installed >= 0);
+            assert!(response.plugins_missing >= 0);
+            assert!(response.plugins_reconciled >= 0);
+            assert!(response.scan_failures >= 0);
+
+            // Every candidate either yielded plugins or failed to load. It cannot
+            // yield fewer installed rows than there were candidates minus failures.
+            assert!(
+                response.plugins_installed + response.scan_failures
+                    >= response.candidates_scanned,
+                "every scanned candidate should be accounted for: {:?}",
+                response
             );
         }
         Err(status) => {
-            // In test environment, it's acceptable for this to fail due to missing configuration
-            // Check if it's a configuration-related error
+            // Two acceptable failures here, and neither is a defect in the RPC:
+            //
+            // - no usable configuration in the test environment;
+            // - no scanner sidecar, because the test harness runs from
+            //   target/debug/deps/ while `vst-meta` sits in target/debug/.
+            //
+            // The second is deliberate. Making the sidecar findable from test
+            // binaries would mean this test kicked off a real plugin scan — minutes
+            // of loading third-party binaries — to check some gRPC plumbing.
+            // `tests/database/plugin_scan.rs` covers the persistence logic directly.
             assert!(
-                status.message().contains("ConfigError") || 
-                status.message().contains("InvalidValue") ||
-                status.message().contains("At least one path must be specified"),
+                status.message().contains("ConfigError")
+                    || status.message().contains("InvalidValue")
+                    || status.message().contains("At least one path must be specified")
+                    || status.message().contains("Could not find the plugin scanner binary"),
                 "Unexpected error: {:?}",
                 status
             );

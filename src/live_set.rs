@@ -4,13 +4,10 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use crate::ableton_db::AbletonDatabase;
-use crate::config::CONFIG;
 use crate::error::LiveSetError;
 use crate::models::{AbletonVersion, KeySignature, Plugin, Sample, TimeSignature};
 use crate::scan::{ParseOptions, Parser};
 use crate::utils::metadata::{load_file_hash, load_file_name, load_file_timestamps};
-use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
 use crate::utils::{decompress_gzip_file, validate_ableton_file};
 
 #[derive(Debug)]
@@ -129,34 +126,6 @@ impl LiveSet {
         self.plugins.insert(plugin);
     }
 
-    #[allow(dead_code)]
-    pub fn reparse_plugins(&mut self) -> Result<(), LiveSetError> {
-        let config = CONFIG
-            .as_ref()
-            .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
-        let db_dir = &config.live_database_dir;
-        let ableton_db = AbletonDatabase::new(
-            get_most_recent_plugins_db_file(&PathBuf::from(db_dir))
-                .or_else(|_| get_most_recent_db_file(&PathBuf::from(db_dir)))
-                .map_err(LiveSetError::DatabaseError)?,
-        )
-        .map_err(LiveSetError::DatabaseError)?;
-
-        let mut updated_plugins = HashSet::new();
-
-        for plugin in self.plugins.iter() {
-            let mut updated_plugin = plugin.clone();
-            updated_plugin
-                .reparse(&ableton_db)
-                .map_err(|e| LiveSetError::DatabaseError(e))?;
-            updated_plugins.insert(updated_plugin);
-        }
-
-        self.plugins = updated_plugins;
-
-        Ok(())
-    }
-
     pub fn debug_log_info(&self) {
         println!("{}", "\n=== Live Set Information ===".bold().blue());
 
@@ -251,10 +220,10 @@ impl LiveSet {
             for plugin in &self.plugins {
                 println!(
                     "{} {} ({})",
-                    if plugin.installed {
-                        "✓".green()
-                    } else {
-                        "✗".red()
+                    match plugin.installed {
+                        Some(true) => "✓".green(),
+                        Some(false) => "✗".red(),
+                        None => "?".yellow(),
                     },
                     plugin.name.cyan(),
                     format!("{:?}", plugin.plugin_format).bright_black()

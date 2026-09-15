@@ -131,6 +131,23 @@ impl Spawner {
     /// part-way: a plugin that crashes the scanner is an ordinary result carrying
     /// [`ErrorType::Crashed`], not an error in the scan itself.
     pub fn scan(&self, paths: &[PathBuf]) -> ScanReport {
+        self.scan_with_progress(paths, &mut |_, _, _| {})
+    }
+
+    /// As [`scan`](Self::scan), reporting each plugin as it is attempted.
+    ///
+    /// The callback fires on the worker's `begin` line — *before* the plugin is
+    /// loaded, not after. That is deliberate: a scan of a real library takes minutes,
+    /// and the plugin a user most wants named is the one that is currently hanging,
+    /// which by definition never reports a result.
+    ///
+    /// Arguments are `(index, total, path)`, with `index` counting from zero across
+    /// the whole scan rather than the current batch.
+    pub fn scan_with_progress(
+        &self,
+        paths: &[PathBuf],
+        on_progress: &mut dyn FnMut(usize, usize, &Path),
+    ) -> ScanReport {
         let mut results: Vec<PluginScanResult> = Vec::with_capacity(paths.len());
         let mut cursor = 0usize;
         let mut restarts = 0usize;
@@ -139,7 +156,7 @@ impl Spawner {
 
         while cursor < paths.len() {
             let batch = &paths[cursor..];
-            let run = match self.run_batch(batch) {
+            let run = match self.run_batch(batch, cursor, paths.len(), on_progress) {
                 Ok(run) => run,
                 Err(e) => {
                     // The worker would not start at all. That is not a plugin's fault
@@ -206,7 +223,13 @@ impl Spawner {
     }
 
     /// Run one worker over `batch`, returning what it managed before stopping.
-    fn run_batch(&self, batch: &[PathBuf]) -> Result<BatchRun, PluginScanError> {
+    fn run_batch(
+        &self,
+        batch: &[PathBuf],
+        base: usize,
+        total: usize,
+        on_progress: &mut dyn FnMut(usize, usize, &Path),
+    ) -> Result<BatchRun, PluginScanError> {
         let mut child = self.spawn(batch)?;
 
         // Feed the path list on stdin rather than argv: a large library would blow
@@ -235,7 +258,7 @@ impl Spawner {
         }
 
         let events = self.read_events(&mut child);
-        let run = self.collect(events, batch, &mut child);
+        let run = self.collect(events, batch, &mut child, base, total, on_progress);
 
         // Reap the child regardless of how we got here.
         let _ = child.wait();
@@ -298,7 +321,15 @@ impl Spawner {
     }
 
     /// Consume the event stream, tracking which path is in flight.
-    fn collect(&self, events: Receiver<Event>, batch: &[PathBuf], child: &mut Child) -> BatchRun {
+    fn collect(
+        &self,
+        events: Receiver<Event>,
+        batch: &[PathBuf],
+        child: &mut Child,
+        base: usize,
+        total: usize,
+        on_progress: &mut dyn FnMut(usize, usize, &Path),
+    ) -> BatchRun {
         let mut completed = Vec::new();
         // The worker processes paths in the order we gave them, so position in the
         // stream identifies the path. The echoed path is used only to sanity-check.
@@ -316,6 +347,10 @@ impl Spawner {
                         );
                     }
                     in_flight = Some(next);
+
+                    if let Some(path) = batch.get(next) {
+                        on_progress(base + next, total, path);
+                    }
                 }
 
                 Ok(Event::Result { outcome, .. }) => {

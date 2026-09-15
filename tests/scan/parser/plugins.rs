@@ -262,8 +262,8 @@ fn test_empty_plugin_name_unique_device_id() {
         "device:vst3:audiofx:unique-device-id-that-wont-exist-in-db"
     );
     assert_eq!(plugin.plugin_format, PluginFormat::VST3AudioFx);
-    // Should not be installed since it's not in the database
-    assert_eq!(plugin.installed, false);
+    // The parser emits bare references; only a plugin scan may decide installation.
+    assert_eq!(plugin.installed, None);
 }
 
 #[test]

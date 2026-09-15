@@ -5,6 +5,7 @@ mod helpers;
 mod media;
 mod models;
 pub mod notes;
+pub mod plugin_scan;
 pub mod plugins;
 pub mod projects;
 pub mod samples;
@@ -14,7 +15,8 @@ pub mod tags;
 pub mod tasks;
 
 pub use batch::BatchInsertManager;
-pub use core::LiveSetDatabase;
+pub use core::{LiveSetDatabase, SCHEMA_VERSION};
+pub use plugin_scan::PluginScanPersist;
 pub use plugins::PluginStats;
 pub use samples::{SampleStats, SampleUsageInfo};
 pub use stats::ProjectStatistics;

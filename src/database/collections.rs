@@ -1,7 +1,7 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::live_set::LiveSet;
-use crate::models::{AbletonVersion, CollectionStatistics, KeySignature, Plugin, Sample, TimeSignature};
+use crate::models::{AbletonVersion, CollectionStatistics, KeySignature, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
 use log::debug;
 use rusqlite::types::ToSql;
@@ -518,24 +518,7 @@ impl LiveSetDatabase {
                     )?;
                     live_set.plugins = stmt
                         .query_map([&project_id], |row| {
-                            Ok(Plugin {
-                                id: Uuid::new_v4(),
-                                plugin_id: row.get(1)?,
-                                module_id: row.get(2)?,
-                                dev_identifier: row.get(3)?,
-                                name: row.get(4)?,
-                                plugin_format: row
-                                    .get::<_, String>(5)?
-                                    .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                                installed: row.get(6)?,
-                                vendor: row.get(7)?,
-                                version: row.get(8)?,
-                                sdk_version: row.get(9)?,
-                                flags: row.get(10)?,
-                                scanstate: row.get(11)?,
-                                enabled: row.get(12)?,
-                            })
+                            crate::database::helpers::row_to_plugin(row)
                         })?
                         .filter_map(|r| r.ok())
                         .collect();

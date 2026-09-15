@@ -75,17 +75,11 @@ impl LiveSetBuilder {
         self.plugins.insert(Plugin {
             id: Uuid::new_v4(),
             name: name.to_string(),
-            plugin_id: None,
-            module_id: None,
-            dev_identifier: format!("device:vst3:{}", name),
+            dev_identifier: test_dev_identifier(name),
             vendor: None,
             version: None,
-            sdk_version: None,
-            flags: None,
-            scanstate: None,
-            enabled: None,
             plugin_format: PluginFormat::VST3AudioFx,
-            installed: false,
+            installed: Some(false),
         });
         self
     }
@@ -94,17 +88,11 @@ impl LiveSetBuilder {
         self.plugins.insert(Plugin {
             id: Uuid::new_v4(),
             name: name.to_string(),
-            plugin_id: Some(1),
-            module_id: Some(1),
-            dev_identifier: format!("device:vst3:{}", name),
+            dev_identifier: test_dev_identifier(name),
             vendor,
             version: Some("1.0.0".to_string()),
-            sdk_version: Some("1.0.0".to_string()),
-            flags: Some(0),
-            scanstate: Some(0),
-            enabled: Some(1),
             plugin_format: PluginFormat::VST3AudioFx,
-            installed: true,
+            installed: Some(true),
         });
         self
     }
@@ -170,6 +158,19 @@ pub fn random_letter() -> char {
     char::from(rng.gen_range(b'A'..=b'Z'))
 }
 
+/// A syntactically valid VST3 `dev_identifier` derived from a name.
+///
+/// Deterministic, so the same name always means the same plugin identity — which is
+/// what the builders below rely on. The bytes are arbitrary; only their shape matters.
+pub fn test_dev_identifier(name: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in name.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("device:vst3:audiofx:{:016x}{:016x}", hash, !hash)
+}
+
 pub fn generate_dev_identifier(plugin_format: PluginFormat) -> String {
     let (dev_type, category) = plugin_format.to_dev_type_and_category();
     let random_uuid = Uuid::new_v4();
@@ -191,18 +192,12 @@ pub fn generate_mock_plugin(index: usize) -> Plugin {
     let plugin_format = PluginFormat::random();
     Plugin {
         id: Uuid::new_v4(),
-        plugin_id: None,
-        module_id: None,
         name: format!("Test Plugin {}", index),
         dev_identifier: generate_dev_identifier(plugin_format),
         plugin_format,
         vendor: Some(format!("Test Vendor {}", random_letter())),
         version: Some("1.0.0".to_string()),
-        sdk_version: Some("3.7.0".to_string()),
-        flags: Some(0),
-        scanstate: Some(1),
-        enabled: Some(1),
-        installed: true,
+        installed: Some(true),
     }
 }
 
@@ -321,7 +316,7 @@ mod tests {
         let plugin = result.plugins.iter().next().unwrap();
         assert_eq!(plugin.name, "Serum");
         assert_eq!(plugin.vendor, Some("Xfer Records".to_string()));
-        assert!(plugin.installed);
+        assert_eq!(plugin.installed, Some(true));
     }
 
     #[test]
@@ -335,7 +330,11 @@ mod tests {
             !plugin.dev_identifier.is_empty(),
             "Plugin should have a dev_identifier"
         );
-        assert!(plugin.installed, "Plugin should be installed by default");
+        assert_eq!(
+            plugin.installed,
+            Some(true),
+            "Plugin should be installed by default"
+        );
 
         // Dev identifier format
         let dev_id = &plugin.dev_identifier;
@@ -348,13 +347,7 @@ mod tests {
         // Optional fields
         assert!(plugin.vendor.is_some(), "Plugin should have a vendor");
         assert!(plugin.version.is_some(), "Plugin should have a version");
-        assert!(
-            plugin.sdk_version.is_some(),
-            "Plugin should have an SDK version"
-        );
-        assert!(plugin.flags.is_some(), "Plugin should have flags");
-        assert!(plugin.scanstate.is_some(), "Plugin should have scanstate");
-        assert!(plugin.enabled.is_some(), "Plugin should have enabled state");
+
     }
 
     #[test]

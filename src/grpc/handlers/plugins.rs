@@ -42,18 +42,12 @@ impl PluginsHandler {
                     .into_iter()
                     .map(|grpc_plugin| Plugin {
                         id: grpc_plugin.plugin.id.to_string(),
-                        ableton_plugin_id: grpc_plugin.plugin.plugin_id,
-                        ableton_module_id: grpc_plugin.plugin.module_id,
                         dev_identifier: grpc_plugin.plugin.dev_identifier,
                         name: grpc_plugin.plugin.name,
                         format: grpc_plugin.plugin.plugin_format.to_string(),
                         installed: grpc_plugin.plugin.installed,
                         vendor: grpc_plugin.plugin.vendor,
                         version: grpc_plugin.plugin.version,
-                        sdk_version: grpc_plugin.plugin.sdk_version,
-                        flags: grpc_plugin.plugin.flags,
-                        scanstate: grpc_plugin.plugin.scanstate,
-                        enabled: grpc_plugin.plugin.enabled,
                         usage_count: Some(grpc_plugin.usage_count),
                         project_count: Some(grpc_plugin.project_count),
                     })
@@ -96,18 +90,12 @@ impl PluginsHandler {
                     .into_iter()
                     .map(|plugin| Plugin {
                         id: plugin.id.to_string(),
-                        ableton_plugin_id: plugin.plugin_id,
-                        ableton_module_id: plugin.module_id,
                         dev_identifier: plugin.dev_identifier,
                         name: plugin.name,
                         format: plugin.plugin_format.to_string(),
                         installed: plugin.installed,
                         vendor: plugin.vendor,
                         version: plugin.version,
-                        sdk_version: plugin.sdk_version,
-                        flags: plugin.flags,
-                        scanstate: plugin.scanstate,
-                        enabled: plugin.enabled,
                         usage_count: None, // This method doesn't include usage data
                         project_count: None, // This method doesn't include usage data
                     })
@@ -151,18 +139,12 @@ impl PluginsHandler {
                     .into_iter()
                     .map(|plugin| Plugin {
                         id: plugin.id.to_string(),
-                        ableton_plugin_id: plugin.plugin_id,
-                        ableton_module_id: plugin.module_id,
                         dev_identifier: plugin.dev_identifier,
                         name: plugin.name,
                         format: plugin.plugin_format.to_string(),
                         installed: plugin.installed,
                         vendor: plugin.vendor,
                         version: plugin.version,
-                        sdk_version: plugin.sdk_version,
-                        flags: plugin.flags,
-                        scanstate: plugin.scanstate,
-                        enabled: plugin.enabled,
                         usage_count: None, // This method doesn't include usage data
                         project_count: None, // This method doesn't include usage data
                     })
@@ -198,6 +180,7 @@ impl PluginsHandler {
                     total_plugins: stats.total_plugins,
                     installed_plugins: stats.installed_plugins,
                     missing_plugins: stats.missing_plugins,
+                    unknown_plugins: stats.unknown_plugins,
                     unique_vendors: stats.unique_vendors,
                     plugins_by_format: stats.plugins_by_format,
                     plugins_by_vendor: stats.plugins_by_vendor,
@@ -307,18 +290,12 @@ impl PluginsHandler {
             Ok(Some(grpc_plugin)) => {
                 let proto_plugin = Plugin {
                     id: grpc_plugin.plugin.id.to_string(),
-                    ableton_plugin_id: grpc_plugin.plugin.plugin_id,
-                    ableton_module_id: grpc_plugin.plugin.module_id,
                     dev_identifier: grpc_plugin.plugin.dev_identifier,
                     name: grpc_plugin.plugin.name,
                     format: grpc_plugin.plugin.plugin_format.to_string(),
                     installed: grpc_plugin.plugin.installed,
                     vendor: grpc_plugin.plugin.vendor,
                     version: grpc_plugin.plugin.version,
-                    sdk_version: grpc_plugin.plugin.sdk_version,
-                    flags: grpc_plugin.plugin.flags,
-                    scanstate: grpc_plugin.plugin.scanstate,
-                    enabled: grpc_plugin.plugin.enabled,
                     usage_count: Some(grpc_plugin.usage_count),
                     project_count: Some(grpc_plugin.project_count),
                 };
@@ -397,10 +374,11 @@ impl PluginsHandler {
         match db.refresh_plugin_installation_status() {
             Ok(result) => {
                 let response = RefreshPluginInstallationStatusResponse {
-                    total_plugins_checked: result.total_plugins_checked,
-                    plugins_now_installed: result.plugins_now_installed,
-                    plugins_now_missing: result.plugins_now_missing,
-                    plugins_unchanged: result.plugins_unchanged,
+                    candidates_scanned: result.candidates_scanned,
+                    plugins_installed: result.plugins_installed,
+                    plugins_missing: result.plugins_missing,
+                    plugins_reconciled: result.plugins_reconciled,
+                    scan_failures: result.scan_failures,
                     success: true,
                     error_message: None,
                 };

@@ -41,11 +41,10 @@ fn test_config_loads_with_empty_paths_impl() {
 
     let config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -76,11 +75,10 @@ fn test_config_validation_with_empty_paths_impl() {
 
     let config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -114,11 +112,10 @@ fn test_config_with_valid_paths_impl() {
 
     let config_content = format!(r#"
 paths = ["{}"]
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -146,11 +143,10 @@ fn test_config_status_messages_impl() {
 
     let empty_config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -169,11 +165,10 @@ media_storage_dir = "{}"
 
     let config_with_paths = format!(r#"
 paths = ["{}", "{}"]
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&another_path), escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&another_path), escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_with_paths).unwrap();
     
@@ -205,11 +200,10 @@ fn test_config_path_manipulation_impl() {
 
     let empty_config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -262,11 +256,10 @@ fn test_scanning_with_empty_paths_impl() {
 
     let empty_config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -293,11 +286,10 @@ fn test_config_reload_impl() {
 
     let empty_config_content = format!(r#"
 paths = []
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
@@ -313,11 +305,10 @@ media_storage_dir = "{}"
 
     let updated_config_content = format!(r#"
 paths = ["{}"]
-live_database_dir = "{}"
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&live_db_dir), escape_path_for_toml(&media_dir));
+"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, updated_config_content).unwrap();
 

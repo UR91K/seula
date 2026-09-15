@@ -1,7 +1,6 @@
 use crate::error::DatabaseError;
 use crate::models::{Plugin, GrpcPlugin};
 use rusqlite::params;
-use uuid::Uuid;
 
 use super::LiveSetDatabase;
 
@@ -170,24 +169,7 @@ impl LiveSetDatabase {
         let mut stmt = self.conn.prepare(&query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
-            let plugin = Plugin {
-                id: Uuid::new_v4(),
-                plugin_id: row.get("ableton_plugin_id")?,
-                module_id: row.get("ableton_module_id")?,
-                dev_identifier: row.get("dev_identifier")?,
-                name: row.get("name")?,
-                plugin_format: row
-                    .get::<_, String>("format")?
-                    .parse()
-                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                installed: row.get("installed")?,
-                vendor: row.get("vendor")?,
-                version: row.get("version")?,
-                sdk_version: row.get("sdk_version")?,
-                flags: row.get("flags")?,
-                scanstate: row.get("scanstate")?,
-                enabled: row.get("enabled")?,
-            };
+            let plugin = crate::database::helpers::row_to_plugin(row)?;
             
             Ok(GrpcPlugin {
                 plugin,
@@ -201,91 +183,48 @@ impl LiveSetDatabase {
     }
 
     /// Refresh plugin installation status by checking against Ableton's database
-    pub fn refresh_plugin_installation_status(&mut self) -> Result<PluginRefreshResult, DatabaseError> {
+    /// Rescan the plugins installed on this system and write the results.
+    ///
+    /// This replaces an earlier implementation that asked Ableton's database whether
+    /// each plugin existed. That version tested `get_plugin_by_dev_identifier(..).is_ok()`,
+    /// which is `true` for `Ok(None)` — so it marked every plugin installed regardless
+    /// of the answer (ADR-0006).
+    ///
+    /// Re-resolving references is part of the job: a plugin installed since the last
+    /// scan is picked up here without reparsing any project file (ADR-0009).
+    pub fn refresh_plugin_installation_status(
+        &mut self,
+    ) -> Result<PluginRefreshResult, DatabaseError> {
         use crate::config::CONFIG;
-        use crate::utils::plugins::get_most_recent_db_file;
-        use crate::ableton_db::AbletonDatabase;
+        use crate::scan::plugins::scan_system;
         use std::path::PathBuf;
+        use std::time::Duration;
 
         let config = CONFIG
             .as_ref()
             .map_err(|e| DatabaseError::ConfigError(e.clone()))?;
-        
-        let db_dir = &config.live_database_dir;
-        let db_path_result = get_most_recent_db_file(&PathBuf::from(db_dir));
-        
-        let ableton_db = match db_path_result {
-            Ok(db_path) => {
-                match AbletonDatabase::new(db_path) {
-                    Ok(db) => Some(db),
-                    Err(e) => {
-                        log::warn!("Failed to open Ableton database: {:?}", e);
-                        None
-                    }
-                }
-            }
-            Err(e) => {
-                log::warn!("Ableton database file not found: {:?}", e);
-                None
-            }
-        };
 
-        let mut total_checked = 0;
-        let mut now_installed = 0;
-        let mut now_missing = 0;
-        let mut unchanged = 0;
+        let roots: Vec<PathBuf> = config.vst_search_paths.iter().map(PathBuf::from).collect();
+        let timeout = Duration::from_secs(config.vst_scan_timeout_secs);
 
-        // Get all plugins from our database
-        let mut stmt = self.conn.prepare("SELECT id, dev_identifier, name, format FROM plugins")?;
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>("id")?,
-                row.get::<_, String>("dev_identifier")?,
-                row.get::<_, String>("name")?,
-                row.get::<_, String>("format")?,
-            ))
-        })?;
+        let report = scan_system(&roots, timeout)
+            .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
 
-        for row_result in rows {
-            let (plugin_id, dev_identifier, _name, _plugin_format_str) = row_result?;
-            total_checked += 1;
+        // Only a scan that covered every configured search path may declare anything
+        // missing. A truncated one reports what it saw and leaves the rest alone.
+        let full_scan = !report.budget_exhausted;
 
-            // Check if plugin exists in Ableton's database
-            let is_installed = if let Some(ref db) = ableton_db {
-                db.get_plugin_by_dev_identifier(&dev_identifier).is_ok()
-            } else {
-                false
-            };
+        let candidates_scanned = report.results.len() as i32;
+        let scan_failures = report.failed() as i32;
 
-            // Update the plugin's installation status
-            let current_installed: bool = self.conn.query_row(
-                "SELECT installed FROM plugins WHERE id = ?",
-                params![plugin_id],
-                |row| row.get(0)
-            )?;
-
-            if current_installed != is_installed {
-                // Status changed, update it
-                self.conn.execute(
-                    "UPDATE plugins SET installed = ? WHERE id = ?",
-                    params![is_installed, plugin_id]
-                )?;
-
-                if is_installed {
-                    now_installed += 1;
-                } else {
-                    now_missing += 1;
-                }
-            } else {
-                unchanged += 1;
-            }
-        }
+        let persisted = self.persist_plugin_scan(&report, full_scan)?;
 
         Ok(PluginRefreshResult {
-            total_plugins_checked: total_checked,
-            plugins_now_installed: now_installed,
-            plugins_now_missing: now_missing,
-            plugins_unchanged: unchanged,
+            candidates_scanned,
+            plugins_installed: (persisted.inserted + persisted.updated) as i32,
+            plugins_missing: persisted.marked_missing as i32,
+            plugins_reconciled: persisted.reconciled as i32,
+            scan_failures,
         })
     }
 
@@ -329,24 +268,7 @@ impl LiveSetDatabase {
         let rows = stmt.query_map(
             params![installed, limit.unwrap_or(1000), offset.unwrap_or(0)],
             |row| {
-                Ok(Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: row.get("ableton_plugin_id")?,
-                    module_id: row.get("ableton_module_id")?,
-                    dev_identifier: row.get("dev_identifier")?,
-                    name: row.get("name")?,
-                    plugin_format: row
-                        .get::<_, String>("format")?
-                        .parse()
-                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                    installed: row.get("installed")?,
-                    vendor: row.get("vendor")?,
-                    version: row.get("version")?,
-                    sdk_version: row.get("sdk_version")?,
-                    flags: row.get("flags")?,
-                    scanstate: row.get("scanstate")?,
-                    enabled: row.get("enabled")?,
-                })
+                Ok(crate::database::helpers::row_to_plugin(row)?)
             },
         )?;
 
@@ -406,24 +328,7 @@ impl LiveSetDatabase {
         let mut stmt = self.conn.prepare(&main_query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
-            Ok(Plugin {
-                id: Uuid::new_v4(),
-                plugin_id: row.get("ableton_plugin_id")?,
-                module_id: row.get("ableton_module_id")?,
-                dev_identifier: row.get("dev_identifier")?,
-                name: row.get("name")?,
-                plugin_format: row
-                    .get::<_, String>("format")?
-                    .parse()
-                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                installed: row.get("installed")?,
-                vendor: row.get("vendor")?,
-                version: row.get("version")?,
-                sdk_version: row.get("sdk_version")?,
-                flags: row.get("flags")?,
-                scanstate: row.get("scanstate")?,
-                enabled: row.get("enabled")?,
-            })
+            Ok(crate::database::helpers::row_to_plugin(row)?)
         })?;
 
         let plugins: Result<Vec<Plugin>, _> = rows.collect();
@@ -442,7 +347,19 @@ impl LiveSetDatabase {
             |row| row.get(0),
         )?;
 
-        let missing_plugins = total_plugins - installed_plugins;
+        let missing_plugins: i32 = self.conn.query_row(
+            "SELECT COUNT(*) FROM plugins WHERE installed = false",
+            [],
+            |row| row.get(0),
+        )?;
+
+        // Never scanned for. Not the same as looked-for-and-absent, and deriving it as
+        // `total - installed` would quietly merge the two.
+        let unknown_plugins: i32 = self.conn.query_row(
+            "SELECT COUNT(*) FROM plugins WHERE installed IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
 
         let unique_vendors: i32 = self.conn.query_row(
             "SELECT COUNT(DISTINCT vendor) FROM plugins WHERE vendor IS NOT NULL",
@@ -482,6 +399,7 @@ impl LiveSetDatabase {
             total_plugins,
             installed_plugins,
             missing_plugins,
+            unknown_plugins,
             unique_vendors,
             plugins_by_format,
             plugins_by_vendor,
@@ -715,24 +633,7 @@ impl LiveSetDatabase {
 
         let mut stmt = self.conn.prepare(query)?;
         let result = stmt.query_row(params![uuid.to_string()], |row| {
-            let plugin = Plugin {
-                id: uuid,
-                plugin_id: row.get("ableton_plugin_id")?,
-                module_id: row.get("ableton_module_id")?,
-                dev_identifier: row.get("dev_identifier")?,
-                name: row.get("name")?,
-                plugin_format: row
-                    .get::<_, String>("format")?
-                    .parse()
-                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                installed: row.get("installed")?,
-                vendor: row.get("vendor")?,
-                version: row.get("version")?,
-                sdk_version: row.get("sdk_version")?,
-                flags: row.get("flags")?,
-                scanstate: row.get("scanstate")?,
-                enabled: row.get("enabled")?,
-            };
+            let plugin = crate::database::helpers::row_to_plugin(row)?;
             
             Ok(GrpcPlugin {
                 plugin,
@@ -756,6 +657,8 @@ pub struct PluginStats {
     pub total_plugins: i32,
     pub installed_plugins: i32,
     pub missing_plugins: i32,
+    /// Plugins no scan has looked for yet. `installed + missing + unknown == total`.
+    pub unknown_plugins: i32,
     pub unique_vendors: i32,
     pub plugins_by_format: std::collections::HashMap<String, i32>,
     pub plugins_by_vendor: std::collections::HashMap<String, i32>,
@@ -763,10 +666,16 @@ pub struct PluginStats {
 
 #[derive(serde::Serialize)]
 pub struct PluginRefreshResult {
-    pub total_plugins_checked: i32,
-    pub plugins_now_installed: i32,
-    pub plugins_now_missing: i32,
-    pub plugins_unchanged: i32,
+    /// Plugin binaries the scan attempted to load.
+    pub candidates_scanned: i32,
+    /// Rows the scan confirmed are installed.
+    pub plugins_installed: i32,
+    /// Rows a full scan looked for and did not find.
+    pub plugins_missing: i32,
+    /// Duplicate rows merged into the bundle that exports their class.
+    pub plugins_reconciled: i32,
+    /// Binaries that would not load — usually genuinely broken.
+    pub scan_failures: i32,
 }
 
 #[derive(serde::Serialize)]

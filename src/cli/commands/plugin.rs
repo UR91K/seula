@@ -439,9 +439,31 @@ pub struct PluginRow {
     pub name: String,
     pub vendor: String,
     pub format: String,
-    pub installed: bool,
+    /// `None` when no plugin scan has looked yet.
+    pub installed: Option<bool>,
     pub usage_count: i32,
     pub project_count: i32,
+}
+
+/// Render the tri-state install flag.
+///
+/// "Unknown" is a real answer, not a fallback: it means no plugin scan has run, which
+/// a user fixes with `seula plugin refresh` rather than by installing anything.
+fn installed_cell(installed: Option<bool>) -> String {
+    match installed {
+        Some(true) => colored_cell!("Installed", green),
+        Some(false) => colored_cell!("Missing", red),
+        None => colored_cell!("Unknown", yellow),
+    }
+}
+
+/// The same three states, unstyled, for CSV and JSON.
+fn installed_label(installed: Option<bool>) -> &'static str {
+    match installed {
+        Some(true) => "installed",
+        Some(false) => "missing",
+        None => "unknown",
+    }
 }
 
 #[derive(Serialize)]
@@ -465,11 +487,7 @@ impl TableDisplay for PluginsList {
         ]);
 
         for row in &self.displayed {
-            let status_cell = if row.installed {
-                colored_cell!("Installed", green)
-            } else {
-                colored_cell!("Missing", red)
-            };
+            let status_cell = installed_cell(row.installed);
 
             simple_table_row!(table,
                 &row.id[..8], // Show only first 8 chars of UUID
@@ -505,7 +523,7 @@ impl TableDisplay for PluginsList {
                     row.name.as_str(),
                     row.vendor.as_str(),
                     row.format.as_str(),
-                    &row.installed.to_string(),
+                    installed_label(row.installed),
                     &row.usage_count.to_string(),
                     &row.project_count.to_string(),
                 ])
@@ -533,11 +551,7 @@ impl TableDisplay for PluginsSearchResults {
         ]);
 
         for row in &self.displayed {
-            let status_cell = if row.installed {
-                colored_cell!("Installed", green)
-            } else {
-                colored_cell!("Missing", red)
-            };
+            let status_cell = installed_cell(row.installed);
 
             simple_table_row!(table,
                 &row.id[..8],
@@ -570,7 +584,7 @@ impl TableDisplay for PluginsSearchResults {
                     row.name.as_str(),
                     row.vendor.as_str(),
                     row.format.as_str(),
-                    &row.installed.to_string(),
+                    installed_label(row.installed),
                 ])
                 .map_err(|e| -> CliError { e.into() })?;
         }
@@ -595,15 +609,10 @@ impl TableDisplay for PluginDetails {
         simple_table_row!(table, "Format", self.plugin.plugin_format.to_string());
         simple_table_row!(table, "Dev Identifier", self.plugin.dev_identifier);
         
-        let status = if self.plugin.installed {
-            colored_cell!("Installed", green)
-        } else {
-            colored_cell!("Missing", red)
-        };
+        let status = installed_cell(self.plugin.installed);
         simple_table_row!(table, "Status", status);
         
         simple_table_row!(table, "Version", self.plugin.version.as_deref().unwrap_or("Unknown"));
-        simple_table_row!(table, "SDK Version", self.plugin.sdk_version.as_deref().unwrap_or("Unknown"));
         simple_table_row!(table, "Usage Count", self.usage_count);
         simple_table_row!(table, "Used in Projects", self.project_count);
 
@@ -617,9 +626,8 @@ impl TableDisplay for PluginDetails {
         writer.write_record(["vendor", &self.plugin.vendor.as_deref().unwrap_or("")]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["format", &self.plugin.plugin_format.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["dev_identifier", &self.plugin.dev_identifier]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["installed", &self.plugin.installed.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["installed", installed_label(self.plugin.installed)]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["version", &self.plugin.version.as_deref().unwrap_or("")]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["sdk_version", &self.plugin.sdk_version.as_deref().unwrap_or("")]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["usage_count", &self.usage_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["project_count", &self.project_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
         Ok(())
@@ -639,6 +647,7 @@ impl TableDisplay for PluginStatsDisplay {
         simple_table_row!(table, "Overview", "Total Plugins", self.stats.total_plugins);
         simple_table_row!(table, "Overview", "Installed Plugins", self.stats.installed_plugins);
         simple_table_row!(table, "Overview", "Missing Plugins", self.stats.missing_plugins);
+        simple_table_row!(table, "Overview", "Not Yet Scanned", self.stats.unknown_plugins);
         simple_table_row!(table, "Overview", "Unique Vendors", self.stats.unique_vendors);
 
         // Format breakdown
@@ -659,6 +668,7 @@ impl TableDisplay for PluginStatsDisplay {
         writer.write_record(["Overview", "Total Plugins", &self.stats.total_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["Overview", "Installed Plugins", &self.stats.installed_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["Overview", "Missing Plugins", &self.stats.missing_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["Overview", "Not Yet Scanned", &self.stats.unknown_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["Overview", "Unique Vendors", &self.stats.unique_vendors.to_string()]).map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
@@ -673,20 +683,22 @@ impl TableDisplay for PluginRefreshDisplay {
     fn to_simple_table(&self) -> SimpleTable {
         let mut table = SimpleTable::new(vec!["Refresh Result".to_string(), "Count".to_string()]);
 
-        simple_table_row!(table, "Total Checked", self.result.total_plugins_checked);
-        simple_table_row!(table, colored_cell!("Now Installed", green), self.result.plugins_now_installed);
-        simple_table_row!(table, colored_cell!("Now Missing", red), self.result.plugins_now_missing);
-        simple_table_row!(table, "Unchanged", self.result.plugins_unchanged);
+        simple_table_row!(table, "Candidates Scanned", self.result.candidates_scanned);
+        simple_table_row!(table, colored_cell!("Installed", green), self.result.plugins_installed);
+        simple_table_row!(table, colored_cell!("Missing", red), self.result.plugins_missing);
+        simple_table_row!(table, "Reconciled", self.result.plugins_reconciled);
+        simple_table_row!(table, colored_cell!("Scan Failures", yellow), self.result.scan_failures);
 
         table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         writer.write_record(["result", "count"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["total_checked", &self.result.total_plugins_checked.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["now_installed", &self.result.plugins_now_installed.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["now_missing", &self.result.plugins_now_missing.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["unchanged", &self.result.plugins_unchanged.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["candidates_scanned", &self.result.candidates_scanned.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["plugins_installed", &self.result.plugins_installed.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["plugins_missing", &self.result.plugins_missing.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["plugins_reconciled", &self.result.plugins_reconciled.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["scan_failures", &self.result.scan_failures.to_string()]).map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }

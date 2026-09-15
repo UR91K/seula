@@ -36,19 +36,22 @@ message Project {
 }
 
 message Plugin {
+  // 2, 3, 10-13 held Ableton's own row ids and scan bookkeeping, removed with the
+  // Ableton database dependency (ADR-0006). Reserved rather than recycled so an old
+  // client cannot silently read a new field as an old one.
+  reserved 2, 3, 10, 11, 12, 13;
+  reserved "ableton_plugin_id", "ableton_module_id", "sdk_version", "flags",
+           "scanstate", "enabled";
+
   string id = 1;
-  optional int32 ableton_plugin_id = 2;
-  optional int32 ableton_module_id = 3;
   string dev_identifier = 4;
   string name = 5;
   string format = 6;
-  bool installed = 7;
+  // Absent means no plugin scan has looked yet, which is distinct from having
+  // looked and not found it. See ADR-0005 and ADR-0012.
+  optional bool installed = 7;
   optional string vendor = 8;
   optional string version = 9;
-  optional string sdk_version = 10;
-  optional int32 flags = 11;
-  optional int32 scanstate = 12;
-  optional int32 enabled = 13;
   optional int32 usage_count = 14;
   optional int32 project_count = 15;
 }
@@ -140,6 +143,8 @@ enum ScanStatus {
   SCAN_INSERTING = 4;
   SCAN_COMPLETED = 5;
   SCAN_ERROR = 6;
+  // The first-run plugin scan, which runs before projects are discovered.
+  SCAN_SCANNING_PLUGINS = 7;
 }
 
 enum WatcherEventType {

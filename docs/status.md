@@ -20,34 +20,57 @@ Last reviewed: 2026-09-15.
 | File watcher | **Done** | `src/watcher/`, streams over gRPC |
 | Tags / collections / tasks / notes | **Done** | |
 | Media (cover art, audio) | **Done** | `src/media/`, size limits configurable |
-| Plugin metadata via Ableton DB | **Works, being retired** | `src/ableton_db.rs`. ADR-0006 |
+| Plugin metadata via Ableton DB | **Removed** | Retired 2026-09-15. ADR-0006 |
 | Plugin scanner worker | **Done** | `crates/vst-meta`. ADR-0004 |
 | Plugin scanner supervisor | **Done** | `src/scan/plugins/`. ADR-0004 |
-| Plugin scan → database | **Not started** | Results are printed, never persisted |
-| uid-based plugin matching | **Not started** | Design settled: ADR-0005 |
-| `plugins` table restructure | **Not started** | Design settled: ADR-0007 |
+| Plugin scan → database | **Done** | `src/database/plugin_scan.rs`. `seula plugin refresh` scans and persists |
+| First-run plugin scan | **Done** | Runs before project discovery when one has never completed. ADR-0013 |
+| Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
+| uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
+| `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
 | Analytics dashboard frontend | **Not started** | `FRONTEND_SPEC.md`, status unverified |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
 ## Next
 
-The plugin work is mid-migration. Phase 1 (worker + supervisor) landed in `b261200`.
-Phase 2, in order:
+The plugin migration is complete. Phase 1 (worker + supervisor) landed in `b261200`;
+phase 2 followed in three steps — schema and persistence, the first-run scan, and
+retiring the Ableton database.
 
-1. Persist scan results — restructure `plugins` per ADR-0007.
-2. Match project plugins by `(format, uid)` per ADR-0005, including the
-   `plugin_classes` fallback for multi-class VST3 bundles.
-3. Retire `src/ableton_db.rs` and drop the Ableton-only columns per ADR-0006.
+Plugin metadata now comes entirely from Seula's own scanner. `seula plugin refresh`
+scans the system and persists into `plugins` / `plugin_classes` / `plugin_buses`, sweeps
+what it no longer finds, and merges phantom rows into the bundle that owns their class.
+`seula scan` runs that scan automatically when one has never completed. Parsing a project
+records references in `plugin_refs` and resolves them by `(plugin_kind, uid)`, falling
+back to `plugin_classes.class_id`.
 
-Until 2 lands, `installed` still comes from Ableton's database.
+Nothing in the plugin path reads Ableton's database any more, and `live_database_dir` is
+gone from the configuration.
+
+Worth picking up next, in no particular order:
+
+- **`sdk_version` from the scanner.** VST3 exposes it; the column was dropped with the
+  Ableton fields because nothing else populated it. Re-adding means teaching
+  `crates/vst-meta` to read it, not a schema argument.
+- **A config flag to decline the first-run scan.** Today the only way out is pointing
+  `vst_search_paths` at an empty directory (ADR-0013).
+- **`plugin_paths`**, if duplicate install locations ever need surfacing (ADR-0010).
+
+A full plugin scan is **2m19s for 276 candidates** (debug build, 2026-09-15). The cost is
+plugin load time, not ours, so a release build will not change it much — which is why it
+runs once on first use and thereafter only on demand (ADR-0013).
+
+**Schema versioning:** `SCHEMA_VERSION` (now 2) is bumped only for changes to *existing*
+tables. Adding a table needs no bump, because `initialize()` creates missing ones on
+every open — and a bump discards the user's database (ADR-0011).
 
 ## Known issues
 
 | Issue | Where | Severity |
 |---|---|---|
 | `test_process_projects_integration` fails on `._*.als` AppleDouble sidecars found in the configured project folders. They parse as `.als`, fail, and never reach the DB — while the test asserts every discovered `.als` is present. Environment-dependent. Fixing it means deciding whether the scanner should skip `._` files. | `tests/integration/scanning.rs` | Low, but it keeps the suite red |
-| `refresh_plugin_installation_status` tests `get_plugin_by_dev_identifier(..).is_ok()`, which is `true` for `Ok(None)` — so every plugin is marked installed. Superseded by step 2 above; fix sooner if the flag is trusted anywhere. | `src/database/plugins.rs:255` | Medium |
+| `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
 

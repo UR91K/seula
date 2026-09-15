@@ -230,10 +230,10 @@ fn test_parse_performance() {
         if !live_set.plugins.is_empty() {
             println!("\n{}", "Plugins:".yellow().bold());
             for plugin in &live_set.plugins {
-                let status = if plugin.installed {
-                    "✓".green()
-                } else {
-                    "✗".red()
+                let status = match plugin.installed {
+                    Some(true) => "✓".green(),
+                    Some(false) => "✗".red(),
+                    None => "?".yellow(),
                 };
                 println!(
                     "  {} {} ({})",

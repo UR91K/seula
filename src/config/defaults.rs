@@ -18,12 +18,9 @@ pub const DEFAULT_VST_SCAN_TIMEOUT_SECS: u64 = 30;
 
 /// Generates a default configuration file content
 pub fn generate_default_config() -> Result<String, ConfigError> {
-    let local_data_dir = dirs::data_local_dir()
-        .ok_or_else(|| ConfigError::InvalidPath("Could not get local data directory".into()))?;
     let roaming_data_dir = dirs::data_dir()
         .ok_or_else(|| ConfigError::InvalidPath("Could not get roaming data directory".into()))?;
 
-    let live_database_path = local_data_dir.join("Ableton").join("Live Database");
     let media_storage_path = roaming_data_dir.join("Seula").join("media");
 
     let config_content = format!(
@@ -40,8 +37,6 @@ paths = [
 # Database configuration
 # If database_path is not specified or empty, it will default to the user's data directory
 # database_path = ''
-
-live_database_dir = '{}'
 
 # gRPC server configuration
 grpc_port = {}
@@ -64,7 +59,6 @@ vst_search_paths = []
 # Seconds a single plugin may take to load before the scanner gives up on it.
 # vst_scan_timeout_secs = 30
 "#,
-        live_database_path.display(),
         DEFAULT_GRPC_PORT,
         DEFAULT_LOG_LEVEL,
         media_storage_path.display()

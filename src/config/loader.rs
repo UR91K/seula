@@ -60,9 +60,6 @@ fn process_user_home_placeholders(config: &mut Config) -> Result<(), ConfigError
         .database_path
         .as_ref()
         .map(|path| path.replace("{USER_HOME}", home_dir_str));
-    config.live_database_dir = config
-        .live_database_dir
-        .replace("{USER_HOME}", home_dir_str);
     config.media_storage_dir = config
         .media_storage_dir
         .replace("{USER_HOME}", home_dir_str);

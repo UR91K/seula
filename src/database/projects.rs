@@ -4,7 +4,7 @@ use super::helpers::{
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::live_set::LiveSet;
-use crate::models::{AbletonVersion, KeySignature, Plugin, Sample, TimeSignature};
+use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use crate::utils::metadata::load_file_hash;
 use chrono::{Local, TimeZone, Utc};
 use log::{debug, info};
@@ -136,26 +136,7 @@ impl LiveSetDatabase {
 
         let plugins = stmt
             .query_map([id], |row| {
-                let name: String = row.get(4)?;
-                debug!("Found plugin: {}", name);
-                Ok(Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: row.get(1)?,
-                    module_id: row.get(2)?,
-                    dev_identifier: row.get(3)?,
-                    name,
-                    plugin_format: row
-                        .get::<_, String>(5)?
-                        .parse()
-                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                    installed: row.get(6)?,
-                    vendor: row.get(7)?,
-                    version: row.get(8)?,
-                    sdk_version: row.get(9)?,
-                    flags: row.get(10)?,
-                    scanstate: row.get(11)?,
-                    enabled: row.get(12)?,
-                })
+                crate::database::helpers::row_to_plugin(row)
             })?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
@@ -323,26 +304,7 @@ impl LiveSetDatabase {
 
         let plugins = stmt
             .query_map([id], |row| {
-                let name: String = row.get(4)?;
-                debug!("Found plugin: {}", name);
-                Ok(Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: row.get(1)?,
-                    module_id: row.get(2)?,
-                    dev_identifier: row.get(3)?,
-                    name,
-                    plugin_format: row
-                        .get::<_, String>(5)?
-                        .parse()
-                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                    installed: row.get(6)?,
-                    vendor: row.get(7)?,
-                    version: row.get(8)?,
-                    sdk_version: row.get(9)?,
-                    flags: row.get(10)?,
-                    scanstate: row.get(11)?,
-                    enabled: row.get(12)?,
-                })
+                crate::database::helpers::row_to_plugin(row)
             })?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
@@ -505,26 +467,7 @@ impl LiveSetDatabase {
 
         let plugins = stmt
             .query_map([path], |row| {
-                let name: String = row.get(4)?;
-                debug!("Found plugin: {}", name);
-                Ok(Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: row.get(1)?,
-                    module_id: row.get(2)?,
-                    dev_identifier: row.get(3)?,
-                    name,
-                    plugin_format: row
-                        .get::<_, String>(5)?
-                        .parse()
-                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                    installed: row.get(6)?,
-                    vendor: row.get(7)?,
-                    version: row.get(8)?,
-                    sdk_version: row.get(9)?,
-                    flags: row.get(10)?,
-                    scanstate: row.get(11)?,
-                    enabled: row.get(12)?,
-                })
+                crate::database::helpers::row_to_plugin(row)
             })?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
@@ -617,10 +560,10 @@ impl LiveSetDatabase {
         // Insert plugins
         debug!("Inserting {} plugins", live_set.plugins.len());
         for plugin in &live_set.plugins {
-            let plugin_id = plugin.id.to_string();
-            debug!("Inserted plugin: {} ({})", plugin.name, plugin_id);
-            insert_plugin(&tx, plugin)?;
-            link_project_plugin(&tx, &project_id, &plugin_id)?;
+            if let Some(plugin_id) = insert_plugin(&tx, plugin)? {
+                debug!("Inserted plugin: {} ({})", plugin.name, plugin_id);
+                link_project_plugin(&tx, &project_id, &plugin_id)?;
+            }
         }
 
         // Insert samples
@@ -771,24 +714,7 @@ impl LiveSetDatabase {
                 ).map_err(DatabaseError::from)?;
                 live_set.plugins = plugin_stmt
                     .query_map([&project_id_str], |row| {
-                        Ok(Plugin {
-                            id: Uuid::new_v4(),
-                            plugin_id: row.get(1)?,
-                            module_id: row.get(2)?,
-                            dev_identifier: row.get(3)?,
-                            name: row.get(4)?,
-                            plugin_format: row
-                                .get::<_, String>(5)?
-                                .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                            installed: row.get(6)?,
-                            vendor: row.get(7)?,
-                            version: row.get(8)?,
-                            sdk_version: row.get(9)?,
-                            flags: row.get(10)?,
-                            scanstate: row.get(11)?,
-                            enabled: row.get(12)?,
-                        })
+                        crate::database::helpers::row_to_plugin(row)
                     })
                     .map_err(DatabaseError::from)?
                     .filter_map(|r| r.ok())
@@ -984,24 +910,7 @@ impl LiveSetDatabase {
                 )?;
                 project.plugins = plugin_stmt
                     .query_map([&project_id_str], |row| {
-                        Ok(Plugin {
-                            id: Uuid::new_v4(),
-                            plugin_id: row.get(1)?,
-                            module_id: row.get(2)?,
-                            dev_identifier: row.get(3)?,
-                            name: row.get(4)?,
-                            plugin_format: row
-                                .get::<_, String>(5)?
-                                .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                            installed: row.get(6)?,
-                            vendor: row.get(7)?,
-                            version: row.get(8)?,
-                            sdk_version: row.get(9)?,
-                            flags: row.get(10)?,
-                            scanstate: row.get(11)?,
-                            enabled: row.get(12)?,
-                        })
+                        crate::database::helpers::row_to_plugin(row)
                     })?
                     .filter_map(|r| r.ok())
                     .collect();
@@ -1085,24 +994,7 @@ impl LiveSetDatabase {
                 )?;
                 project.plugins = plugin_stmt
                     .query_map([&project_id_str], |row| {
-                        Ok(Plugin {
-                            id: Uuid::new_v4(),
-                            plugin_id: row.get(1)?,
-                            module_id: row.get(2)?,
-                            dev_identifier: row.get(3)?,
-                            name: row.get(4)?,
-                            plugin_format: row
-                                .get::<_, String>(5)?
-                                .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                            installed: row.get(6)?,
-                            vendor: row.get(7)?,
-                            version: row.get(8)?,
-                            sdk_version: row.get(9)?,
-                            flags: row.get(10)?,
-                            scanstate: row.get(11)?,
-                            enabled: row.get(12)?,
-                        })
+                        crate::database::helpers::row_to_plugin(row)
                     })?
                     .filter_map(|r| r.ok())
                     .collect();
@@ -1303,24 +1195,7 @@ impl LiveSetDatabase {
                 )?;
                 project.plugins = plugin_stmt
                     .query_map([&project_id_str], |row| {
-                        Ok(Plugin {
-                            id: Uuid::new_v4(),
-                            plugin_id: row.get(1)?,
-                            module_id: row.get(2)?,
-                            dev_identifier: row.get(3)?,
-                            name: row.get(4)?,
-                            plugin_format: row
-                                .get::<_, String>(5)?
-                                .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
-                            installed: row.get(6)?,
-                            vendor: row.get(7)?,
-                            version: row.get(8)?,
-                            sdk_version: row.get(9)?,
-                            flags: row.get(10)?,
-                            scanstate: row.get(11)?,
-                            enabled: row.get(12)?,
-                        })
+                        crate::database::helpers::row_to_plugin(row)
                     })?
                     .filter_map(|r| r.ok())
                     .collect();
@@ -1530,9 +1405,9 @@ impl LiveSetDatabase {
 
         // Insert new plugins
         for plugin in &new_live_set.plugins {
-            let plugin_id = plugin.id.to_string();
-            super::helpers::insert_plugin(&tx, plugin)?;
-            super::helpers::link_project_plugin(&tx, project_id, &plugin_id)?;
+            if let Some(plugin_id) = super::helpers::insert_plugin(&tx, plugin)? {
+                super::helpers::link_project_plugin(&tx, project_id, &plugin_id)?;
+            }
         }
 
         // Insert new samples

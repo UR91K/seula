@@ -14,14 +14,16 @@ src/
     parallel.rs    manual worker pool                      (ADR-0002)
     plugins/       system plugin scanning, supervisor      (ADR-0004)
   database/      SQLite, one module per entity, FTS5 search
+    batch.rs       project batch insert; resolves plugin references (ADR-0005, 0009)
+    plugin_scan.rs persists plugin scan results                     (ADR-0007, 0012)
   grpc/          12 services, one handler each
   cli/           clap commands + interactive mode; output.rs owns table/JSON/CSV
   config/        config.toml loading, validation, platform paths
   media/         cover art and audio file storage
   watcher/       filesystem change notifications
-  ableton_db.rs  reads Ableton's own plugin DB            (being retired, ADR-0006)
 crates/
   vst-meta/      the plugin scanner worker — runs as a SUBPROCESS (ADR-0004)
+                 the sole source of plugin metadata since ADR-0006
 proto/services/  gRPC definitions
 ```
 
@@ -52,7 +54,23 @@ also documents the guard-lifetime bug that made it silently serial for its whole
 so do not reintroduce `while let Ok(x) = rx.lock().unwrap().recv()`.
 
 **Plugin identity is `(format, uid)`, never the name or version.** Ableton's
-`dev_identifier` is a wrapper around the plugin's own native ID. See ADR-0005.
+`dev_identifier` is a wrapper around the plugin's own native ID. Parse it with
+`PluginKey`, which has nowhere to put Ableton's instr/audiofx call — unlike
+`PluginFormat`, whose four variants bake it in. See ADR-0005.
+
+**Only a plugin scan writes `plugins.installed`.** Parsing a project records a
+*reference*; a project file cannot know what is installed on this machine. The flag is
+tri-state — `NULL` means no scan has looked, which is not the same as looked-and-absent
+— so a partial scan can leave plugins it never reached alone instead of declaring them
+missing. See ADR-0012.
+
+**Bump `SCHEMA_VERSION` only for changes to existing tables.** Adding a table needs no
+bump — `initialize()` creates missing ones on every open. A bump *discards the user's
+database* (ADR-0011), which is an absurd price for one new table.
+
+**Store uids and class IDs through `PluginKey::uid_hex()`.** Ableton writes them
+lowercase and dashed, the scanner uppercase and undashed. Skip the normalisation and
+every lookup silently misses.
 
 ## When something looks odd
 

@@ -1,10 +1,11 @@
 # 0006. Retire the Ableton plugin database dependency
 
-- **Status:** Accepted — not yet implemented
+- **Status:** Accepted — implemented 2026-09-15
 - **Decided:** 2026-09-15
 - **Recorded:** 2026-09-15
 - **Confidence:** decided now
-- **Evidence:** `src/ableton_db.rs`; `make_plugin` in `src/scan/parser.rs:922`
+- **Evidence:** the former `ableton_db.rs` (deleted by this decision); `make_plugin` in
+  `src/scan/parser.rs`
 
 ## Context
 
@@ -20,7 +21,7 @@ Three problems:
 2. **It is limited to the fields Ableton happens to store.** No bus layouts, channel
    counts, latency, or GUI presence.
 3. **The schema drifts between Live versions.** `build_plugin_query`
-   (`src/ableton_db.rs:100`) introspects the `plugins` table's columns at runtime and
+   (in the former `ableton_db.rs`) introspects the `plugins` table's columns at runtime and
    selects only the ones that exist. That workaround, and the `Live-plugins-*.db`
    filename filter added in `cb04a1b` / `802ec38` after "most recent `.db`" kept picking
    the *files* database, are both load-bearing and both fragile.
@@ -30,7 +31,7 @@ from the binaries, and the join key is the plugin's own identifier, not Ableton'
 
 ## Decision
 
-Once uid matching lands, delete `src/ableton_db.rs` and drop the Ableton-only fields
+Once uid matching lands, delete `ableton_db.rs` and drop the Ableton-only fields
 from `Plugin`: `plugin_id`, `module_id`, `flags`, `scanstate`, `enabled`. `installed`
 becomes a function of scan results.
 
@@ -59,7 +60,21 @@ explicitly not required.
 
 ## Notes
 
-Not yet started. Sequencing is in `docs/status.md`.
+Implemented 2026-09-15, after ADR-0009 and ADR-0013. What actually went:
+
+- `ableton_db.rs` and its `DbPlugin` row type.
+- `Plugin::reparse`, the `INSTALLED_PLUGINS` cache, and `LiveSet::reparse_plugins`.
+- The transitional per-batch fallback added in phase 2 step 1.
+- `plugin_id`, `module_id`, `sdk_version`, `flags`, `scanstate` and `enabled` from
+  `Plugin`, the `plugins` table, and `Plugin` in `proto/common.proto` — field numbers
+  reserved rather than recycled.
+- `live_database_dir` from the configuration, which pointed at Ableton's database
+  directory and had no other purpose.
+
+`sdk_version` went with them, which ADR-0006 did not originally list. It is a real VST3
+concept the scanner could report, but nothing populated it except Ableton, so keeping a
+permanently-NULL column would have been worse than removing it. Re-adding it is a
+scanner change, not a schema argument.
 
 `refresh_plugin_installation_status` (`src/database/plugins.rs:255`) is replaced by this
 work. It currently tests `get_plugin_by_dev_identifier(..).is_ok()`, which returns `true`

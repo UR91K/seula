@@ -30,7 +30,6 @@ impl ConfigHandler {
         let config_data = ConfigData {
             paths: config.paths.clone(),
             database_path: config.database_path.clone(),
-            live_database_dir: config.live_database_dir.clone(),
             grpc_port: config.grpc_port as u32,
             log_level: config.log_level.clone(),
             media_storage_dir: config.media_storage_dir.clone(),
@@ -187,7 +186,6 @@ impl ConfigHandler {
 
         match config.update_settings(
             req.database_path,
-            req.live_database_dir,
             req.grpc_port.map(|p| p as u16),
             req.log_level,
             req.media_storage_dir,
@@ -228,7 +226,6 @@ impl ConfigHandler {
                 let config_data = ConfigData {
                     paths: new_config.paths.clone(),
                     database_path: new_config.database_path.clone(),
-                    live_database_dir: new_config.live_database_dir.clone(),
                     grpc_port: new_config.grpc_port as u32,
                     log_level: new_config.log_level.clone(),
                     media_storage_dir: new_config.media_storage_dir.clone(),

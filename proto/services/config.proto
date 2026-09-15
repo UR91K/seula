@@ -37,7 +37,9 @@ message GetConfigRequest {}
 message ConfigData {
   repeated string paths = 1;
   optional string database_path = 2;
-  string live_database_dir = 3;
+  // 3 held live_database_dir, removed with the Ableton database
+  // dependency (ADR-0006).
+  reserved 3;
   uint32 grpc_port = 4;
   string log_level = 5;
   string media_storage_dir = 6;
@@ -97,7 +99,7 @@ message RemovePathResponse {
 // Update Settings
 message UpdateSettingsRequest {
   optional string database_path = 1;
-  optional string live_database_dir = 2;
+  reserved 2;
   optional uint32 grpc_port = 3;
   optional string log_level = 4;
   optional string media_storage_dir = 5;

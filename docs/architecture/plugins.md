@@ -7,8 +7,8 @@ The most intricate area in the codebase, and the one mid-migration. Read
 
 | Type | Location | Means |
 |---|---|---|
-| `PluginInfo` | `src/models.rs:731` | Raw — exactly what an `.als` yields |
-| `DbPlugin` | `src/ableton_db.rs:9` | A row from Ableton's own database (being retired) |
+| `PluginInfo` | `src/models.rs` | Raw — exactly what an `.als` yields |
+| `PluginKey` | `src/models.rs` | The join key: `(format, uid)` as an enum (ADR-0005) |
 | `Plugin` | `src/models.rs:587` | The merged record, stored in Seula's database |
 | `GrpcPlugin` | `src/models.rs:617` | `Plugin` + usage counts, for API responses |
 | `PluginMeta` | `crates/vst-meta/src/meta.rs` | What the scanner extracts from a binary |
@@ -39,12 +39,12 @@ Results accumulate into `plugin_info_tags: HashMap<String, PluginInfo>` keyed by
 
 ## Where everything else comes from
 
-Today: Ableton's database, via `make_plugin` (`parser.rs:922`). Vendor, version, SDK
-version, Ableton's row ids and scan bookkeeping, and `installed` — which means only
-"the lookup hit". On a miss, the XML name and format survive and everything optional is
-`None`.
+The scanner, and only the scanner. A reference that matches nothing installed keeps its
+name and format from the `.als` and nothing else — vendor and version stay NULL, which
+is honest: we have never seen the binary.
 
-Being replaced by the scanner. See ADR-0006.
+Ableton's own database was the source until 2026-09-15 and is now gone entirely, along
+with the five columns that only it populated. See ADR-0006.
 
 ## Identity
 
@@ -81,8 +81,66 @@ discovery.rs ──► spawner.rs ──[spawn]──► vst-meta (subprocess)
   depends on `vst-meta` with `default-features = false` so the VST hosts are not even
   linked here.
 
-Exercise it with `seula plugin scan-system`. Results are printed, **not persisted** —
-that is the next piece of work.
+`seula plugin scan-system` prints results without touching the database — the
+diagnostic view. `seula plugin refresh` scans and persists.
+
+`seula scan` runs the same scan automatically when one has never completed, before
+discovering projects, and reports each plugin as it is attempted under a
+`scanning_plugins` phase. The trigger is a recorded fact in `app_state`, not an empty
+plugins table — a machine whose plugins all fail to load would leave that table empty and
+rescan forever. See ADR-0013.
+
+## Persisting, and matching
+
+```
+plugin refresh ──► scan ──► persist_plugin_scan     (src/database/plugin_scan.rs)
+                              upsert on (plugin_kind, uid), installed = 1
+                              replace plugin_classes / plugin_buses
+                              sweep unseen -> installed = 0   (full scans only)
+                              reconcile phantoms
+
+project scan  ──► parser emits bare references
+                  BatchTransaction resolves them        (src/database/batch.rs)
+                    1. (plugin_kind, uid)
+                    2. plugin_classes.class_id -> owning bundle
+                    3. otherwise create a row, installed unknown
+                  writes plugin_refs recording which branch won
+```
+
+The parser no longer touches a database at all. It used to open Ableton's SQLite file
+inside `finalize_result` — once per project, on every worker thread.
+
+**Only the scan writes `installed`**, and it is tri-state: `NULL` means no scan has
+looked, which is different from having looked and not found it (ADR-0012). A partial
+scan — narrowed with `--paths`, or cut short by the restart budget — skips the sweep,
+because it has no grounds to call anything missing.
+
+**Phantom reconciliation** is what makes "install the missing plugin, run refresh" work.
+A project can reference a bundle's non-primary class before that bundle is ever scanned;
+the reference is a real identity, so it gets its own row. Once the bundle turns up, that
+row is a duplicate, and the merge repoints `plugin_refs` and `project_plugins` at the
+real bundle before deleting it.
+
+## Schema
+
+| Table | Key | A row means |
+|---|---|---|
+| `plugins` | `(plugin_kind, uid)` | a plugin — installed, referenced, or both (ADR-0007) |
+| `plugin_refs` | `dev_identifier` | an Ableton reference string → the plugin it resolves to (ADR-0009) |
+| `plugin_classes` | — | a class a VST3 bundle's factory exports; `class_id` is the matching fallback |
+| `plugin_buses` | — | a bundle's bus layout |
+| `project_plugins` | — | which projects use which plugin, unchanged |
+
+`plugins.format` keeps its four display values (`"VST3 Instrument"`, …). Identity is
+`plugin_kind` + `uid`, deliberately separate, because `format` bakes in Ableton's
+instr/audiofx call — which ADR-0005 keeps out of identity.
+
+`plugins.dev_identifier` is a representative reference kept for display; `plugin_refs`
+is the authoritative and exhaustive mapping.
+
+Uids and `class_id`s are stored normalised through `PluginKey::uid_hex()` — lowercase,
+undashed. Ableton writes lowercase and the scanner uppercase, so without that every
+lookup would miss.
 
 ## VST2 shells
 

@@ -82,18 +82,12 @@ pub fn convert_live_set_to_proto(
             .into_iter()
             .map(|p| Plugin {
                 id: p.id.to_string(),
-                ableton_plugin_id: p.plugin_id,
-                ableton_module_id: p.module_id,
                 dev_identifier: p.dev_identifier,
                 name: p.name,
                 format: p.plugin_format.to_string(),
                 installed: p.installed,
                 vendor: Some(p.vendor.unwrap_or_default()),
                 version: Some(p.version.unwrap_or_default()),
-                sdk_version: Some(p.sdk_version.unwrap_or_default()),
-                flags: p.flags,
-                scanstate: p.scanstate,
-                enabled: p.enabled,
                 usage_count: None, // Not available in this context
                 project_count: None, // Not available in this context
             })

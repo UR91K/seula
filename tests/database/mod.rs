@@ -6,6 +6,7 @@ pub mod batch;
 pub mod collections;
 pub mod core;
 pub mod media;
+pub mod plugin_scan;
 pub mod search;
 pub mod tags;
 

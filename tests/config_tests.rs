@@ -46,10 +46,6 @@ fn test_config_validation() {
             }
 
             assert!(
-                !config.live_database_dir.contains("{USER_HOME}"),
-                "Live database dir should not contain {{USER_HOME}} placeholder"
-            );
-            assert!(
                 !config.media_storage_dir.contains("{USER_HOME}"),
                 "Media storage dir should not contain {{USER_HOME}} placeholder"
             );

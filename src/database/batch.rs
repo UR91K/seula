@@ -1,4 +1,5 @@
-use log::{debug, info};
+use chrono::Local;
+use log::{debug, info, warn};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -8,11 +9,37 @@ use uuid::Uuid;
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::live_set::LiveSet;
-use crate::models::{Plugin, Sample};
+use crate::models::{Plugin, PluginKey, Sample};
+
+/// Ableton's name for a reference, recovering it from the identifier when the project
+/// file's `<Name>` element was blank.
+fn reference_name(plugin: &Plugin) -> String {
+    if !plugin.name.trim().is_empty() {
+        return plugin.name.clone();
+    }
+    crate::models::dev_identifier_display_name(&plugin.dev_identifier).unwrap_or_default()
+}
+
+/// One project reference, and the plugin we resolved it to.
+struct PluginRef {
+    dev_identifier: String,
+    plugin_key: PluginKey,
+    ableton_name: String,
+    ableton_format: String,
+    resolved_via: &'static str,
+}
 
 struct BatchTransaction<'a> {
     tx: Transaction<'a>,
-    unique_plugins: HashMap<String, Plugin>, // dev_identifier -> Plugin
+    /// Keyed on the plugin's own identity (ADR-0005), not on Ableton's reference
+    /// string: one plugin can be referenced by several `dev_identifier`s.
+    unique_plugins: HashMap<PluginKey, Plugin>,
+    /// Every class a known VST3 bundle exports, mapped to the bundle that owns it.
+    /// A project references whichever processor class the user instantiated, which
+    /// need not be the bundle's top-level uid.
+    class_index: HashMap<PluginKey, PluginKey>,
+    /// Reference rows to write once the plugins they point at exist.
+    plugin_refs: Vec<PluginRef>,
     unique_samples: HashMap<String, Sample>, // path -> Sample
     plugin_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
     sample_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
@@ -24,6 +51,8 @@ impl<'a> BatchTransaction<'a> {
         Ok(Self {
             tx: conn.transaction()?,
             unique_plugins: HashMap::new(),
+            class_index: HashMap::new(),
+            plugin_refs: Vec::new(),
             unique_samples: HashMap::new(),
             plugin_id_map: HashMap::new(),
             sample_id_map: HashMap::new(),
@@ -34,35 +63,64 @@ impl<'a> BatchTransaction<'a> {
     fn load_existing_plugins(&mut self) -> Result<(), DatabaseError> {
         debug!("Loading existing plugins from database");
         let mut stmt = self.tx.prepare(
-            "SELECT id, ableton_plugin_id, ableton_module_id, dev_identifier, name, format,
-                    installed, vendor, version, sdk_version, flags, scanstate, enabled
+            "SELECT uid, id, dev_identifier, name, format, installed, vendor, version
              FROM plugins",
         )?;
 
         let existing_plugins = stmt.query_map([], |row| {
-            Ok(Plugin {
-                id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
-                plugin_id: row.get(1)?,
-                module_id: row.get(2)?,
-                dev_identifier: row.get(3)?,
-                name: row.get(4)?,
-                plugin_format: row.get::<_, String>(5)?.parse().unwrap(),
-                installed: row.get(6)?,
-                vendor: row.get(7)?,
-                version: row.get(8)?,
-                sdk_version: row.get(9)?,
-                flags: row.get(10)?,
-                scanstate: row.get(11)?,
-                enabled: row.get(12)?,
-            })
+            let uid: String = row.get(0)?;
+            Ok((
+                uid,
+                Plugin {
+                    id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
+                    dev_identifier: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    name: row.get(3)?,
+                    plugin_format: row.get::<_, String>(4)?.parse().unwrap(),
+                    installed: row.get(5)?,
+                    vendor: row.get(6)?,
+                    version: row.get(7)?,
+                },
+            ))
         })?;
 
-        for plugin in existing_plugins {
-            let plugin = plugin?;
-            self.unique_plugins
-                .insert(plugin.dev_identifier.clone(), plugin);
+        for row in existing_plugins {
+            let (uid, plugin) = row?;
+            match PluginKey::from_uid_hex(&uid) {
+                Some(key) => {
+                    self.unique_plugins.insert(key, plugin);
+                }
+                // Only reachable if something wrote a uid by a route other than
+                // PluginKey::uid_hex(); skipping is safer than guessing.
+                None => warn!("Skipping plugin row with unparseable uid: {}", uid),
+            }
         }
         debug!("Loaded {} existing plugins", self.unique_plugins.len());
+        Ok(())
+    }
+
+    /// Build the class-ID lookup used when a reference names a bundle's non-primary
+    /// processor class rather than the bundle itself.
+    fn load_class_index(&mut self) -> Result<(), DatabaseError> {
+        let mut stmt = self.tx.prepare(
+            "SELECT c.class_id, p.uid
+             FROM plugin_classes c
+             JOIN plugins p ON p.id = c.plugin_id",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        for row in rows {
+            let (class_id, owner_uid) = row?;
+            if let (Some(class_key), Some(owner_key)) = (
+                PluginKey::from_uid_hex(&class_id),
+                PluginKey::from_uid_hex(&owner_uid),
+            ) {
+                self.class_index.insert(class_key, owner_key);
+            }
+        }
+        debug!("Loaded {} plugin classes", self.class_index.len());
         Ok(())
     }
 
@@ -91,13 +149,14 @@ impl<'a> BatchTransaction<'a> {
     }
 
     fn merge_plugin_metadata(existing: &mut Plugin, new: &Plugin) {
+        // A scanned plugin's name, vendor and version came from the binary itself.
+        // A project reference must never overwrite them with Ableton's version of
+        // the same facts.
+        if existing.installed == Some(true) {
+            return;
+        }
+
         // Keep non-null values from new plugin if they exist
-        if new.plugin_id.is_some() {
-            existing.plugin_id = new.plugin_id;
-        }
-        if new.module_id.is_some() {
-            existing.module_id = new.module_id;
-        }
         // Merge name: use new name if existing name is empty or if new name is non-empty
         if !new.name.trim().is_empty() && (existing.name.trim().is_empty() || existing.name != new.name) {
             existing.name = new.name.clone();
@@ -108,41 +167,65 @@ impl<'a> BatchTransaction<'a> {
         if new.version.is_some() {
             existing.version = new.version.clone();
         }
-        if new.sdk_version.is_some() {
-            existing.sdk_version = new.sdk_version.clone();
-        }
-        if new.flags.is_some() {
-            existing.flags = new.flags;
-        }
-        if new.scanstate.is_some() {
-            existing.scanstate = new.scanstate;
-        }
-        if new.enabled.is_some() {
-            existing.enabled = new.enabled;
-        }
-        // Update installed status if the new plugin is installed
-        if new.installed {
-            existing.installed = true;
+        // `installed` is owned by the plugin scan, never by parsing a project, so
+        // merging two references must not touch it. Keep whatever the scan last wrote
+        // (or None, if no scan has looked).
+        if existing.installed.is_none() {
+            existing.installed = new.installed;
         }
     }
 
     fn collect_items(&mut self, live_sets: &[LiveSet]) -> Result<(), DatabaseError> {
         // First load existing items
         self.load_existing_plugins()?;
+        self.load_class_index()?;
         self.load_existing_samples()?;
 
         for live_set in live_sets {
             // Collect and merge plugins
             for plugin in &live_set.plugins {
                 let old_id = plugin.id.to_string();
+
+                let Some(ref_key) = PluginKey::from_dev_identifier(&plugin.dev_identifier)
+                else {
+                    // The parser only emits references whose identifier parsed, so
+                    // this means the two disagree about the format's shape.
+                    warn!(
+                        "Skipping plugin reference with unparseable dev_identifier: {}",
+                        plugin.dev_identifier
+                    );
+                    continue;
+                };
+
+                let (target_key, resolved_via) = if self.unique_plugins.contains_key(&ref_key) {
+                    (ref_key, "uid")
+                } else if let Some(owner) = self.class_index.get(&ref_key).copied() {
+                    // A class of a bundle we already have. Resolve to the bundle so
+                    // this does not become a phantom duplicate of a plugin we own.
+                    (owner, "class_id")
+                } else {
+                    // Nothing knows this plugin yet. The reference still carries a
+                    // real identity, so it gets an ordinary row with `installed`
+                    // left unknown until a scan looks.
+                    (ref_key, "created")
+                };
+
                 let entry = self
                     .unique_plugins
-                    .entry(plugin.dev_identifier.clone())
+                    .entry(target_key)
                     .and_modify(|existing| Self::merge_plugin_metadata(existing, plugin))
                     .or_insert_with(|| plugin.clone());
 
                 // Map the old UUID to the canonical UUID
                 self.plugin_id_map.insert(old_id, entry.id.to_string());
+
+                self.plugin_refs.push(PluginRef {
+                    dev_identifier: plugin.dev_identifier.clone(),
+                    plugin_key: target_key,
+                    ableton_name: reference_name(plugin),
+                    ableton_format: plugin.plugin_format.to_string(),
+                    resolved_via,
+                });
             }
 
             // Collect and merge samples
@@ -177,44 +260,71 @@ impl<'a> BatchTransaction<'a> {
     fn insert_plugins(&mut self) -> Result<(), DatabaseError> {
         debug!("Upserting {} plugins", self.unique_plugins.len());
 
-        for plugin in self.unique_plugins.values() {
-            let plugin_id = plugin.id.to_string();
+        for (key, plugin) in &self.unique_plugins {
             self.tx.execute(
                 "INSERT INTO plugins (
-                    id, ableton_plugin_id, ableton_module_id, dev_identifier,
-                    name, format, installed, vendor, version, sdk_version,
-                    flags, scanstate, enabled
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(dev_identifier) DO UPDATE SET
-                    ableton_plugin_id = COALESCE(EXCLUDED.ableton_plugin_id, ableton_plugin_id),
-                    ableton_module_id = COALESCE(EXCLUDED.ableton_module_id, ableton_module_id),
-                    name = EXCLUDED.name,
-                    format = EXCLUDED.format,
-                    installed = EXCLUDED.installed OR plugins.installed,
-                    vendor = COALESCE(EXCLUDED.vendor, vendor),
-                    version = COALESCE(EXCLUDED.version, version),
-                    sdk_version = COALESCE(EXCLUDED.sdk_version, sdk_version),
-                    flags = COALESCE(EXCLUDED.flags, flags),
-                    scanstate = COALESCE(EXCLUDED.scanstate, scanstate),
-                    enabled = COALESCE(EXCLUDED.enabled, enabled)
+                    id, plugin_kind, uid, dev_identifier, name, format, vendor, version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(plugin_kind, uid) DO UPDATE SET
+                    -- A scanned plugin's identity fields came from the binary, so a
+                    -- project reference must not overwrite them.
+                    name = CASE WHEN plugins.installed IS 1 THEN plugins.name ELSE EXCLUDED.name END,
+                    format = CASE WHEN plugins.installed IS 1 THEN plugins.format ELSE EXCLUDED.format END,
+                    vendor = COALESCE(plugins.vendor, EXCLUDED.vendor),
+                    version = COALESCE(plugins.version, EXCLUDED.version),
+                    dev_identifier = COALESCE(plugins.dev_identifier, EXCLUDED.dev_identifier)
+                    -- `installed` is deliberately absent: it belongs to the plugin
+                    -- scan, and a project scan knows nothing about it.
                 ",
                 params![
-                    plugin_id,
-                    plugin.plugin_id,
-                    plugin.module_id,
+                    plugin.id.to_string(),
+                    key.kind(),
+                    key.uid_hex(),
                     plugin.dev_identifier,
                     plugin.name,
                     plugin.plugin_format.to_string(),
-                    plugin.installed,
                     plugin.vendor,
                     plugin.version,
-                    plugin.sdk_version,
-                    plugin.flags,
-                    plugin.scanstate,
-                    plugin.enabled,
                 ],
             )?;
             self.stats.plugins_inserted += 1;
+        }
+        Ok(())
+    }
+
+    /// Record which reference string resolved to which plugin.
+    ///
+    /// This is what lets a later `plugin refresh` re-resolve references without
+    /// reparsing any project file (ADR-0009).
+    fn insert_plugin_refs(&mut self) -> Result<(), DatabaseError> {
+        let now = SqlDateTime::from(Local::now());
+
+        for reference in &self.plugin_refs {
+            let Some(plugin) = self.unique_plugins.get(&reference.plugin_key) else {
+                continue;
+            };
+
+            self.tx.execute(
+                "INSERT INTO plugin_refs (
+                    dev_identifier, plugin_id, ableton_name, ableton_format,
+                    resolved_via, first_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(dev_identifier) DO UPDATE SET
+                    plugin_id = EXCLUDED.plugin_id,
+                    ableton_name = EXCLUDED.ableton_name,
+                    ableton_format = EXCLUDED.ableton_format,
+                    resolved_via = EXCLUDED.resolved_via
+                    -- first_seen_at keeps its original value
+                ",
+                params![
+                    reference.dev_identifier,
+                    plugin.id.to_string(),
+                    reference.ableton_name,
+                    reference.ableton_format,
+                    reference.resolved_via,
+                    now,
+                ],
+            )?;
         }
         Ok(())
     }
@@ -369,8 +479,10 @@ impl<'a> BatchInsertManager<'a> {
         // Collect all unique items
         batch.collect_items(&self.live_sets)?;
 
-        // First insert all plugins and samples
+        // First insert all plugins and samples. plugin_refs must follow the plugins
+        // it points at.
         batch.insert_plugins()?;
+        batch.insert_plugin_refs()?;
         batch.insert_samples()?;
 
         // Then insert projects and their relationships

@@ -54,13 +54,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::ableton_db::AbletonDatabase;
-use crate::config::CONFIG;
 use crate::error::LiveSetError;
 use crate::models::{
     AbletonVersion, KeySignature, Plugin, PluginInfo, Sample, Scale, TimeSignature, Tonic,
 };
-use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
 use crate::utils::plugins::LineTrackingBuffer;
 use crate::utils::{EventExt, StringResultExt};
 #[allow(unused_imports)]
@@ -853,41 +850,16 @@ impl Parser {
             ));
         }
 
-        // Convert plugin info tags to Plugin instances
-        let config = CONFIG
-            .as_ref()
-            .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
-        let db_dir = &config.live_database_dir;
-        let db_path_result = get_most_recent_plugins_db_file(&PathBuf::from(db_dir))
-            .or_else(|_| get_most_recent_db_file(&PathBuf::from(db_dir)));
-        if let Ok(db_path) = db_path_result {
-            if let Ok(ableton_db) = AbletonDatabase::new(db_path) {
-                for (dev_identifier, info) in &self.plugin_info_tags {
-                    let db_plugin = ableton_db
-                        .get_plugin_by_dev_identifier(dev_identifier)
-                        .map_err(LiveSetError::DatabaseError)?;
-                    let plugin = Self::make_plugin(dev_identifier, info, db_plugin.as_ref(), self.current_file.as_ref());
-                    result.plugins.insert(plugin);
-                }
-            } else {
-                warn_fn!(
-                    "finalize_result",
-                    "Failed to open Ableton database, using unverified plugins"
-                );
-                for (dev_identifier, info) in &self.plugin_info_tags {
-                    let plugin = Self::make_plugin(dev_identifier, info, None, self.current_file.as_ref());
-                    result.plugins.insert(plugin);
-                }
-            }
-        } else {
-            warn_fn!(
-                "finalize_result",
-                "Ableton database file not found, using unverified plugins"
-            );
-            for (dev_identifier, info) in &self.plugin_info_tags {
-                let plugin = Self::make_plugin(dev_identifier, info, None, self.current_file.as_ref());
-                result.plugins.insert(plugin);
-            }
+        // Plugin references, unenriched. The .als carries only a name, a
+        // dev_identifier and the format derived from it; everything else is resolved
+        // against our own plugins table once per batch in the database layer, rather
+        // than opening a database here — per project, on every worker thread.
+        for (dev_identifier, info) in &self.plugin_info_tags {
+            result.plugins.insert(Self::make_plugin(
+                dev_identifier,
+                info,
+                self.current_file.as_ref(),
+            ));
         }
 
         // Handle key signature if requested
@@ -919,99 +891,38 @@ impl Parser {
         Ok(result)
     }
 
+    /// Build a bare plugin reference from what the project file gave us.
+    ///
+    /// Vendor, version and installation status are deliberately absent: the `.als`
+    /// does not contain them, and inventing `installed: false` here would mean the
+    /// parser asserting something only a plugin scan can know.
     fn make_plugin(
         dev_identifier: &str,
         info: &PluginInfo,
-        db_plugin: Option<&crate::ableton_db::DbPlugin>,
         current_file: Option<&String>,
     ) -> Plugin {
-        let plugin = match db_plugin {
-            Some(db_plugin) => {
-                trace_fn!(
-                    "finalize_result",
-                    "Found plugin {} {} on system, flagging as installed",
-                    db_plugin.vendor.as_deref().unwrap_or("Unknown").purple(),
-                    db_plugin.name.green()
-                );
-                
-                // Use database name if it's not empty, otherwise fall back to XML name
-                let final_name = if !db_plugin.name.trim().is_empty() {
-                    db_plugin.name.clone()
-                } else {
-                    info.name.clone()
-                };
-                
-                Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: Some(db_plugin.plugin_id),
-                    module_id: db_plugin.module_id,
-                    dev_identifier: db_plugin.dev_identifier.clone(),
-                    name: final_name,
-                    vendor: db_plugin.vendor.clone(),
-                    version: db_plugin.version.clone(),
-                    sdk_version: db_plugin.sdk_version.clone(),
-                    flags: db_plugin.flags,
-                    scanstate: db_plugin.parsestate,
-                    enabled: db_plugin.enabled,
-                    plugin_format: info.plugin_format,
-                    installed: true,
-                }
-            }
-            None => {
-                trace_fn!(
-                    "finalize_result",
-                    "Plugin not found in database: {:?}",
-                    info
-                );
-                Plugin {
-                    id: Uuid::new_v4(),
-                    plugin_id: None,
-                    module_id: None,
-                    dev_identifier: dev_identifier.to_string(),
-                    name: info.name.clone(),
-                    vendor: None,
-                    version: None,
-                    sdk_version: None,
-                    flags: None,
-                    scanstate: None,
-                    enabled: None,
-                    plugin_format: info.plugin_format,
-                    installed: false,
-                }
-            }
-        };
-
-        // Check for blank plugin names and warn only if both XML and database names are empty
-        if plugin.name.trim().is_empty() {
+        if info.name.trim().is_empty() {
             let file_info = current_file
                 .map(|f| format!(" in file: {}", f))
                 .unwrap_or_default();
-            
-            // Only warn if this is a truly blank plugin (no name in XML and no name in database)
-            let should_warn = match db_plugin {
-                Some(db_plugin) => {
-                    // If database plugin exists but has empty name, and XML also has empty name
-                    db_plugin.name.trim().is_empty() && info.name.trim().is_empty()
-                }
-                None => {
-                    // If no database plugin found, warn if XML name is empty
-                    info.name.trim().is_empty()
-                }
-            };
-            
-            if should_warn {
-                warn_fn!(
-                    "finalize_result",
-                    "Created plugin with blank name - Device ID: {}, Plugin Info: {:?}{}",
-                    dev_identifier,
-                    info,
-                    file_info
-                );
-                println!();
-            }
+            warn_fn!(
+                "finalize_result",
+                "Created plugin with blank name - Device ID: {}, Plugin Info: {:?}{}",
+                dev_identifier,
+                info,
+                file_info
+            );
         }
 
-        plugin
+        Plugin {
+            id: Uuid::new_v4(),
+            dev_identifier: dev_identifier.to_string(),
+            name: info.name.clone(),
+            vendor: None,
+            version: None,
+            plugin_format: info.plugin_format,
+            installed: None,
+        }
     }
 
     /// Handles XML start/empty element events with context-aware processing.

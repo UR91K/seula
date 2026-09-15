@@ -24,19 +24,13 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::{Serialize, Deserialize};
-use std::collections::HashSet;
 use std::fmt;
 use std::path::PathBuf;
 use std::str::{self, FromStr};
-use std::sync::Arc;
 use uuid::Uuid;
 
-use once_cell::sync::Lazy;
 
-use crate::ableton_db::AbletonDatabase;
-use crate::config::CONFIG;
-use crate::error::{DatabaseError, SampleError, TimeSignatureError};
-use crate::utils::plugins::{get_most_recent_db_file, get_most_recent_plugins_db_file};
+use crate::error::{SampleError, TimeSignatureError};
 
 /// Unique identifier type for database entities.
 ///
@@ -554,6 +548,199 @@ impl fmt::Display for PluginFormat {
     }
 }
 
+/// The parts of an Ableton `dev_identifier`.
+///
+/// ```text
+/// device:vst3:audiofx:72c4db71-7a4d-459a-b97e-51745d84b39d
+///        kind category id
+///
+/// device:vst:audiofx:1096184373?n=Altiverb%207
+///                    id           name (URL-encoded)
+/// ```
+pub(crate) struct DevIdentifierParts<'a> {
+    /// `vst` or `vst3`.
+    pub kind: &'a str,
+    /// `instr` or `audiofx` — **Ableton's** classification, which disagrees with the
+    /// plugin's own in practice. Never part of identity; see ADR-0005.
+    pub category: &'a str,
+    /// The plugin's own identifier: decimal `i32` for VST2, dashed hex class ID for
+    /// VST3.
+    pub id: &'a str,
+    /// The `?n=` value, still URL-encoded. Ableton's display name for the plugin.
+    pub name: Option<&'a str>,
+}
+
+/// Split a `dev_identifier` into its parts, or `None` if it is not one.
+///
+/// The single place that understands this string's shape. Its two consumers read
+/// different fields out of it, deliberately: [`parse_plugin_format`] wants `category`,
+/// while [`PluginKey`] has nowhere to put it.
+///
+/// [`parse_plugin_format`]: crate::utils::plugins::parse_plugin_format
+pub(crate) fn split_dev_identifier(dev_identifier: &str) -> Option<DevIdentifierParts<'_>> {
+    let rest = dev_identifier.strip_prefix("device:")?;
+    let (kind, rest) = rest.split_once(':')?;
+    let (category, rest) = rest.split_once(':')?;
+
+    if !matches!(kind, "vst" | "vst3") {
+        return None;
+    }
+
+    // Everything before `?` is the identifier. The query carries Ableton's display
+    // name; treat it as one of possibly several parameters rather than assuming.
+    let (id, name) = match rest.split_once('?') {
+        Some((id, query)) => (id, query.split('&').find_map(|p| p.strip_prefix("n="))),
+        None => (rest, None),
+    };
+
+    if id.is_empty() {
+        return None;
+    }
+
+    Some(DevIdentifierParts {
+        kind,
+        category,
+        id,
+        name,
+    })
+}
+
+/// A plugin's own identity, independent of how any host refers to it.
+///
+/// This is the join key between a plugin reference in a project file and a binary the
+/// scanner found on disk (ADR-0005). Ableton's `dev_identifier` is an *encoding* of
+/// this, not a separate namespace: strip its prefix and any `?n=` suffix and what
+/// remains is the plugin's native identifier.
+///
+/// The format lives in the variant rather than in a field, so there is nowhere to put
+/// Ableton's `instr`/`audiofx` classification — which must never participate in
+/// identity, because it is Ableton's opinion rather than the plugin's and the two
+/// disagree in practice. Note that [`PluginFormat`] *does* encode that distinction in
+/// its four variants, which is exactly why it is not the key.
+///
+/// Version is deliberately absent too: a uid is stable across plugin updates, so a
+/// project referencing Serum still matches after Serum ships a new build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PluginKey {
+    /// VST2's 32-bit unique id, usually a packed four-character code.
+    Vst2(u32),
+    /// VST3's 128-bit class ID.
+    Vst3([u8; 16]),
+}
+
+impl PluginKey {
+    /// Derive the key from Ableton's `dev_identifier`.
+    ///
+    /// Returns `None` for anything that is not a plugin reference — which is also the
+    /// gate the parser uses for "is this device a plugin at all".
+    pub fn from_dev_identifier(dev_identifier: &str) -> Option<Self> {
+        let parts = split_dev_identifier(dev_identifier)?;
+
+        match parts.kind {
+            // Ableton writes the id as decimal without a guaranteed sign convention,
+            // and VST2's `unique_id` is a signed i32. Going via i64 accepts both
+            // `-1094795586` and `3200171710` — the same 32 bits either way.
+            "vst" => Some(PluginKey::Vst2(parts.id.parse::<i64>().ok()? as u32)),
+            "vst3" => Self::from_uid_hex(&parts.id.replace('-', "")),
+            _ => None,
+        }
+    }
+
+    /// Derive the key from a uid as the scanner reports it (`PluginMeta::uid`).
+    ///
+    /// The length disambiguates the format, and is fixed by the formats themselves
+    /// rather than being a heuristic: a VST2 id is 32 bits (8 hex digits) and a VST3
+    /// class ID is 128 bits (32 hex digits). Case is not significant — Ableton writes
+    /// lowercase and the scanner uppercase.
+    pub fn from_uid_hex(uid: &str) -> Option<Self> {
+        match uid.len() {
+            8 => Some(PluginKey::Vst2(u32::from_str_radix(uid, 16).ok()?)),
+            32 => {
+                let bytes = hex::decode(uid).ok()?;
+                Some(PluginKey::Vst3(bytes.try_into().ok()?))
+            }
+            _ => None,
+        }
+    }
+
+    /// The canonical lowercase hex form, for storage and comparison.
+    pub fn uid_hex(&self) -> String {
+        match self {
+            PluginKey::Vst2(id) => format!("{:08x}", id),
+            PluginKey::Vst3(bytes) => hex::encode(bytes),
+        }
+    }
+
+    /// `"VST2"` or `"VST3"` — the format half of the stored identity.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            PluginKey::Vst2(_) => "VST2",
+            PluginKey::Vst3(_) => "VST3",
+        }
+    }
+}
+
+/// Ableton's display name for a plugin, from a `dev_identifier`'s `?n=` suffix.
+///
+/// Only VST2 identifiers carry one. It exists as a fallback for the rare project file
+/// whose `<Name>` element is blank — the parser warns about those, and recovering
+/// "Altiverb 7" from `?n=Altiverb%207` beats storing an empty string.
+pub fn dev_identifier_display_name(dev_identifier: &str) -> Option<String> {
+    let encoded = split_dev_identifier(dev_identifier)?.name?;
+    let decoded = percent_decode(encoded);
+    if decoded.trim().is_empty() {
+        None
+    } else {
+        Some(decoded)
+    }
+}
+
+/// Minimal percent-decoder for the `?n=` suffix.
+///
+/// Not a general URL decoder: this handles the one field we read, and leaves malformed
+/// escapes as literal text rather than failing.
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if i + 3 <= bytes.len() => {
+                match std::str::from_utf8(&bytes[i + 1..i + 3])
+                    .ok()
+                    .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+                {
+                    Some(byte) => {
+                        out.push(byte);
+                        i += 3;
+                    }
+                    None => {
+                        out.push(bytes[i]);
+                        i += 1;
+                    }
+                }
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            byte => {
+                out.push(byte);
+                i += 1;
+            }
+        }
+    }
+
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+impl fmt::Display for PluginKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.kind(), self.uid_hex())
+    }
+}
+
 /// Represents a plugin used in an Ableton Live project.
 ///
 /// This struct contains comprehensive information about a plugin, including
@@ -562,9 +749,9 @@ impl fmt::Display for PluginFormat {
 ///
 /// # Plugin Installation Status
 ///
-/// The [`Plugin::installed`] field indicates whether the plugin is currently
-/// installed on the system. This is determined by cross-referencing the
-/// plugin's [`Plugin::dev_identifier`] with Ableton's plugin database.
+/// The [`Plugin::installed`] field indicates whether the plugin is installed on this
+/// system, as of the last plugin scan. It is written only by that scan — never by
+/// parsing a project — and is `None` until a scan has looked.
 ///
 /// # Examples
 ///
@@ -579,18 +766,16 @@ impl fmt::Display for PluginFormat {
 /// );
 ///
 /// // Check if plugin is installed
-/// if plugin.installed {
-///     println!("Plugin {} is installed", plugin.name);
+/// match plugin.installed {
+///     Some(true) => println!("Plugin {} is installed", plugin.name),
+///     Some(false) => println!("Plugin {} is missing", plugin.name),
+///     None => println!("Plugin {} has not been scanned for", plugin.name),
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Plugin {
     /// Unique identifier for our database
     pub id: Uuid,
-    /// Ableton database plugin ID (if found)
-    pub plugin_id: Option<i32>,
-    /// Ableton database module ID (if found)
-    pub module_id: Option<i32>,
     /// Developer identifier used to uniquely identify the plugin
     pub dev_identifier: String,
     /// Human-readable plugin name
@@ -599,18 +784,15 @@ pub struct Plugin {
     pub vendor: Option<String>,
     /// Plugin version string
     pub version: Option<String>,
-    /// SDK version used to build the plugin
-    pub sdk_version: Option<String>,
-    /// Plugin-specific flags from Ableton database
-    pub flags: Option<i32>,
-    /// Scan state from Ableton database
-    pub scanstate: Option<i32>,
-    /// Whether the plugin is enabled in Ableton
-    pub enabled: Option<i32>,
     /// The format/type of this plugin
     pub plugin_format: PluginFormat,
-    /// Whether the plugin is currently installed on the system
-    pub installed: bool,
+    /// Whether the plugin is installed on this system, as of the last plugin scan.
+    ///
+    /// `None` means no scan has looked yet — which is different from having looked and
+    /// not found it. A partial scan (one narrowed with `--paths`, or one whose restart
+    /// budget ran out) leaves plugins it did not reach as `None` rather than declaring
+    /// them missing.
+    pub installed: Option<bool>,
 }
 
 /// Plugin data with usage statistics for gRPC responses
@@ -629,7 +811,7 @@ impl Plugin {
     ///
     /// This constructor creates a plugin with the provided basic information
     /// and sets all optional fields to `None`. The plugin is initially marked
-    /// as not installed until [`Plugin::reparse`] is called.
+    /// with `installed` unknown until a plugin scan has looked.
     ///
     /// # Arguments
     ///
@@ -653,79 +835,26 @@ impl Plugin {
     /// );
     ///
     /// assert_eq!(plugin.name, "Massive");
-    /// assert_eq!(plugin.installed, false); // Not yet parsed
+    /// assert_eq!(plugin.installed, None); // No scan has looked yet
     /// ```
     pub fn new(name: String, dev_identifier: String, plugin_format: PluginFormat) -> Self {
         Self {
             id: Uuid::new_v4(),
-            plugin_id: None,
-            module_id: None,
             dev_identifier,
             name,
             vendor: None,
             version: None,
-            sdk_version: None,
-            flags: None,
-            scanstate: None,
-            enabled: None,
             plugin_format,
-            installed: false,
+            installed: None,
         }
     }
 
-    /// Updates plugin information by querying Ableton's plugin database.
-    ///
-    /// This method looks up the plugin in Ableton's database using the
-    /// [`Plugin::dev_identifier`] and updates all available fields with
-    /// the information found. If the plugin is found, it's marked as installed.
-    ///
-    /// # Arguments
-    ///
-    /// * `db` - Reference to the Ableton database connection
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the database query succeeds (regardless of whether
-    /// the plugin was found), or a [`DatabaseError`] if the query fails.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use seula::models::{Plugin, PluginFormat};
-    /// use seula::ableton_db::AbletonDatabase;
-    ///
-    /// let mut plugin = Plugin::new(
-    ///     "Operator".to_string(),
-    ///     "operator_live".to_string(),
-    ///     PluginFormat::VST2Instrument,
-    /// );
-    ///
-    /// let db = AbletonDatabase::new("path/to/ableton.db".into()).unwrap();
-    /// plugin.reparse(&db).unwrap();
-    ///
-    /// if plugin.installed {
-    ///     println!("Plugin {} by {} is installed", plugin.name, plugin.vendor.unwrap_or("Unknown".to_string()));
-    /// }
-    /// ```
-    pub fn reparse(&mut self, db: &AbletonDatabase) -> Result<(), DatabaseError> {
-        if let Some(db_plugin) = db.get_plugin_by_dev_identifier(&self.dev_identifier)? {
-            self.plugin_id = Some(db_plugin.plugin_id);
-            self.module_id = db_plugin.module_id;
-            self.name = db_plugin.name;
-            self.vendor = db_plugin.vendor;
-            self.version = db_plugin.version;
-            self.sdk_version = db_plugin.sdk_version;
-            self.flags = db_plugin.flags;
-            self.scanstate = db_plugin.parsestate;
-            self.enabled = db_plugin.enabled;
-            self.installed = true;
-        } else {
-            self.installed = false;
-        }
-        Ok(())
-    }
 }
 
+/// What a project file says about a plugin, before anything is resolved.
+///
+/// Exactly the three things an `.als` yields — and `plugin_format` is derived from
+/// `dev_identifier` rather than read, so it is really two.
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct PluginInfo {
@@ -738,67 +867,6 @@ impl fmt::Display for PluginInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.plugin_format, self.name)
     }
-}
-
-// Plugin implementations
-
-#[allow(unused_variables)]
-static INSTALLED_PLUGINS: Lazy<Arc<Result<HashSet<(String, PluginFormat)>, DatabaseError>>> =
-    Lazy::new(|| {
-        Arc::new({
-            (|| {
-                let config = CONFIG
-                    .as_ref()
-                    .map_err(|e| DatabaseError::ConfigError(e.clone()))?;
-                let db_dir = PathBuf::from(&config.live_database_dir);
-                let db_path = get_most_recent_plugins_db_file(&db_dir)
-                    .or_else(|_| get_most_recent_db_file(&db_dir))?;
-
-                let db = AbletonDatabase::new(db_path)?;
-
-                db.get_database_plugins()
-                    .map(|vec| vec.into_iter().collect::<HashSet<_>>())
-            })()
-        })
-    });
-
-/// Returns a set of all plugins installed on the system.
-///
-/// This function queries Ableton's plugin database to get a list of all
-/// currently installed plugins. The result is cached globally for performance.
-///
-/// # Returns
-///
-/// Returns an `Arc<Result<HashSet<(String, PluginFormat)>, DatabaseError>>` where:
-/// - The `HashSet` contains tuples of `(dev_identifier, plugin_format)`
-/// - The `Arc` allows sharing the result between threads
-/// - The `Result` indicates whether the database query succeeded
-///
-/// # Errors
-///
-/// Returns a [`DatabaseError`] if:
-/// - The configuration cannot be loaded
-/// - The Ableton database file cannot be found or opened
-/// - The database query fails
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use seula::models::get_installed_plugins;
-///
-/// match get_installed_plugins().as_ref() {
-///     Ok(plugins) => {
-///         println!("Found {} installed plugins", plugins.len());
-///         for (dev_id, format) in plugins.iter() {
-///             println!("  {} ({})", dev_id, format);
-///         }
-///     }
-///     Err(e) => eprintln!("Failed to get installed plugins: {}", e),
-/// }
-/// ```
-#[allow(dead_code)]
-pub fn get_installed_plugins() -> Arc<Result<HashSet<(String, PluginFormat)>, DatabaseError>> {
-    INSTALLED_PLUGINS.clone()
 }
 
 // Sample types
@@ -1037,4 +1105,192 @@ pub struct CollectionStatistics {
     pub most_common_key: Option<String>,
     /// Most common time signature across all projects
     pub most_common_time_signature: Option<String>,
+}
+
+#[cfg(test)]
+mod plugin_key_tests {
+    use super::*;
+
+    // Every string here is real: the `dev_identifier`s come from the parser fixtures
+    // in tests/scan/parser/plugins.rs, and the uids are what `vst-meta` actually
+    // reported when scanning this machine. The point of these tests is to hold the
+    // two halves of ADR-0005 together — if either side's encoding ever drifts, the
+    // round-trip assertions below break rather than matching silently failing.
+
+    const PRO_Q_3_DEV_ID: &str = "device:vst3:audiofx:72c4db71-7a4d-459a-b97e-51745d84b39d";
+    const PRO_Q_3_SCANNED_UID: &str = "72C4DB717A4D459AB97E51745D84B39D";
+
+    const ALTIVERB_DEV_ID: &str = "device:vst:audiofx:1096184373?n=Altiverb%207";
+    const ALTIVERB_SCANNED_UID: &str = "41567235";
+
+    const SPRINGBOX_DEV_ID: &str = "device:vst3:audiofx:13b117f4-1b21-3a38-7923-ff895d3b3131";
+
+    #[test]
+    fn vst3_reference_and_scanned_binary_agree() {
+        assert_eq!(
+            PluginKey::from_dev_identifier(PRO_Q_3_DEV_ID),
+            PluginKey::from_uid_hex(PRO_Q_3_SCANNED_UID),
+            "the fixture's dev_identifier and the scanner's uid are the same plugin"
+        );
+    }
+
+    #[test]
+    fn vst2_reference_and_scanned_binary_agree() {
+        assert_eq!(
+            PluginKey::from_dev_identifier(ALTIVERB_DEV_ID),
+            PluginKey::from_uid_hex(ALTIVERB_SCANNED_UID)
+        );
+    }
+
+    #[test]
+    fn vst2_decimal_id_is_the_fourcc() {
+        // 1096184373 == 0x41567235 == "AVr5", Altiverb's four-character code.
+        let key = PluginKey::from_dev_identifier(ALTIVERB_DEV_ID).unwrap();
+        assert_eq!(key, PluginKey::Vst2(0x4156_7235));
+
+        let PluginKey::Vst2(id) = key else {
+            panic!("expected a VST2 key")
+        };
+        assert_eq!(&id.to_be_bytes(), b"AVr5");
+    }
+
+    #[test]
+    fn vst3_uid_matches_the_als_uid_fields() {
+        // The same .als carries the class ID a second time, as four u32s. ADR-0005
+        // derives the dev_identifier suffix from them; this asserts that derivation
+        // rather than trusting the prose.
+        let fields: [u32; 4] = [330_373_108, 455_162_424, 2_032_402_313, 1_564_160_305];
+        let mut bytes = Vec::new();
+        for field in fields {
+            bytes.extend_from_slice(&field.to_be_bytes());
+        }
+
+        assert_eq!(
+            PluginKey::from_dev_identifier(SPRINGBOX_DEV_ID),
+            Some(PluginKey::Vst3(bytes.try_into().unwrap()))
+        );
+    }
+
+    #[test]
+    fn abletons_category_is_not_part_of_identity() {
+        // The whole reason the format lives in the variant. Ableton's instr/audiofx
+        // call is its own, and disagrees with the plugin's in practice.
+        let as_fx = PluginKey::from_dev_identifier(
+            "device:vst3:audiofx:72c4db71-7a4d-459a-b97e-51745d84b39d",
+        );
+        let as_instr = PluginKey::from_dev_identifier(
+            "device:vst3:instr:72c4db71-7a4d-459a-b97e-51745d84b39d",
+        );
+
+        assert_eq!(as_fx, as_instr);
+        assert!(as_fx.is_some());
+    }
+
+    #[test]
+    fn vst2_ids_are_accepted_in_either_sign_convention() {
+        // The same 32 bits: VST2's unique_id is a signed i32 and Ableton writes it as
+        // decimal without committing to a convention.
+        let negative = PluginKey::from_dev_identifier("device:vst:instr:-1094795586");
+        let positive = PluginKey::from_dev_identifier("device:vst:instr:3200171710");
+
+        assert_eq!(negative, positive);
+        assert!(negative.is_some());
+    }
+
+    #[test]
+    fn uid_case_does_not_matter() {
+        // Ableton writes lowercase, the scanner uppercase.
+        assert_eq!(
+            PluginKey::from_uid_hex(PRO_Q_3_SCANNED_UID),
+            PluginKey::from_uid_hex(&PRO_Q_3_SCANNED_UID.to_lowercase())
+        );
+    }
+
+    #[test]
+    fn canonical_form_round_trips() {
+        let key = PluginKey::from_dev_identifier(PRO_Q_3_DEV_ID).unwrap();
+
+        assert_eq!(key.kind(), "VST3");
+        assert_eq!(key.uid_hex(), PRO_Q_3_SCANNED_UID.to_lowercase());
+        assert_eq!(PluginKey::from_uid_hex(&key.uid_hex()), Some(key));
+
+        let vst2 = PluginKey::from_dev_identifier(ALTIVERB_DEV_ID).unwrap();
+        assert_eq!(vst2.kind(), "VST2");
+        assert_eq!(vst2.uid_hex(), "41567235");
+        assert_eq!(PluginKey::from_uid_hex(&vst2.uid_hex()), Some(vst2));
+    }
+
+    #[test]
+    fn non_plugin_identifiers_are_rejected() {
+        // This is also the parser's gate for "is this device a plugin at all", so a
+        // false positive here would invent plugins out of stock Ableton devices.
+        for input in [
+            "",
+            "device:",
+            "device:vst3",
+            "device:vst3:audiofx",
+            "device:vst3:audiofx:",
+            "device:auv3:audiofx:1234",
+            "device:drum:instr:1234",
+            "vst3:audiofx:72c4db71",
+            "query:Everything#Pro-Q%203",
+        ] {
+            assert_eq!(
+                PluginKey::from_dev_identifier(input),
+                None,
+                "should not parse as a plugin reference: {:?}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_uids_are_rejected_rather_than_truncated() {
+        assert_eq!(PluginKey::from_uid_hex(""), None);
+        assert_eq!(PluginKey::from_uid_hex("72c4db71"), Some(PluginKey::Vst2(0x72c4db71)));
+        // Right length, not hex.
+        assert_eq!(PluginKey::from_uid_hex("zzzzzzzz"), None);
+        assert_eq!(PluginKey::from_uid_hex(&"z".repeat(32)), None);
+        // Wrong length: a truncated or over-long uid must not silently match.
+        assert_eq!(PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39"), None);
+        assert_eq!(PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39dff"), None);
+    }
+
+    #[test]
+    fn the_display_name_suffix_is_split_off_not_included() {
+        let parts = split_dev_identifier(ALTIVERB_DEV_ID).unwrap();
+
+        assert_eq!(parts.kind, "vst");
+        assert_eq!(parts.category, "audiofx");
+        assert_eq!(parts.id, "1096184373");
+        assert_eq!(parts.name, Some("Altiverb%207"));
+    }
+
+    #[test]
+    fn the_display_name_suffix_decodes() {
+        assert_eq!(
+            dev_identifier_display_name(ALTIVERB_DEV_ID).as_deref(),
+            Some("Altiverb 7")
+        );
+        // VST3 identifiers carry no name.
+        assert_eq!(dev_identifier_display_name(PRO_Q_3_DEV_ID), None);
+        // A malformed escape stays literal rather than losing the whole name.
+        assert_eq!(
+            dev_identifier_display_name("device:vst:instr:1?n=Odd%ZZName").as_deref(),
+            Some("Odd%ZZName")
+        );
+        // Truncated escape at the end.
+        assert_eq!(
+            dev_identifier_display_name("device:vst:instr:1?n=Trail%").as_deref(),
+            Some("Trail%")
+        );
+    }
+
+    #[test]
+    fn a_name_suffix_does_not_change_the_key() {
+        assert_eq!(
+            PluginKey::from_dev_identifier("device:vst:instr:1096184373"),
+            PluginKey::from_dev_identifier("device:vst:instr:1096184373?n=Anything%20At%20All")
+        );
+    }
 }

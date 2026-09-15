@@ -10,7 +10,7 @@ use seula::{
 use uuid::Uuid;
 
 use super::*;
-use crate::common::{create_test_live_set_from_parse, setup, LiveSetBuilder};
+use crate::common::{create_test_live_set_from_parse, setup, test_dev_identifier, LiveSetBuilder};
 
 pub fn create_test_live_set() -> LiveSet {
     let now = Local::now();
@@ -20,18 +20,12 @@ pub fn create_test_live_set() -> LiveSet {
     // Add a test plugin
     plugins.insert(Plugin {
         id: Uuid::new_v4(),
-        plugin_id: Some(1),
-        module_id: Some(2),
-        dev_identifier: "device:vst3:audiofx:test-plugin".to_string(),
+        dev_identifier: test_dev_identifier("test-plugin"),
         name: "Test Plugin".to_string(),
         vendor: Some("Test Vendor".to_string()),
         version: Some("1.0.0".to_string()),
-        sdk_version: Some("1.0".to_string()),
-        flags: Some(0),
-        scanstate: Some(1),
-        enabled: Some(1),
         plugin_format: PluginFormat::VST3AudioFx,
-        installed: true,
+        installed: Some(true),
     });
 
     // Add a test sample
@@ -159,7 +153,13 @@ pub fn test_insert_and_retrieve_project() {
         retrieved_plugin.plugin_format,
         original_plugin.plugin_format
     );
-    assert_eq!(retrieved_plugin.installed, original_plugin.installed);
+    // Not `original_plugin.installed`: inserting a project records a *reference* to a
+    // plugin, and a project file cannot know what is installed on this machine. Only a
+    // plugin scan writes that flag, so it reads back unknown.
+    assert_eq!(
+        retrieved_plugin.installed, None,
+        "a project insert must not assert installation status"
+    );
 
     // Compare first sample
     let original_sample = original_live_set.samples.iter().next().unwrap();

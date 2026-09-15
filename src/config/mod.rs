@@ -28,8 +28,6 @@ pub use loader::MAX_DIRECTORY_TRAVERSAL_DEPTH;
 /// # Database file path (optional, defaults to user data directory)
 /// # database_path = "C:\\Users\\username\\AppData\\Roaming\\Seula\\seula.db"
 ///
-/// # Directory containing Ableton Live database files
-/// live_database_dir = "C:\\Users\\username\\AppData\\Local\\Ableton\\Live Database"
 ///
 /// # gRPC server port (can be overridden by STUDIO_PROJECT_MANAGER_GRPC_PORT env var)
 /// grpc_port = 50051
@@ -51,8 +49,6 @@ pub struct Config {
     /// Database file path (optional, defaults to user data directory)
     #[serde(default = "defaults::default_database_path")]
     pub database_path: Option<String>,
-    /// Directory containing Ableton Live database files
-    pub live_database_dir: String,
     /// gRPC server port (can be overridden by STUDIO_PROJECT_MANAGER_GRPC_PORT env var)
     #[serde(default = "defaults::default_grpc_port")]
     pub grpc_port: u16,
@@ -150,7 +146,6 @@ impl Config {
     pub fn update_settings(
         &mut self,
         database_path: Option<String>,
-        live_database_dir: Option<String>,
         grpc_port: Option<u16>,
         log_level: Option<String>,
         media_storage_dir: Option<String>,
@@ -159,9 +154,6 @@ impl Config {
     ) -> Result<Vec<String>, ConfigError> {
         if let Some(db_path) = database_path {
             self.database_path = Some(db_path);
-        }
-        if let Some(live_db_dir) = live_database_dir {
-            self.live_database_dir = live_db_dir;
         }
         if let Some(port) = grpc_port {
             self.grpc_port = port;

@@ -74,6 +74,9 @@ message GetPluginStatsResponse {
   int32 unique_vendors = 4;
   map<string, int32> plugins_by_format = 5;  // VST3, VST, AU, etc.
   map<string, int32> plugins_by_vendor = 6;
+  // Plugins no scan has looked for yet, distinct from looked-for-and-absent.
+  // installed + missing + unknown == total.
+  int32 unknown_plugins = 7;
 }
 
 
@@ -93,12 +96,18 @@ message GetProjectsByPluginResponse {
 message RefreshPluginInstallationStatusRequest {}
 
 message RefreshPluginInstallationStatusResponse {
-  int32 total_plugins_checked = 1;
-  int32 plugins_now_installed = 2;
-  int32 plugins_now_missing = 3;
-  int32 plugins_unchanged = 4;
+  // Plugin binaries the scan attempted to load.
+  int32 candidates_scanned = 1;
+  // Rows the scan confirmed are installed.
+  int32 plugins_installed = 2;
+  // Rows a full scan looked for and did not find.
+  int32 plugins_missing = 3;
+  // Binaries that would not load. Usually genuinely broken, worth surfacing.
+  int32 scan_failures = 4;
   bool success = 5;
   optional string error_message = 6;
+  // Duplicate rows merged into the bundle that actually exports their class.
+  int32 plugins_reconciled = 7;
 }
 
 // Get Plugin Vendors

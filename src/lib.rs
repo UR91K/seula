@@ -37,7 +37,6 @@
 //!
 //! The library uses a `config.toml` file for configuration. See [`config`] module for details.
 
-pub mod ableton_db;
 pub mod cli;
 pub mod config;
 pub mod database;
@@ -130,10 +129,11 @@ use crate::database::batch::BatchInsertManager;
 use crate::error::LiveSetError;
 use crate::live_set::LiveSetPreprocessed;
 use crate::scan::parallel::ParallelParser;
+use crate::scan::plugins::scan_system_with_progress;
 use crate::scan::project_scanner::ProjectPathScanner;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
@@ -277,14 +277,6 @@ where
     debug!("Initializing database at {}", database_path);
     let mut db = LiveSetDatabase::new(PathBuf::from(database_path))?;
 
-    progress!(
-        0,
-        0,
-        0.0,
-        "Discovering projects...".to_string(),
-        "discovering"
-    );
-
     let scanner = ProjectPathScanner::new()?;
     let mut found_projects = HashSet::new();
 
@@ -294,6 +286,75 @@ where
         progress!(1, 1, 1.0, "Setup required: No project paths configured".to_string(), "completed");
         return Ok(());
     }
+
+    // Plugins before projects, on a first run only.
+    //
+    // The project parse below records plugin *references*, which the database layer
+    // resolves against the plugins table. Scanning afterwards would work — the upsert
+    // matches on identity either way — but it would leave a first run reporting every
+    // plugin as unknown until the user found `seula plugin refresh` on their own.
+    if !db.has_scanned_plugins()? {
+        info!("No plugin scan has completed yet; scanning installed plugins first");
+
+        let roots: Vec<PathBuf> = config.vst_search_paths.iter().map(PathBuf::from).collect();
+        let timeout = Duration::from_secs(config.vst_scan_timeout_secs);
+
+        let scan = {
+            // Report each plugin as it is attempted. This takes minutes on a real
+            // library, and the plugin worth naming is the one currently being loaded --
+            // especially when it is the one that hangs.
+            let mut on_plugin = |index: usize, total: usize, path: &Path| {
+                if let Some(ref mut callback) = progress_callback {
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("plugin");
+                    callback(
+                        index as u32,
+                        total as u32,
+                        if total == 0 {
+                            0.0
+                        } else {
+                            index as f32 / total as f32
+                        },
+                        format!("Scanning {}", name),
+                        "scanning_plugins",
+                    );
+                }
+            };
+            scan_system_with_progress(&roots, timeout, &mut on_plugin)
+        };
+
+        match scan {
+            Ok(report) => {
+                // A truncated scan has not really looked everywhere, so it neither
+                // sweeps nor counts as having run.
+                let full_scan = !report.budget_exhausted;
+                match db.persist_plugin_scan(&report, full_scan) {
+                    Ok(persisted) => info!(
+                        "First-run plugin scan: {} installed, {} missing, {} failed to load",
+                        persisted.inserted + persisted.updated,
+                        persisted.marked_missing,
+                        report.failed()
+                    ),
+                    Err(e) => warn!("Failed to persist the first-run plugin scan: {:?}", e),
+                }
+            }
+            Err(e) => {
+                // Scanning plugins is not why the user ran this. A missing sidecar or
+                // an unreadable plugin directory must not stop projects being indexed.
+                warn!("Skipping the first-run plugin scan: {}", e);
+            }
+        }
+    }
+
+    progress!(
+        0,
+        0,
+        0.0,
+        "Discovering projects...".to_string(),
+        "discovering"
+    );
 
     // Scan all configured directories
     for path in &config.paths {

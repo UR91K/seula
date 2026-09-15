@@ -54,7 +54,6 @@ impl ConfigCommands {
         Ok(ConfigDisplay {
             paths: config.paths.clone(),
             database_path: config.database_path().unwrap_or_else(|| "Default".to_string()),
-            live_database_dir: config.live_database_dir.clone(),
             grpc_port: config.grpc_port(),
             log_level: config.log_level(),
             media_storage_dir: config.media_storage_dir.clone(),
@@ -148,7 +147,6 @@ impl ConfigCommands {
 pub struct ConfigDisplay {
     pub paths: Vec<String>,
     pub database_path: String,
-    pub live_database_dir: String,
     pub grpc_port: u16,
     pub log_level: String,
     pub media_storage_dir: String,
@@ -177,7 +175,6 @@ impl TableDisplay for ConfigDisplay {
 
         // Paths
         simple_table_row!(table, "Database Path", self.database_path);
-        simple_table_row!(table, "Live Database Dir", self.live_database_dir);
         simple_table_row!(table, "Media Storage Dir", self.media_storage_dir);
 
         // Project paths
@@ -212,7 +209,6 @@ impl TableDisplay for ConfigDisplay {
         writer.write_record(["grpc_port", &self.grpc_port.to_string()]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["log_level", &self.log_level]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["database_path", &self.database_path]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["live_database_dir", &self.live_database_dir]).map_err(|e| -> CliError { e.into() })?;
         writer.write_record(["media_storage_dir", &self.media_storage_dir]).map_err(|e| -> CliError { e.into() })?;
         
         // Project paths
