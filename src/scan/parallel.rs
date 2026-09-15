@@ -30,6 +30,29 @@ impl ParserWorker {
     }
 }
 
+/// Pull items off a shared receiver, handing each to `f`.
+///
+/// The lock **must** be released before `f` runs. Writing this as
+/// `while let Ok(item) = rx.lock().unwrap().recv() { f(item) }` looks equivalent and
+/// is not: temporaries created in the scrutinee of a `while let` (or `match`) live
+/// until the end of the block, so the `MutexGuard` would stay alive for the whole
+/// body. Every worker would then hold the queue lock for the entire duration of its
+/// parse, and the pool would run strictly one file at a time while still reporting
+/// N threads. Rust 2024's `if let` rescoping does not extend to `while let`.
+///
+/// This existed as that exact bug until 2026-09-15; `worker_loop_runs_bodies_concurrently`
+/// is the regression test. Binding the item first is the whole fix.
+fn drain<T>(rx: &Arc<Mutex<Receiver<T>>>, mut f: impl FnMut(T)) {
+    loop {
+        // Bind first: this statement ends here, so the guard is dropped before `f`.
+        let item = match rx.lock().unwrap().recv() {
+            Ok(item) => item,
+            Err(_) => break, // Sender dropped; no more work is coming.
+        };
+        f(item);
+    }
+}
+
 /// Manages parallel parsing of Live Set files
 pub struct ParallelParser {
     #[allow(unused)]
@@ -57,10 +80,10 @@ impl ParallelParser {
                 trace!("Worker thread {} started", thread_id);
                 let worker = ParserWorker::new(results_tx);
 
-                while let Ok(path) = work_rx.lock().unwrap().recv() {
+                drain(&work_rx, |path| {
                     trace!("Worker {} processing file: {}", thread_id, path.display());
                     worker.process_file(path);
-                }
+                });
                 trace!("Worker thread {} exiting", thread_id);
             });
 
@@ -97,6 +120,86 @@ impl ParallelParser {
     /// Get receiver for parsing results
     pub fn get_results_receiver(&self) -> &Receiver<ParseResult> {
         &self.results_rx
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    /// The pool must actually run work in parallel.
+    ///
+    /// This is a silent failure mode: with the queue lock held across the body, the
+    /// parser still produces correct results and still reports N threads -- it just
+    /// runs them one at a time. Nothing but observed concurrency catches it, which is
+    /// why the existing result-correctness tests missed it for the code's whole life.
+    #[test]
+    fn worker_loop_runs_bodies_concurrently() {
+        const THREADS: usize = 4;
+        const ITEMS: usize = 8;
+
+        let (work_tx, work_rx) = channel::<usize>();
+        let work_rx = Arc::new(Mutex::new(work_rx));
+
+        let in_flight = Arc::new(AtomicUsize::new(0));
+        let max_in_flight = Arc::new(AtomicUsize::new(0));
+
+        let mut handles = Vec::with_capacity(THREADS);
+        for _ in 0..THREADS {
+            let work_rx = Arc::clone(&work_rx);
+            let in_flight = Arc::clone(&in_flight);
+            let max_in_flight = Arc::clone(&max_in_flight);
+
+            handles.push(thread::spawn(move || {
+                drain(&work_rx, |_item| {
+                    // Stand-in for LiveSet::new() on a multi-megabyte file. The sleep
+                    // guarantees an overlap window wide enough that genuine
+                    // parallelism is observed rather than merely possible.
+                    let now = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                    max_in_flight.fetch_max(now, Ordering::SeqCst);
+                    thread::sleep(Duration::from_millis(30));
+                    in_flight.fetch_sub(1, Ordering::SeqCst);
+                });
+            }));
+        }
+
+        for i in 0..ITEMS {
+            work_tx.send(i).unwrap();
+        }
+        drop(work_tx); // Closes the queue so the workers exit.
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let observed = max_in_flight.load(Ordering::SeqCst);
+        // Deliberately not asserting the full THREADS: a loaded or single-core CI box
+        // may not get all four overlapping, but anything above 1 proves the guard is
+        // released. The bug pins this at exactly 1.
+        assert!(
+            observed > 1,
+            "workers ran serially (max concurrent = {observed}); the queue lock is \
+             being held across the loop body"
+        );
+    }
+
+    /// The loop must terminate when the sender is dropped, or `ParallelParser::drop`
+    /// would block forever joining its workers.
+    #[test]
+    fn drain_stops_when_the_sender_is_dropped() {
+        let (work_tx, work_rx) = channel::<usize>();
+        let work_rx = Arc::new(Mutex::new(work_rx));
+
+        work_tx.send(1).unwrap();
+        work_tx.send(2).unwrap();
+        drop(work_tx);
+
+        let mut seen = Vec::new();
+        drain(&work_rx, |item| seen.push(item));
+
+        assert_eq!(seen, vec![1, 2], "queued work must drain before exiting");
     }
 }
 
