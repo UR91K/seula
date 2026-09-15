@@ -71,10 +71,14 @@ Implemented 2026-09-15, after ADR-0009 and ADR-0013. What actually went:
 - `live_database_dir` from the configuration, which pointed at Ableton's database
   directory and had no other purpose.
 
-`sdk_version` went with them, which ADR-0006 did not originally list. It is a real VST3
+`sdk_version` went with them, which this ADR did not originally list. It is a real VST3
 concept the scanner could report, but nothing populated it except Ableton, so keeping a
-permanently-NULL column would have been worse than removing it. Re-adding it is a
-scanner change, not a schema argument.
+permanently-NULL column would have been worse than removing it.
+
+Re-adding it was raised and **declined** by the maintainer on 2026-09-15: no use case for
+knowing a plugin's SDK version could be named. It is cheap to reverse — a `vst-meta`
+change plus one column, no schema argument — but it should stay gone until something
+actually wants it.
 
 `refresh_plugin_installation_status` (`src/database/plugins.rs:255`) is replaced by this
 work. It currently tests `get_plugin_by_dev_identifier(..).is_ok()`, which returns `true`

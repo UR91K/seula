@@ -50,9 +50,6 @@ gone from the configuration.
 
 Worth picking up next, in no particular order:
 
-- **`sdk_version` from the scanner.** VST3 exposes it; the column was dropped with the
-  Ableton fields because nothing else populated it. Re-adding means teaching
-  `crates/vst-meta` to read it, not a schema argument.
 - **A config flag to decline the first-run scan.** Today the only way out is pointing
   `vst_search_paths` at an empty directory (ADR-0013).
 - **`plugin_paths`**, if duplicate install locations ever need surfacing (ADR-0010).
