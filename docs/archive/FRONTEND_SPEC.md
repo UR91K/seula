@@ -1,0 +1,206 @@
+# Ableton Project Management Frontend Spec
+
+## Always visible components
+1. windows explorer style status bar at the bottom at all times
+    - loading bar with status messages when scanning in progress.
+2. navigation sidebar for switching to different views
+3. settings button at the bottom of sidebar or in the top right
+
+## 5 views
+
+### 1. Projects view
+- **Main data list** showing projects with dynamic content
+    - shows all projects when no search is entered
+    - shows ranked search results when search is entered
+    - click on row headers to sort using that field
+    - paginated with "items per page" selector
+    - resizeable column widths with persistence
+    - select all checkbox in header - status bar shows selection count
+    - select multiple projects for batch operations 
+- **Batch Operations Toolbar** (appears when multiple items are selected)
+    - Archive selected projects button
+    - Delete selected projects button (only enabled if all selected are archived)
+    - Add tags to selected (with tag picker/autocomplete)
+    - Remove tags from selected (shows common tags across selection)
+    - Add to collection (with collection picker + "Create New" option)
+    - Remove from collection (with collection picker showing common collections)
+    - Create collection from selection (with name input)
+- **Project row elements** (in this order):
+    - play button for audition audio (not present if no audio)
+        - has cover art of parent collection in the background (if its only got one collection) 
+    - plus button for adding audition audio
+    - project name
+        - just the file name
+        - has a pen icon next to it when hovered over to edit it
+        - if different from file name, display the file name greyed out next to it, either all the time or when hovered
+    - tags (if any)
+    - **REORDERABLE/HIDEABLE columns**:
+        - ableton version
+        - creation timestamp
+        - modified timestamp
+        - length (in MM:SS)
+        - tempo
+        - key/scale signature
+        - time signature
+        - plugins
+            - hover (or click, not sure) for detailed list (possibly scrollable) of plugins with statuses
+        - samples
+            - same deal as plugins
+- **Search and filtering**:
+    - search bar at the top with advanced search operators
+- **Details panel** (optional - toggleable in top right of title bar):
+    - optional details view at the right to view selected project (similar to windows explorer)
+    - shows all the same data as in the list, plus:
+        - description (notes)
+        - collections contained in
+        - tasks
+            - checkboxes for individual task selection
+            - "Mark Selected as Complete/Incomplete" buttons
+            - "Delete Selected Tasks" button
+            - "Select All Tasks" checkbox
+- **Right-click context menu** for each project:
+    - add tag (shows existing tags + add new tag button + manage tags)
+        - manage tags opens a modal to execute CRUD operations on tags
+    - open in ableton (not available when multiple are selected)
+    - show in explorer (not available when multiple are selected)
+    - rename (not available when multiple are selected)
+    - add audio demo (not available when multiple are selected)
+    - add project(s) to collection
+        - option to select from existing collections or create new
+    - hide/archive project(s) (marks as deleted/hidden) OR unhide project (if hidden)
+- **Hidden projects management**:
+    - optional toggle or filter to show/hide deleted projects ("hidden projects" view)
+    - hidden projects can be (single or in batch selection):
+        - unhidden/unarchived (reactivated)
+        - permanently deleted from database (requires confirmation, does NOT delete file)
+- **Tag management features**:
+    - ability to create, rename, and delete tags
+    - rename tag: updates all projects using that tag
+    - delete tag: removes tag from all projects (with confirmation)
+    - tag usage statistics in management interface
+- **Single project import**:
+    - "add project" button to import individual .als files from outside watched directories
+    - drag and drop support for .als files to import them
+    - automatic scanning and parsing of imported files
+    - validation of file format and existence before import
+
+### 2. Collections view
+- **Grid of collections** (like library view in a media player program / spotify or youtube)
+    - has other options for style of view
+- each collection shows the following, when not selected:
+    - cover art
+    - name
+    - tracklist count
+    - estimated duration
+    - date created
+- **Details view** when a collection is opened:
+    - all information in grid view
+    - description
+    - full re-orderable tracklist
+        - selection options:
+            - remove selected from collection
+    - consolidated list of all tasks of contained projects
+        - has same set of operations that a single project's tasks do.
+
+
+### 3. Plugins view
+- **List view of all plugins** with pagination support
+- each plugin row shows:
+    - plugin name
+    - vendor/developer
+    - format (VST3, VST2, AU, etc.)
+    - installation status (installed/missing) with visual indicator
+    - usage count (number of projects using this plugin)
+    - project count (number of unique projects)
+- **Search and filtering**:
+    - search bar at the top for plugin name/vendor search
+    - filter dropdown for plugin format (VST3, VST2, AU, etc.)
+    - filter toggle for installation status (all/installed only/missing only)
+    - filter dropdown for vendor selection
+- **Sorting options**:
+    - sort by name (A-Z, Z-A)
+    - sort by vendor
+    - sort by usage count (most used first)
+    - sort by installation status
+- **Status bar** (Windows Explorer style):
+    - shows total plugin count, installed count, missing count
+    - shows unique vendor count
+    - updates dynamically based on current filter/search
+- **Usage details**:
+    - click on usage count to see list of projects using that plugin
+    - hover over plugin name for additional details (version, SDK version, etc.)
+
+### 4. Samples view
+- **List view of all samples** with pagination support
+- each sample row shows:
+    - sample name
+    - file path (truncated, with tooltip showing full path)
+    - file type/extension
+    - presence status (present/missing) with visual indicator
+    - usage count (number of projects using this sample)
+    - project count (number of unique projects)
+- **Search and filtering**:
+    - search bar at the top for sample name/path search
+    - filter dropdown for file extension (.wav, .aiff, .mp3, etc.)
+    - filter toggle for presence status (all/present only/missing only)
+- **Sorting options**:
+    - sort by name (A-Z, Z-A)
+    - sort by path
+    - sort by usage count (most used first)
+    - sort by presence status
+    - sort by file type
+- **Status bar** (Windows Explorer style):
+    - shows total sample count, present count, missing count
+    - shows unique file path count
+    - shows estimated total file size
+    - shows breakdown by file type
+    - updates dynamically based on current filter/search
+- **Usage details**:
+    - click on usage count to see list of projects using that sample
+    - hover over file path for full path display
+    - right-click menu with "show in explorer" option (for present samples)
+
+### 5. Stats view (LOW PRIORITY - add once everything else works)
+- dashboard-style overview with multiple sections and visualizations
+- **Overview Cards Section** (top of page):
+    - total projects count
+    - total collections count  
+    - total plugins count
+    - total samples count
+    - total tags count
+    - total tasks count with completion rate percentage
+- **Musical Analytics Section**:
+    - tempo distribution chart (histogram/bar chart)
+    - key signature distribution (pie chart or bar chart)
+    - time signature distribution (pie chart)
+    - average project duration display
+- **Plugin & Sample Analytics Section**:
+    - top 10 most used plugins (horizontal bar chart with usage counts)
+    - top plugin vendors (pie chart or horizontal bars)
+    - top 10 most used samples (horizontal bar chart)
+    - average plugins per project metric
+    - average samples per project metric
+- **Project Activity Section**:
+    - projects created per year (line chart or bar chart)
+    - projects created per month (line chart, last 12-24 months)
+    - average monthly project creation rate
+    - recent activity timeline/heatmap
+- **Project Insights Section**:
+    - most complex projects list (by plugin/sample count)
+    - longest project duration with project name
+    - projects under 40 seconds count and percentage
+    - Ableton version distribution (pie chart showing version usage)
+- **Collection Analytics Section**:
+    - average projects per collection
+    - largest collection info (name and project count)
+- **Tag Analytics Section**:
+    - most used tags (word cloud or horizontal bar chart)
+    - tag usage distribution
+- **Task Management Section**:
+    - completed vs pending tasks breakdown (pie chart)
+    - task completion rate over time (if historical data available)
+- **Filtering/Time Range Options**:
+    - date range selector for time-based analytics
+    - option to filter stats by collection, tag, or other criteria
+- **Export Options**:
+    - button to export statistics as CSV
