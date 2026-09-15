@@ -54,6 +54,42 @@ so do not reintroduce `while let Ok(x) = rx.lock().unwrap().recv()`.
 **Plugin identity is `(format, uid)`, never the name or version.** Ableton's
 `dev_identifier` is a wrapper around the plugin's own native ID. See ADR-0005.
 
+## When something looks odd
+
+Parts of this codebase are deliberately unusual, and the reasoning is frequently older
+than the code. If something looks wrong-shaped, has no ADR, and the tests pass:
+
+**Do not silently "fix" it, and do not silently leave it.** Both throw away information.
+
+1. Check `docs/decisions/` and the module's own `//!` header. Several of these are
+   already answered, at length.
+2. If nothing covers it, ask — naming what looks odd *and* what you would expect
+   instead. A concrete alternative gets a far better answer than "why is this like
+   this?", because it can be accepted or rejected on the merits.
+3. Write the answer down before moving on, in whichever home it belongs to:
+
+| The answer you get | Where it goes |
+|---|---|
+| "Deliberate, because X" | new ADR, `Accepted (retrospective)` |
+| "I looked at changing it and decided not to" | new ADR, `Reaffirmed` |
+| "No idea, that's just what I wrote" | new ADR, `Incidental` — say what now depends on it |
+| "That's a bug" | fix it, add a regression test, note it in `docs/status.md` |
+| Too small to be a decision | a `//` note at the site |
+
+Batch questions and ask at a natural pause, unless the answer changes what you do next.
+One round of five beats five interruptions.
+
+Two things worth knowing. **"I don't remember" is a real answer** — record it as
+`Incidental` rather than inventing a plausible rationale; a fiction manufactures
+confidence in a choice nobody made. And **odd-but-deliberate and actually-broken are not
+exclusive**: `src/scan/parallel.rs` was both — the design was right and had been argued
+out carefully, while a language-level detail one layer below the argument had silently
+disabled it for the code's entire life. Verify, then ask.
+
+`docs/status.md` lists decisions with no written rationale anywhere. If your question
+lands on one of those, you have found the most valuable thing you can write today: the
+maintainer's memory is the only source for them, and the only one that decays.
+
 ## Known, not broken
 
 - `test_process_projects_integration` fails on `._*.als` — macOS AppleDouble sidecar
