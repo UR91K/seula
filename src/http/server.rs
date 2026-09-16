@@ -18,6 +18,7 @@ use super::handlers::plugins as plugin_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::samples as sample_handlers;
 use super::handlers::search as search_handlers;
+use super::handlers::system as system_handlers;
 use super::handlers::tags as tag_handlers;
 use super::handlers::tasks as task_handlers;
 use super::state::AppState;
@@ -334,6 +335,46 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/projects/:project_id/audio-file",
             put(media_handlers::set_project_audio_file)
                 .delete(media_handlers::remove_project_audio_file),
+        )
+        .route(
+            "/api/v1/system/info",
+            get(system_handlers::get_system_info),
+        )
+        .route(
+            "/api/v1/system/statistics",
+            get(system_handlers::get_statistics),
+        )
+        .route(
+            "/api/v1/system/statistics/export",
+            get(system_handlers::export_statistics),
+        )
+        .route(
+            "/api/v1/system/scan-status",
+            get(system_handlers::get_scan_status),
+        )
+        .route(
+            "/api/v1/system/scan",
+            post(system_handlers::scan_directories),
+        )
+        .route(
+            "/api/v1/system/watcher/start",
+            post(system_handlers::start_watcher),
+        )
+        .route(
+            "/api/v1/system/watcher/stop",
+            post(system_handlers::stop_watcher),
+        )
+        .route(
+            "/api/v1/system/watcher/events",
+            get(system_handlers::get_watcher_events),
+        )
+        .route(
+            "/api/v1/projects/add",
+            post(system_handlers::add_single_project),
+        )
+        .route(
+            "/api/v1/projects/add-multiple",
+            post(system_handlers::add_multiple_projects),
         )
         .layer(cors)
         .with_state(state)
