@@ -16,7 +16,7 @@ impl SqlDateTime {
 }
 
 impl ToSql for SqlDateTime {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::from(self.0.timestamp()))
     }
 }
