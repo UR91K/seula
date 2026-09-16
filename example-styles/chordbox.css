@@ -1,0 +1,491 @@
+/**
+ * Chord Box surface styling. The note buttons are the Showdown `.greenbutton`
+ * recipe from pokemon.css with the hue lifted into a custom property, so every
+ * role is literally the same button in a different color rather than six
+ * hand-tuned variants.
+ */
+
+body {
+  background: #F5F7FE;
+  color: #222222;
+}
+
+.cb-topbar {
+  height: auto;
+  padding: 0;
+  margin: 0;
+  background: #E5ECFB;
+  background: linear-gradient(180deg, #E8EEFC, #D7DEEA);
+  text-shadow: white 0 1px 0;
+  border-bottom: 1px solid #2A4066;
+}
+.cb-topbar-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cb-topbar h1 {
+  font-size: 14pt;
+  color: #2A3A56;
+  margin: 0;
+}
+.cb-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.cb-panel {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+  background: white;
+  box-shadow: inset 2px 2px 2px rgba(0, 0, 0, 0.15);
+  min-height: calc(100vh - 52px);
+  box-sizing: border-box;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.cb-sidebar {
+  width: 260px;
+  flex: none;
+}
+.cb-main {
+  flex: 1;
+  min-width: 0;
+}
+
+h2.cb-h {
+  font-size: 11pt;
+  color: #2A3A56;
+  border-bottom: 2px solid #A6BBD4;
+  padding-bottom: 3px;
+  margin: 0 0 10px 0;
+}
+h3.cb-h {
+  font-size: 10pt;
+  color: #3A4A66;
+  margin: 16px 0 6px 0;
+}
+
+.cb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.cb-spacer {
+  flex: 1;
+}
+.cb-muted {
+  color: #888888;
+  font-size: 9pt;
+}
+.cb-mono {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 9.5pt;
+}
+
+/* --- chord list --- */
+
+.cb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cb-list li {
+  margin-bottom: 4px;
+}
+.cb-listitem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+.cb-listitem .cb-listname {
+  display: block;
+  font-size: 10pt;
+}
+.cb-listitem .cb-listsub {
+  display: block;
+  color: #777777;
+  font-size: 8.5pt;
+  font-family: Consolas, Monaco, monospace;
+  margin-top: 2px;
+}
+
+/* --- the piano roll --- */
+
+.cb-grid {
+  border: 1px solid #A6BBD4;
+  border-radius: 6px;
+  background: #F8FBFD;
+  box-shadow: inset 0 1px 2px #CCCCCC;
+  padding: 0;
+  max-height: 62vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.cb-gridrow {
+  display: flex;
+  align-items: stretch;
+  height: 18px;
+  background: #FCFDFF;
+}
+/* Black-key rows shade the lane as well as the key, so the pattern of the
+   keyboard reads all the way across the roll. */
+.cb-gridrow.cb-black {
+  background: #EDF1F7;
+}
+.cb-gridrow.cb-octedge {
+  border-bottom: 1px solid #C3CEDF;
+}
+
+/* Left gutter is a real keyboard: one row per semitone, DAW-style. */
+.cb-key {
+  width: 58px;
+  flex: none;
+  box-sizing: border-box;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 8pt;
+  line-height: 18px;
+  padding-right: 5px;
+  text-align: right;
+  user-select: none;
+  color: #445;
+  background: linear-gradient(90deg, #FFFFFF, #F2F4F8);
+  border-right: 1px solid #2A4066;
+  border-bottom: 1px solid #D8DEE8;
+}
+.cb-key.cb-keyblack {
+  color: #E8ECF3;
+  background: linear-gradient(90deg, #4A5468, #333B4A);
+  border-bottom: 1px solid #2A3140;
+  width: 40px;
+  margin-right: 18px;
+}
+
+.cb-cell {
+  flex: 1;
+  border: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  min-width: 0;
+}
+.cb-cell:hover {
+  background: rgba(34, 102, 170, 0.12);
+}
+
+/* A played note: the Showdown button, hue-swapped. --s drops to 0% for notes
+   with no marker, which lands exactly on the stock grey `.button` look. */
+.cb-note {
+  --h: 0;
+  --s: 30%;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 -1px 2px rgba(255, 255, 255, 1);
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 8pt;
+  color: #222222;
+  padding: 0 6px;
+  margin: 1px 2px;
+  border: solid 1px hsl(var(--h), var(--s), 70%);
+  background: hsl(var(--h), var(--s), 93%);
+  background: linear-gradient(180deg, hsl(var(--h), var(--s), 97%), hsl(var(--h), var(--s), 84%));
+}
+.cb-note:hover {
+  background: linear-gradient(180deg, hsl(var(--h), var(--s), 94%), hsl(var(--h), var(--s), 77%));
+  border-color: hsl(var(--h), var(--s), 41%);
+}
+.cb-note:active {
+  background: linear-gradient(180deg, hsl(var(--h), var(--s), 77%), hsl(var(--h), var(--s), 83%));
+  border-color: hsl(var(--h), var(--s), 41%);
+}
+.cb-note.cb-plain {
+  --s: 0%;
+}
+
+/* A marker with no note under it: same button, diagonal stripes in the role's
+   own color, so a missing 5th still reads as a 5th at a glance. */
+.cb-note.cb-absent {
+  background: repeating-linear-gradient(
+    45deg,
+    hsl(var(--h), var(--s), 84%),
+    hsl(var(--h), var(--s), 84%) 3px,
+    hsl(var(--h), var(--s), 97%) 3px,
+    hsl(var(--h), var(--s), 97%) 6px
+  );
+  box-shadow: none;
+  color: #555555;
+}
+.cb-note.cb-absent:hover {
+  border-color: hsl(var(--h), var(--s), 41%);
+}
+
+.cb-notelabel {
+  float: left;
+  font-family: Consolas, Monaco, monospace;
+}
+.cb-rolelabel {
+  float: right;
+  font-size: 8pt;
+  color: #444444;
+}
+
+/* --- role palette --- */
+
+.cb-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cb-swatch {
+  --h: 0;
+  --s: 30%;
+  font-size: 8.5pt;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: solid 1px hsl(var(--h), var(--s), 70%);
+  background: linear-gradient(180deg, hsl(var(--h), var(--s), 97%), hsl(var(--h), var(--s), 84%));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 -1px 2px rgba(255, 255, 255, 1);
+}
+.cb-swatch.cb-sel {
+  border-color: hsl(var(--h), var(--s), 30%);
+  box-shadow: 0 0 0 2px #2266AA;
+}
+
+.cb-note-box {
+  border: 1px solid #acb6e7;
+  box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #c7cdee;
+  background: #EEF0FA;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 9.5pt;
+}
+
+.cb-empty {
+  color: #999999;
+  font-size: 10pt;
+  padding: 30px 0;
+  text-align: center;
+}
+
+.cb-name-input {
+  font-size: 12pt;
+  padding: 4px 6px;
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Re-root isn't a marker tool - it rewrites stored intervals - so it sits
+   apart from the six that just place a marker. */
+.cb-toolsep {
+  width: 1px;
+  align-self: stretch;
+  background: #C3CEDF;
+  margin: 0 4px;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 8pt;
+  padding: 2px 9px;
+  border-radius: 10px;
+  border: 1px solid #AAAAAA;
+  background: linear-gradient(180deg, #f6f6f6, #e3e3e3);
+  color: #444444;
+}
+
+/* --- movement chart: a shared piano roll across side-by-side blocks ---
+   Row height / block width / column gap are plain constants (see
+   MovementChart.tsx) rather than intrinsic sizing, because the SVG connector
+   overlay has to compute the same coordinates independently - a CSS Grid with
+   fixed track sizes is the one layout mode both can agree on without a
+   measurement pass. */
+
+.cb-mv-wrap {
+  position: relative;
+  border: 1px solid #A6BBD4;
+  border-radius: 6px;
+  background: #F8FBFD;
+  box-shadow: inset 0 1px 2px #CCCCCC;
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.cb-mv-grid {
+  position: relative;
+}
+
+.cb-mv-rowband {
+  background: #FCFDFF;
+}
+.cb-mv-rowband.cb-black {
+  background: #EDF1F7;
+}
+.cb-mv-rowband.cb-rootrow {
+  border-bottom: 1px solid #C3CEDF;
+}
+
+.cb-mv-rowlabel {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 8pt;
+  color: #8895AC;
+  border-right: 1px solid #2A4066;
+}
+
+.cb-mv-panel {
+  align-self: stretch;
+  justify-self: stretch;
+  margin: 2px 4px 4px;
+  border-radius: 8px;
+  background: rgba(166, 187, 212, 0.15);
+  border: 1px solid rgba(42, 64, 102, 0.2);
+}
+.cb-mv-panel.cb-mv-broken {
+  background: repeating-linear-gradient(45deg, #F6E2E2, #F6E2E2 4px, #FBEFEF 4px, #FBEFEF 8px);
+  border-color: #CC8888;
+}
+
+.cb-mv-blockhead {
+  align-self: center;
+  justify-self: stretch;
+  text-align: center;
+  padding: 4px 2px;
+  overflow: hidden;
+}
+.cb-mv-blockhead .cb-mv-label {
+  display: block;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 10pt;
+  font-weight: bold;
+  color: #2A3A56;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-mv-blockhead .cb-mv-summary {
+  display: block;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 8pt;
+  color: #888888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cb-mv-note {
+  align-self: center;
+  justify-self: stretch;
+  margin: 1px 3px;
+  height: 16px;
+  line-height: 14px;
+  padding: 0 4px;
+  cursor: default;
+}
+
+.cb-mv-lanerail {
+  align-self: center;
+  justify-self: stretch;
+  height: 0;
+  /* The rail runs the full extent of the span, behind the pills, which hide it
+     where they overlap. Alpha lives in the colour, not in opacity: an opacity
+     below 1 makes the rail its own stacking context, which paints it over the
+     pills instead. See docs/movement-chart-lane-rails.md. */
+  border-top: 1px dashed hsla(var(--h), 45%, 42%, 0.55);
+  margin: 0 10px;
+}
+.cb-mv-lanepill {
+  align-self: center;
+  justify-self: stretch;
+  margin: 0 3px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 4px;
+  cursor: default;
+  text-align: center;
+}
+.cb-mv-lanelabel {
+  align-self: center;
+  justify-self: start;
+  padding-left: 12px;
+  font-size: 9pt;
+  color: #667788;
+  white-space: nowrap;
+}
+
+.cb-mv-connectors,
+.cb-mv-labels {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  pointer-events: none;
+}
+
+/* Compact and monospace, not the general-purpose .tag chip: it has to fit
+   inside COL_GAP (MovementChart.tsx) between two panels even at its widest
+   ("+11"), and Verdana's looser metrics don't leave enough margin there. */
+.cb-mv-intervaltag {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 8pt;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid #AAAAAA;
+  background: linear-gradient(180deg, #f6f6f6, #e3e3e3);
+  color: #2A3A56;
+}
+
+/* --- analysis spans (editable list) --- */
+
+.cb-span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid #EEF0FA;
+}
+.cb-span-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+  margin-top: 8px;
+}
+.cb-span-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cb-span-role {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
