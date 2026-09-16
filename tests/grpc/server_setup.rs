@@ -3,10 +3,10 @@
 use super::*;
 use crate::common::{setup, LiveSetBuilder};
 use std::path::PathBuf;
-use seula::grpc::StudioProjectManagerServer;
+use seula::grpc::SeulaServer;
 use seula::media::{MediaConfig, MediaStorageManager};
 
-pub async fn create_test_server() -> StudioProjectManagerServer {
+pub async fn create_test_server() -> SeulaServer {
     setup("error");
 
     // Create in-memory database
@@ -21,7 +21,7 @@ pub async fn create_test_server() -> StudioProjectManagerServer {
     let media_storage = MediaStorageManager::new(temp_dir, media_config)
         .expect("Failed to create test media storage");
 
-    StudioProjectManagerServer::new_for_test(db, media_storage)
+    SeulaServer::new_for_test(db, media_storage)
 }
 
 pub async fn create_test_project_in_db(db: &Arc<Mutex<ProjectDatabase>>) -> String {
@@ -72,14 +72,14 @@ pub async fn create_test_project_in_db(db: &Arc<Mutex<ProjectDatabase>>) -> Stri
 }
 
 /// Setup test server and return both server and database reference
-pub async fn setup_test_server() -> (StudioProjectManagerServer, Arc<Mutex<ProjectDatabase>>) {
+pub async fn setup_test_server() -> (SeulaServer, Arc<Mutex<ProjectDatabase>>) {
     let server = create_test_server().await;
     let db = server.db().clone();
     (server, db)
 }
 
 /// Create a test project with the given name and path
-pub async fn create_test_project(server: &StudioProjectManagerServer, name: &str, path: &str) -> String {
+pub async fn create_test_project(server: &SeulaServer, name: &str, path: &str) -> String {
     let db = server.db();
     let project_id = uuid::Uuid::new_v4().to_string();
     
@@ -103,7 +103,7 @@ pub async fn create_test_project(server: &StudioProjectManagerServer, name: &str
 }
 
 /// Create a test sample with the given parameters
-pub async fn create_test_sample(server: &StudioProjectManagerServer, name: &str, path: &str, is_present: bool) -> String {
+pub async fn create_test_sample(server: &SeulaServer, name: &str, path: &str, is_present: bool) -> String {
     let db = server.db();
     let sample_id = uuid::Uuid::new_v4().to_string();
     
@@ -119,7 +119,7 @@ pub async fn create_test_sample(server: &StudioProjectManagerServer, name: &str,
 }
 
 /// Link a sample to a project (create usage relationship)
-pub async fn add_sample_to_project(server: &StudioProjectManagerServer, project_id: &str, sample_id: &str) {
+pub async fn add_sample_to_project(server: &SeulaServer, project_id: &str, sample_id: &str) {
     let db = server.db();
     
     {

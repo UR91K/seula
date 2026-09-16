@@ -26,7 +26,7 @@ use super::watcher::*;
 use super::config::*;
 
 #[derive(Clone)]
-pub struct StudioProjectManagerServer {
+pub struct SeulaServer {
     db: Arc<Mutex<ProjectDatabase>>,
     media_storage: Arc<MediaStorageManager>,
     pub projects_handler: ProjectsHandler,
@@ -41,7 +41,7 @@ pub struct StudioProjectManagerServer {
     pub config_handler: ConfigHandler,
 }
 
-impl StudioProjectManagerServer {
+impl SeulaServer {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let config = CONFIG
             .as_ref()
@@ -151,7 +151,7 @@ impl StudioProjectManagerServer {
 
 // Project Service Implementation
 #[tonic::async_trait]
-impl project_service_server::ProjectService for StudioProjectManagerServer {
+impl project_service_server::ProjectService for SeulaServer {
     async fn get_projects(
         &self,
         request: Request<GetProjectsRequest>,
@@ -245,7 +245,7 @@ impl project_service_server::ProjectService for StudioProjectManagerServer {
 
 // Search Service Implementation
 #[tonic::async_trait]
-impl search_service_server::SearchService for StudioProjectManagerServer {
+impl search_service_server::SearchService for SeulaServer {
     async fn search(
         &self,
         request: Request<SearchRequest>,
@@ -256,7 +256,7 @@ impl search_service_server::SearchService for StudioProjectManagerServer {
 
 // Collection Service Implementation
 #[tonic::async_trait]
-impl collection_service_server::CollectionService for StudioProjectManagerServer {
+impl collection_service_server::CollectionService for SeulaServer {
     async fn get_collections(
         &self,
         request: Request<GetCollectionsRequest>,
@@ -391,7 +391,7 @@ impl collection_service_server::CollectionService for StudioProjectManagerServer
 
 // Tag Service Implementation
 #[tonic::async_trait]
-impl tag_service_server::TagService for StudioProjectManagerServer {
+impl tag_service_server::TagService for SeulaServer {
     async fn get_tags(
         &self,
         request: Request<GetTagsRequest>,
@@ -486,7 +486,7 @@ impl tag_service_server::TagService for StudioProjectManagerServer {
 
 // Task Service Implementation
 #[tonic::async_trait]
-impl task_service_server::TaskService for StudioProjectManagerServer {
+impl task_service_server::TaskService for SeulaServer {
     async fn get_project_tasks(
         &self,
         request: Request<GetProjectTasksRequest>,
@@ -546,7 +546,7 @@ impl task_service_server::TaskService for StudioProjectManagerServer {
 
 // Media Service Implementation
 #[tonic::async_trait]
-impl media_service_server::MediaService for StudioProjectManagerServer {
+impl media_service_server::MediaService for SeulaServer {
     async fn upload_cover_art(
         &self,
         request: Request<tonic::Streaming<UploadCoverArtRequest>>,
@@ -629,7 +629,7 @@ impl media_service_server::MediaService for StudioProjectManagerServer {
 
 // System Service Implementation
 #[tonic::async_trait]
-impl system_service_server::SystemService for StudioProjectManagerServer {
+impl system_service_server::SystemService for SeulaServer {
     async fn get_system_info(
         &self,
         request: Request<GetSystemInfoRequest>,
@@ -654,7 +654,7 @@ impl system_service_server::SystemService for StudioProjectManagerServer {
 
 // Scanning Service Implementation
 #[tonic::async_trait]
-impl scanning_service_server::ScanningService for StudioProjectManagerServer {
+impl scanning_service_server::ScanningService for SeulaServer {
     type ScanDirectoriesStream = ReceiverStream<Result<ScanProgressResponse, Status>>;
 
     async fn scan_directories(
@@ -688,7 +688,7 @@ impl scanning_service_server::ScanningService for StudioProjectManagerServer {
 
 // Watcher Service Implementation
 #[tonic::async_trait]
-impl watcher_service_server::WatcherService for StudioProjectManagerServer {
+impl watcher_service_server::WatcherService for SeulaServer {
     async fn start_watcher(
         &self,
         request: Request<StartWatcherRequest>,
@@ -715,7 +715,7 @@ impl watcher_service_server::WatcherService for StudioProjectManagerServer {
 
 // Plugin Service Implementation
 #[tonic::async_trait]
-impl plugin_service_server::PluginService for StudioProjectManagerServer {
+impl plugin_service_server::PluginService for SeulaServer {
     async fn get_all_plugins(
         &self,
         request: Request<GetAllPluginsRequest>,
@@ -784,7 +784,7 @@ impl plugin_service_server::PluginService for StudioProjectManagerServer {
 
 // Sample Service Implementation
 #[tonic::async_trait]
-impl sample_service_server::SampleService for StudioProjectManagerServer {
+impl sample_service_server::SampleService for SeulaServer {
     async fn get_all_samples(
         &self,
         request: Request<GetAllSamplesRequest>,
@@ -860,7 +860,7 @@ impl sample_service_server::SampleService for StudioProjectManagerServer {
 
 // Config Service Implementation
 #[tonic::async_trait]
-impl config_service_server::ConfigService for StudioProjectManagerServer {
+impl config_service_server::ConfigService for SeulaServer {
     async fn get_config(
         &self,
         request: Request<GetConfigRequest>,

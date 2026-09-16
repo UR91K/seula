@@ -45,7 +45,7 @@ paths = [
 # gRPC server configuration
 grpc_port = {}
 
-# HTTP server configuration (can be overridden by STUDIO_PROJECT_MANAGER_HTTP_PORT env var)
+# HTTP server configuration (can be overridden by SEULA_HTTP_PORT env var)
 http_port = {}
 
 # Logging configuration

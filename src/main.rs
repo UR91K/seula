@@ -188,7 +188,7 @@ async fn start_grpc_server(state: SharedState) -> Result<(), Box<dyn std::error:
         e
     })?;
 
-    let server = grpc::server::StudioProjectManagerServer::from_shared(
+    let server = grpc::server::SeulaServer::from_shared(
         state.db,
         state.media_storage,
         state.services,

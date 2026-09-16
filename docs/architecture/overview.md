@@ -87,8 +87,8 @@ generally exists in both surfaces or neither.
 ## Configuration
 
 `config.toml`, loaded once into a global `CONFIG` (`src/config/`). Supports
-`{USER_HOME}` expansion. Several values have environment overrides
-(`STUDIO_PROJECT_MANAGER_*`) that predate the rename and still work.
+`{USER_HOME}` expansion. Several values have environment overrides (`SEULA_*`) —
+`STUDIO_PROJECT_MANAGER_*` before ADR-0027 finished the product rename.
 
 ## Tests
 

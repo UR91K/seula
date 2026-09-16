@@ -47,7 +47,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     // This should not panic or crash
     let result = Config::new();
@@ -59,7 +59,7 @@ media_storage_dir = "{}"
     assert_eq!(config.paths.len(), 0, "Config should have no paths");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test that configuration validation allows empty paths but issues warnings
@@ -81,7 +81,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let config = Config::new().unwrap();
     let validation_result = config.validate();
@@ -94,7 +94,7 @@ media_storage_dir = "{}"
             "Should warn about no paths configured");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test that configuration with valid paths works normally
@@ -118,7 +118,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let config = Config::new().unwrap();
     assert!(!config.needs_setup(), "Config should not need setup with valid paths");
@@ -126,7 +126,7 @@ media_storage_dir = "{}"
     assert_eq!(config.paths.len(), 1, "Config should have one path");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test the status message functionality
@@ -149,7 +149,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let config = Config::new().unwrap();
     let status = config.get_status_message();
@@ -179,7 +179,7 @@ media_storage_dir = "{}"
     assert!(status.contains("2 project path(s)"), "Should mention number of paths");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test config path manipulation methods
@@ -206,7 +206,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let mut config = Config::new().unwrap();
     assert!(config.needs_setup(), "Should need setup initially");
@@ -238,7 +238,7 @@ media_storage_dir = "{}"
     assert!(config.needs_setup(), "Should need setup after removing all paths");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test that the main scanning function handles empty paths gracefully
@@ -262,14 +262,14 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     // This should not panic or crash, but return Ok(()) indicating setup is needed
     let result = process_projects();
     assert!(result.is_ok(), "process_projects should handle empty paths gracefully");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }
 
 /// Test config reload functionality
@@ -292,7 +292,7 @@ media_storage_dir = "{}"
 "#, escape_path_for_toml(&media_dir));
 
     fs::write(&config_path, empty_config_content).unwrap();
-    std::env::set_var("STUDIO_PROJECT_MANAGER_CONFIG", config_path.to_str().unwrap());
+    std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     // Test reload
     let (config, warnings) = Config::reload().unwrap();
@@ -318,5 +318,5 @@ media_storage_dir = "{}"
     assert_eq!(config.paths.len(), 1, "Should have one path after reload");
 
     // Clean up
-    std::env::remove_var("STUDIO_PROJECT_MANAGER_CONFIG");
+    std::env::remove_var("SEULA_CONFIG");
 }

@@ -107,10 +107,10 @@ RUST_LOG=debug cargo test
 ## Configuration
 
 Uses `config.toml` with environment variable overrides:
-- `STUDIO_PROJECT_MANAGER_GRPC_PORT` - Override gRPC port
-- `STUDIO_PROJECT_MANAGER_LOG_LEVEL` - Override log level
-- `STUDIO_PROJECT_MANAGER_DATABASE_PATH` - Override database path
-- `STUDIO_PROJECT_MANAGER_CONFIG` - Override config file location
+- `SEULA_GRPC_PORT` - Override gRPC port
+- `SEULA_LOG_LEVEL` - Override log level
+- `SEULA_DATABASE_PATH` - Override database path
+- `SEULA_CONFIG` - Override config file location
 
 ## Performance Characteristics
 

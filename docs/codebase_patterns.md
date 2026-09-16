@@ -55,7 +55,7 @@ fn test_scenario_2_impl() {
 - `Mutex` synchronization (more complex)
 - `serial_test` crate (external dependency)
 
-**Used In**: `tests/config_startup_tests.rs` - Config service tests that use `STUDIO_PROJECT_MANAGER_CONFIG` environment variable.
+**Used In**: `tests/config_startup_tests.rs` - Config service tests that use `SEULA_CONFIG` environment variable.
 
 ---
 
@@ -230,13 +230,13 @@ use super::{service_name}::*;
 
 // Add handler to server struct
 #[derive(Clone)]
-pub struct StudioProjectManagerServer {
+pub struct SeulaServer {
     // ... existing handlers
     pub {service_name}_handler: {ServiceName}Handler,
 }
 
 // Initialize handler in new() method
-impl StudioProjectManagerServer {
+impl SeulaServer {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // ... existing initialization
         Ok(Self {
@@ -248,7 +248,7 @@ impl StudioProjectManagerServer {
 
 // Implement the service trait
 #[tonic::async_trait]
-impl {service_name}_service_server::{ServiceName}Service for StudioProjectManagerServer {
+impl {service_name}_service_server::{ServiceName}Service for SeulaServer {
     async fn get_item(
         &self,
         request: Request<GetItemRequest>,

@@ -2,7 +2,7 @@
 //!
 //! `AppState` bundles `Services` with `SystemService` because `SystemService` is
 //! not a field of the `Services` aggregator -- it is constructed separately in
-//! `src/grpc/server.rs::StudioProjectManagerServer::new()` and reached only through
+//! `src/grpc/server.rs::SeulaServer::new()` and reached only through
 //! `SystemHandler` there. See ADR-0024's Consequences section: folding
 //! `SystemService` into `Services` is a service-layer change, not an HTTP one, and
 //! is deliberately out of scope here.

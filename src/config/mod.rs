@@ -29,7 +29,7 @@ pub use loader::MAX_DIRECTORY_TRAVERSAL_DEPTH;
 /// # database_path = "C:\\Users\\username\\AppData\\Roaming\\Seula\\seula.db"
 ///
 ///
-/// # gRPC server port (can be overridden by STUDIO_PROJECT_MANAGER_GRPC_PORT env var)
+/// # gRPC server port (can be overridden by SEULA_GRPC_PORT env var)
 /// grpc_port = 50051
 ///
 /// # Logging level: error, warn, info, debug, trace
@@ -49,10 +49,10 @@ pub struct Config {
     /// Database file path (optional, defaults to user data directory)
     #[serde(default = "defaults::default_database_path")]
     pub database_path: Option<String>,
-    /// gRPC server port (can be overridden by STUDIO_PROJECT_MANAGER_GRPC_PORT env var)
+    /// gRPC server port (can be overridden by SEULA_GRPC_PORT env var)
     #[serde(default = "defaults::default_grpc_port")]
     pub grpc_port: u16,
-    /// HTTP server port (can be overridden by STUDIO_PROJECT_MANAGER_HTTP_PORT env var)
+    /// HTTP server port (can be overridden by SEULA_HTTP_PORT env var)
     #[serde(default = "defaults::default_http_port")]
     pub http_port: u16,
     /// Logging level
@@ -80,7 +80,7 @@ pub struct Config {
 impl Config {
     /// Returns the gRPC port with environment variable override support
     pub fn grpc_port(&self) -> u16 {
-        std::env::var("STUDIO_PROJECT_MANAGER_GRPC_PORT")
+        std::env::var("SEULA_GRPC_PORT")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(self.grpc_port)
@@ -88,7 +88,7 @@ impl Config {
 
     /// Returns the HTTP port with environment variable override support
     pub fn http_port(&self) -> u16 {
-        std::env::var("STUDIO_PROJECT_MANAGER_HTTP_PORT")
+        std::env::var("SEULA_HTTP_PORT")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(self.http_port)
@@ -96,12 +96,12 @@ impl Config {
 
     /// Returns the log level with environment variable override support
     pub fn log_level(&self) -> String {
-        std::env::var("STUDIO_PROJECT_MANAGER_LOG_LEVEL").unwrap_or_else(|_| self.log_level.clone())
+        std::env::var("SEULA_LOG_LEVEL").unwrap_or_else(|_| self.log_level.clone())
     }
 
     /// Returns the database path with environment variable override support
     pub fn database_path(&self) -> Option<String> {
-        std::env::var("STUDIO_PROJECT_MANAGER_DATABASE_PATH")
+        std::env::var("SEULA_DATABASE_PATH")
             .ok()
             .or(self.database_path.clone())
     }

@@ -95,13 +95,13 @@ fn set_default_database_path(config: &mut Config) -> Result<(), ConfigError> {
 }
 
 /// Finds the configuration file using the search strategy:
-/// 1. Environment variable STUDIO_PROJECT_MANAGER_CONFIG
+/// 1. Environment variable SEULA_CONFIG
 /// 2. AppData directory (primary location for deployed apps)
 /// 3. Relative to executable (for development/portable use)
 /// 4. Creates default config in AppData if none found
 pub fn find_config_file() -> Result<PathBuf, ConfigError> {
     // First check environment variable
-    if let Ok(config_path) = std::env::var("STUDIO_PROJECT_MANAGER_CONFIG") {
+    if let Ok(config_path) = std::env::var("SEULA_CONFIG") {
         let path = PathBuf::from(config_path);
         if path.exists() {
             return Ok(path);

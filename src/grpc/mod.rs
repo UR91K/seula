@@ -55,4 +55,4 @@ pub mod config {
     tonic::include_proto!("seula.config");
 }
 
-pub use server::StudioProjectManagerServer;
+pub use server::SeulaServer;
