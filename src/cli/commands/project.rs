@@ -2,10 +2,9 @@ use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::ProjectCommands;
 use crate::cli::CliError;
 use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
+use crate::services::DeletionScope;
 
 use serde::Serialize;
-use uuid::Uuid;
-use chrono::Utc;
 
 #[async_trait::async_trait]
 impl CliCommand for ProjectCommands {
@@ -30,9 +29,15 @@ impl ProjectCommands {
     async fn list_projects(&self, ctx: &CliContext, deleted: bool, limit: usize, offset: usize) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
 
-        let db = ctx.db.lock().await;
-        let status = if deleted { Some(false) } else { Some(true) };
-        let projects = db.get_all_projects_with_status(status)?;
+        let scope = if deleted { DeletionScope::DeletedOnly } else { DeletionScope::ActiveOnly };
+        let (projects, total_count) = ctx
+            .services
+            .projects
+            .list_projects(
+                scope, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None,
+            )
+            .await?;
 
         // Simple pagination
         let start = offset.min(projects.len());
@@ -55,14 +60,13 @@ impl ProjectCommands {
             })
             .collect();
 
-        let data = ProjectsList { total: projects.len(), displayed: rows };
+        let data = ProjectsList { total: total_count as usize, displayed: rows };
         formatter.print(&data)
     }
 
     async fn show_project(&self, ctx: &CliContext, id: &str) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-        let mut db = ctx.db.lock().await;
-        match db.get_project_by_id(id)? {
+        match ctx.services.projects.get_project(id).await? {
             Some(p) => {
                 let details = ProjectDetails::from_live_set(&p);
                 formatter.print(&details)
@@ -79,68 +83,39 @@ impl ProjectCommands {
             return Ok(());
         }
 
-        let db = ctx.db.lock().await;
-        let ts = Utc::now().timestamp();
-        match (name, notes) {
-            (Some(n), Some(s)) => {
-                db.conn.execute(
-                    "UPDATE projects SET name = ?, notes = ?, modified_at = ? WHERE id = ?",
-                    rusqlite::params![n, s, ts, id],
-                )?;
-            }
-            (Some(n), None) => {
-                db.conn.execute(
-                    "UPDATE projects SET name = ?, modified_at = ? WHERE id = ?",
-                    rusqlite::params![n, ts, id],
-                )?;
-            }
-            (None, Some(s)) => {
-                db.conn.execute(
-                    "UPDATE projects SET notes = ?, modified_at = ? WHERE id = ?",
-                    rusqlite::params![s, ts, id],
-                )?;
-            }
-            (None, None) => {}
-        }
+        ctx.services.projects.update_project(id, name, notes).await?;
 
         // Show updated project summary
         self.show_project(ctx, id).await
     }
 
     async fn delete_project(&self, ctx: &CliContext, id: &str) -> Result<(), CliError> {
-        let mut db = ctx.db.lock().await;
-        let uuid = Uuid::parse_str(id).map_err(|e| -> CliError { e.into() })?;
-        db.mark_project_deleted(&uuid)?;
+        ctx.services.projects.mark_deleted(id).await?;
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
         formatter.print_message(&format!("Project {} marked as deleted", id), crate::cli::output::MessageType::Success);
         Ok(())
     }
 
     async fn restore_project(&self, ctx: &CliContext, id: &str) -> Result<(), CliError> {
-        let mut db = ctx.db.lock().await;
-        let uuid = Uuid::parse_str(id).map_err(|e| -> CliError { e.into() })?;
+        use crate::error::DatabaseError;
 
-        // Get stored path
-        let project_any = db.get_project_by_id_any_status(id)?;
-        let project = match project_any {
-            Some(p) => p,
-            None => {
+        match ctx.services.projects.reactivate(id).await {
+            Ok(()) => {
+                let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
+                formatter.print_message(&format!("Project {} restored", id), crate::cli::output::MessageType::Success);
+                Ok(())
+            }
+            Err(DatabaseError::NotFound(_)) => {
                 let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
                 formatter.print_message(&format!("Project not found: {}", id), crate::cli::output::MessageType::Warning);
-                return Ok(());
+                Ok(())
             }
-        };
-
-        db.reactivate_project(&uuid, &project.file_path)?;
-
-        let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-        formatter.print_message(&format!("Project {} restored", id), crate::cli::output::MessageType::Success);
-        Ok(())
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn rescan_project(&self, ctx: &CliContext, id: &str) -> Result<(), CliError> {
-        let mut db = ctx.db.lock().await;
-        let result = db.rescan_project(id, false)?;
+        let result = ctx.services.projects.rescan(id, false).await?;
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
         if result.success {
             formatter.print_message(&result.scan_summary, crate::cli::output::MessageType::Success);
@@ -151,10 +126,9 @@ impl ProjectCommands {
     }
 
     async fn show_project_stats(&self, ctx: &CliContext) -> Result<(), CliError> {
-        let db = ctx.db.lock().await;
-        let stats = db.get_project_statistics(
+        let stats = ctx.services.projects.get_statistics(
             None, None, None, None, None, None, None, None, None, None, None, None,
-        )?;
+        ).await?;
 
         let display = ProjectStatisticsDisplay::from_stats(&stats);
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);

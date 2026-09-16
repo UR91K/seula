@@ -675,6 +675,7 @@ async fn test_get_projects_with_enhanced_filtering() {
         modified_after: None,
         modified_before: None,
         has_audio_file: None,
+        deletion_scope: 0,
     };
 
     let response = server

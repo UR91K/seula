@@ -1187,6 +1187,7 @@ async fn create_test_project(server: &StudioProjectManagerServer, _: &str) -> se
             modified_after: None,
             modified_before: None,
             has_audio_file: None,
+            deletion_scope: 0,
         }))
         .await
         .unwrap();

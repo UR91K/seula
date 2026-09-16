@@ -27,6 +27,7 @@ use super::config::*;
 
 #[derive(Clone)]
 pub struct StudioProjectManagerServer {
+    db: Arc<Mutex<ProjectDatabase>>,
     pub projects_handler: ProjectsHandler,
     pub search_handler: SearchHandler,
     pub collections_handler: CollectionsHandler,
@@ -68,7 +69,8 @@ impl StudioProjectManagerServer {
         let services = Services::new(Arc::clone(&db));
 
         Ok(Self {
-            projects_handler: ProjectsHandler::new(Arc::clone(&db)),
+            db: Arc::clone(&db),
+            projects_handler: ProjectsHandler::new(services.projects.clone()),
             search_handler: SearchHandler::new(Arc::clone(&db)),
             collections_handler: CollectionsHandler::new(Arc::clone(&db)),
             tags_handler: TagsHandler::new(services.tags.clone()),
@@ -99,7 +101,8 @@ impl StudioProjectManagerServer {
         let services = Services::new(Arc::clone(&db));
 
         Self {
-            projects_handler: ProjectsHandler::new(Arc::clone(&db)),
+            db: Arc::clone(&db),
+            projects_handler: ProjectsHandler::new(services.projects.clone()),
             search_handler: SearchHandler::new(Arc::clone(&db)),
             collections_handler: CollectionsHandler::new(Arc::clone(&db)),
             tags_handler: TagsHandler::new(services.tags.clone()),
@@ -120,7 +123,7 @@ impl StudioProjectManagerServer {
     }
 
     pub fn db(&self) -> &Arc<Mutex<ProjectDatabase>> {
-        &self.projects_handler.db
+        &self.db
     }
 
     pub fn media_storage(&self) -> &Arc<MediaStorageManager> {

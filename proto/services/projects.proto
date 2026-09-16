@@ -36,13 +36,23 @@ service ProjectService {
 // Copy these request/response messages from your original
 // seula.proto:
 
+// Which projects to include by deletion status. Unspecified (the zero value)
+// means ACTIVE_ONLY -- callers that want deleted or all projects must ask
+// explicitly. See ADR-0017 evidence / service-layer audit: the old unfiltered
+// GetProjects silently returned active + deleted with no way to opt out.
+enum DeletionScope {
+  DELETION_SCOPE_ACTIVE_ONLY = 0;
+  DELETION_SCOPE_DELETED_ONLY = 1;
+  DELETION_SCOPE_ALL = 2;
+}
+
 // Project Management
 message GetProjectsRequest {
   optional int32 limit = 1;
   optional int32 offset = 2;
   optional string sort_by = 3;
   optional bool sort_desc = 4;
-  
+
   // Enhanced filtering options
   optional double min_tempo = 5;
   optional double max_tempo = 6;
@@ -58,6 +68,7 @@ message GetProjectsRequest {
   optional int64 modified_after = 16;
   optional int64 modified_before = 17;
   optional bool has_audio_file = 18;
+  DeletionScope deletion_scope = 19;
 }
 
 message GetProjectsResponse {

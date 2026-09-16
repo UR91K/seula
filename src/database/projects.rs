@@ -1069,6 +1069,7 @@ impl ProjectDatabase {
     /// Get projects with comprehensive filtering options
     pub fn get_projects_with_filters(
         &self,
+        is_active: Option<bool>,
         limit: Option<i32>,
         offset: Option<i32>,
         sort_by: Option<String>,
@@ -1108,7 +1109,12 @@ impl ProjectDatabase {
         };
 
         // Build WHERE conditions for filtering
-        let mut conditions = vec!["is_active = true"];
+        let mut conditions: Vec<&str> = vec!["1=1"];
+        match is_active {
+            Some(true) => conditions.push("is_active = true"),
+            Some(false) => conditions.push("is_active = false"),
+            None => {}
+        }
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
         if let Some(min_tempo_val) = min_tempo {

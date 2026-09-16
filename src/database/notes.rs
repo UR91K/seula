@@ -1,4 +1,5 @@
 use crate::error::DatabaseError;
+use chrono::Utc;
 use log::debug;
 use rusqlite::params;
 
@@ -28,8 +29,8 @@ impl ProjectDatabase {
 
         // Update the notes
         tx.execute(
-            "UPDATE projects SET notes = ? WHERE id = ?",
-            params![notes, project_id],
+            "UPDATE projects SET notes = ?, modified_at = ? WHERE id = ?",
+            params![notes, Utc::now().timestamp(), project_id],
         )?;
 
         tx.commit()?;
@@ -56,8 +57,8 @@ impl ProjectDatabase {
 
         // Update the name
         tx.execute(
-            "UPDATE projects SET name = ? WHERE id = ?",
-            params![name, project_id],
+            "UPDATE projects SET name = ?, modified_at = ? WHERE id = ?",
+            params![name, Utc::now().timestamp(), project_id],
         )?;
 
         tx.commit()?;
