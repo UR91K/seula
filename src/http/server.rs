@@ -6,11 +6,12 @@
 
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+use super::handlers::projects as project_handlers;
 use super::handlers::tags as tag_handlers;
 use super::state::AppState;
 
@@ -69,6 +70,46 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/projects/:project_id/tags/:tag_id",
             post(tag_handlers::tag_project).delete(tag_handlers::untag_project),
+        )
+        .route(
+            "/api/v1/projects",
+            get(project_handlers::list_projects),
+        )
+        .route(
+            "/api/v1/projects/statistics",
+            get(project_handlers::get_statistics),
+        )
+        .route(
+            "/api/v1/projects/batch-archive",
+            post(project_handlers::batch_mark_archived),
+        )
+        .route(
+            "/api/v1/projects/batch-delete",
+            post(project_handlers::batch_delete),
+        )
+        .route(
+            "/api/v1/projects/:project_id",
+            get(project_handlers::get_project).delete(project_handlers::mark_project_deleted),
+        )
+        .route(
+            "/api/v1/projects/:project_id/permanent",
+            axum::routing::delete(project_handlers::permanently_delete_project),
+        )
+        .route(
+            "/api/v1/projects/:project_id/notes",
+            put(project_handlers::update_project_notes),
+        )
+        .route(
+            "/api/v1/projects/:project_id/name",
+            put(project_handlers::update_project_name),
+        )
+        .route(
+            "/api/v1/projects/:project_id/reactivate",
+            post(project_handlers::reactivate_project),
+        )
+        .route(
+            "/api/v1/projects/:project_id/rescan",
+            post(project_handlers::rescan_project),
         )
         .layer(cors)
         .with_state(state)
