@@ -1,4 +1,4 @@
-use log::debug;
+use tracing::debug;
 use tonic::{Request, Response, Status};
 
 use super::super::common::*;

@@ -1,7 +1,7 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
 use chrono::Local;
-use log::debug;
+use tracing::debug;
 use rusqlite::params;
 use uuid::Uuid;
 

@@ -132,7 +132,7 @@ use crate::project::ProjectPreprocessed;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::plugins::scan_system_with_progress;
 use crate::scan::project_scanner::ProjectPathScanner;
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;

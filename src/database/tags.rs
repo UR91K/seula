@@ -3,7 +3,7 @@ use crate::error::DatabaseError;
 use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
-use log::debug;
+use tracing::debug;
 use rusqlite::{params, OptionalExtension};
 use std::collections::HashSet;
 use std::path::PathBuf;

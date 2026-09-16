@@ -41,7 +41,7 @@ impl MediaService {
         }
 
         if let Err(e) = db.update_collection_cover_art(collection_id, Some(&media_file.id)) {
-            log::warn!("Failed to set collection cover art: {:?}", e);
+            tracing::warn!("Failed to set collection cover art: {:?}", e);
         }
 
         Ok(media_file)
@@ -64,7 +64,7 @@ impl MediaService {
         }
 
         if let Err(e) = db.update_project_audio_file(project_id, Some(&media_file.id)) {
-            log::warn!("Failed to set project audio file: {:?}", e);
+            tracing::warn!("Failed to set project audio file: {:?}", e);
         }
 
         Ok(media_file)
@@ -95,7 +95,7 @@ impl MediaService {
             &media_file.file_extension,
             &media_file.media_type,
         ) {
-            log::warn!("Failed to delete physical file from storage: {:?}", e);
+            tracing::warn!("Failed to delete physical file from storage: {:?}", e);
         }
 
         Ok(())
@@ -175,10 +175,10 @@ impl MediaService {
                     .storage
                     .delete_file(&file.id, &file.file_extension, &file.media_type)
                 {
-                    log::warn!("Failed to delete physical file from storage: {:?}", e);
+                    tracing::warn!("Failed to delete physical file from storage: {:?}", e);
                 }
                 if let Err(e) = db.delete_media_file(&file.id) {
-                    log::error!("Failed to delete media file from database: {:?}", e);
+                    tracing::error!("Failed to delete media file from database: {:?}", e);
                     continue;
                 }
             }

@@ -1,4 +1,4 @@
-use log::info;
+use tracing::info;
 use std::env;
 use seula::config::CONFIG;
 use seula::{grpc, tray};
@@ -223,19 +223,30 @@ async fn run_direct_command(command: &Commands, format: seula::cli::OutputFormat
 }
 
 fn init_logging(log_level: &str) {
+    use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+
     let level = match log_level.to_lowercase().as_str() {
-        "error" => log::LevelFilter::Error,
-        "warn" => log::LevelFilter::Warn,
-        "info" => log::LevelFilter::Info,
-        "debug" => log::LevelFilter::Debug,
-        "trace" => log::LevelFilter::Trace,
+        "error" => LevelFilter::ERROR,
+        "warn" => LevelFilter::WARN,
+        "info" => LevelFilter::INFO,
+        "debug" => LevelFilter::DEBUG,
+        "trace" => LevelFilter::TRACE,
         _ => {
             eprintln!("Invalid log level '{}', defaulting to 'info'", log_level);
-            log::LevelFilter::Info
+            LevelFilter::INFO
         }
     };
 
-    env_logger::Builder::from_default_env()
-        .filter_level(level)
-        .init();
+    // Reproduces `env_logger::Builder::from_default_env().filter_level(level)`.
+    // There, RUST_LOG is parsed first and `filter_level` then *replaces* the
+    // bare (no-target) directive while leaving per-target ones alone -- so
+    // `RUST_LOG=seula::scan=trace` wins for that module, but a bare
+    // `RUST_LOG=debug` loses to the config value. `add_directive` with a bare
+    // level has the same replace-on-same-key behaviour, so the precedence is
+    // unchanged.
+    let filter = EnvFilter::builder()
+        .parse_lossy(std::env::var("RUST_LOG").unwrap_or_default())
+        .add_directive(level.into());
+
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 }

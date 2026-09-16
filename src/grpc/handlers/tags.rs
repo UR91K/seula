@@ -1,4 +1,4 @@
-use log::debug;
+use tracing::debug;
 use tonic::{Request, Response, Status};
 
 use crate::services::TagsService;
@@ -229,7 +229,7 @@ impl TagsHandler {
                 match super::utils::convert_live_set_to_proto(live_set, &mut db) {
                     Ok(project) => projects.push(project),
                     Err(e) => {
-                        log::error!("Failed to convert LiveSet to proto: {:?}", e);
+                        tracing::error!("Failed to convert LiveSet to proto: {:?}", e);
                         continue;
                     }
                 }

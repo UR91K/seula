@@ -1,6 +1,6 @@
 use crate::config::Config;
 use chrono::{DateTime, Utc};
-use log::{debug, info};
+use tracing::{debug, info};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};

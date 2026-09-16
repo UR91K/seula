@@ -1,6 +1,6 @@
 //! File event tests
 
-use log::debug;
+use tracing::debug;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Write;

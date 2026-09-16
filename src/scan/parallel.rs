@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use tracing::{debug, trace};
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};

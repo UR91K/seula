@@ -43,7 +43,7 @@ pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
 
     for root in roots {
         if !root.is_dir() {
-            log::debug!(
+            tracing::debug!(
                 "Skipping VST search path (not a directory): {}",
                 root.display()
             );
@@ -61,7 +61,7 @@ pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
                 Err(e) => {
                     // An unreadable subdirectory is common enough on a system drive
                     // that it should not abort the walk.
-                    log::debug!("Skipping unreadable entry during plugin discovery: {}", e);
+                    tracing::debug!("Skipping unreadable entry during plugin discovery: {}", e);
                     continue;
                 }
             };

@@ -108,7 +108,7 @@ impl ProjectDatabase {
 
         // Debug logging
         if min_usage_count.is_some() || max_usage_count.is_some() {
-            log::debug!("SQL Query: {}", main_query);
+            tracing::debug!("SQL Query: {}", main_query);
         }
 
         // Add pagination parameters

@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};

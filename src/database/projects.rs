@@ -7,7 +7,7 @@ use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use crate::utils::metadata::load_file_hash;
 use chrono::{Local, TimeZone, Utc};
-use log::{debug, info};
+use tracing::{debug, info};
 use rusqlite::{params, OptionalExtension, Result as SqliteResult};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

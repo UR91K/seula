@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use log::{error, trace};
+use tracing::{error, trace};
 
 use crate::error::TimeSignatureError;
 

@@ -5,7 +5,7 @@
 //! project never does, because a project file cannot know what is installed.
 
 use chrono::Local;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use rusqlite::{params, OptionalExtension, Transaction};
 use uuid::Uuid;
 

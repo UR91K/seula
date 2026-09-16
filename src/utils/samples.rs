@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[allow(unused_imports)]
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 #[allow(unused_imports)]
 use crate::error::{AttributeError, SampleError, XmlParseError};

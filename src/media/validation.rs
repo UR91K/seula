@@ -2,7 +2,7 @@
 // This module provides advanced validation beyond basic extension checking
 
 use super::{MediaError, MediaType};
-use log::{debug, warn};
+use tracing::{debug, warn};
 
 pub struct FileValidator;
 

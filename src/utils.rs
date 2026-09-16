@@ -7,7 +7,7 @@ use std::path::Path;
 use std::str::from_utf8;
 use std::sync::Mutex;
 
-use log::{error, trace};
+use tracing::{error, trace};
 use once_cell::sync::Lazy;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
@@ -25,7 +25,7 @@ macro_rules! trace_fn {
     ($fn_name:expr, $($arg:tt)+) => {
         {
             use colored::Colorize;
-            log::trace!("[{}] {}", $fn_name.to_string().bright_blue().bold(), format!($($arg)+))
+            tracing::trace!("[{}] {}", $fn_name.to_string().bright_blue().bold(), format!($($arg)+))
         }
     };
 }
@@ -35,7 +35,7 @@ macro_rules! debug_fn {
     ($fn_name:expr, $($arg:tt)+) => {
         {
             use colored::Colorize;
-            log::debug!("[{}] {}", $fn_name.to_string().cyan().bold(), format!($($arg)+))
+            tracing::debug!("[{}] {}", $fn_name.to_string().cyan().bold(), format!($($arg)+))
         }
     };
 }
@@ -45,7 +45,7 @@ macro_rules! info_fn {
     ($fn_name:expr, $($arg:tt)+) => {
         {
             use colored::Colorize;
-            log::info!("[{}] {}", $fn_name.to_string().green().bold(), format!($($arg)+))
+            tracing::info!("[{}] {}", $fn_name.to_string().green().bold(), format!($($arg)+))
         }
     };
 }
@@ -55,7 +55,7 @@ macro_rules! warn_fn {
     ($fn_name:expr, $($arg:tt)+) => {
         {
             use colored::Colorize;
-            log::warn!("[{}] {}", $fn_name.to_string().yellow().bold(), format!($($arg)+))
+            tracing::warn!("[{}] {}", $fn_name.to_string().yellow().bold(), format!($($arg)+))
         }
     };
 }
@@ -65,7 +65,7 @@ macro_rules! error_fn {
     ($fn_name:expr, $($arg:tt)+) => {
         {
             use colored::Colorize;
-            log::error!("[{}] {}", $fn_name.to_string().red().bold(), format!($($arg)+))
+            tracing::error!("[{}] {}", $fn_name.to_string().red().bold(), format!($($arg)+))
         }
     };
 }
@@ -73,7 +73,7 @@ macro_rules! error_fn {
 #[macro_export]
 macro_rules! trace_with_line {
     ($fn_name:expr, $line:expr, $($arg:tt)+) => {
-        log::trace!("[{}] At line {} in xml data: {}", $fn_name.bright_blue().bold(), $line, format!($($arg)+))
+        tracing::trace!("[{}] At line {} in xml data: {}", $fn_name.bright_blue().bold(), $line, format!($($arg)+))
     };
 }
 

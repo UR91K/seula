@@ -162,7 +162,7 @@ impl Spawner {
                     // The worker would not start at all. That is not a plugin's fault
                     // and retrying will not fix it, so stop rather than burn the
                     // budget spawning a binary that isn't there.
-                    log::error!("Plugin scanner could not be started: {}", e);
+                    tracing::error!("Plugin scanner could not be started: {}", e);
                     break;
                 }
             };
@@ -181,7 +181,7 @@ impl Spawner {
                 }
                 Some((offset, error_type)) => {
                     let culprit = &batch[offset];
-                    log::warn!(
+                    tracing::warn!(
                         "Plugin scanner {} on {} -- recording it and resuming",
                         error_type,
                         culprit.display()
@@ -202,7 +202,7 @@ impl Spawner {
                     restarts += 1;
 
                     if restarts > budget {
-                        log::error!(
+                        tracing::error!(
                             "Plugin scanner restarted {} times; abandoning the remaining {} \
                              candidates",
                             restarts,
@@ -252,7 +252,7 @@ impl Spawner {
         if let Some(stderr) = child.stderr.take() {
             thread::spawn(move || {
                 for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                    log::debug!("vst-meta: {}", line);
+                    tracing::debug!("vst-meta: {}", line);
                 }
             });
         }
@@ -267,7 +267,7 @@ impl Spawner {
     }
 
     fn spawn(&self, batch: &[PathBuf]) -> Result<Child, PluginScanError> {
-        log::debug!(
+        tracing::debug!(
             "Spawning {} for {} candidate(s)",
             self.worker.display(),
             batch.len()
@@ -312,7 +312,7 @@ impl Spawner {
                             return; // Supervisor stopped listening.
                         }
                     }
-                    Err(e) => log::warn!("Unparseable line from plugin scanner: {} ({})", line, e),
+                    Err(e) => tracing::warn!("Unparseable line from plugin scanner: {} ({})", line, e),
                 }
             }
         });
@@ -340,7 +340,7 @@ impl Spawner {
             match events.recv_timeout(self.timeout) {
                 Ok(Event::Begin { path }) => {
                     if next < batch.len() && batch[next].display().to_string() != path {
-                        log::warn!(
+                        tracing::warn!(
                             "Plugin scanner reported an unexpected path: got {}, expected {}",
                             path,
                             batch[next].display()
@@ -358,7 +358,7 @@ impl Spawner {
                         completed.push((offset, outcome));
                         next = offset + 1;
                     } else {
-                        log::warn!("Plugin scanner sent a result with nothing in flight");
+                        tracing::warn!("Plugin scanner sent a result with nothing in flight");
                     }
                 }
 
@@ -405,7 +405,7 @@ fn blame(in_flight: Option<usize>, next: usize, batch_len: usize) -> Option<usiz
     match in_flight {
         Some(offset) => Some(offset),
         None if next < batch_len => {
-            log::warn!(
+            tracing::warn!(
                 "Plugin scanner stopped after {} of {} candidates without announcing the next",
                 next,
                 batch_len
@@ -433,7 +433,7 @@ fn locate_worker() -> Result<PathBuf, PluginScanError> {
         if path.is_file() {
             return Ok(path);
         }
-        log::warn!(
+        tracing::warn!(
             "{} points at {}, which is not a file; falling back to the sidecar lookup",
             WORKER_PATH_ENV,
             path.display()

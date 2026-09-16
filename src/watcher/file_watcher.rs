@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::database::ProjectDatabase;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use notify::{
     self,
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},

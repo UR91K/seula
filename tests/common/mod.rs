@@ -26,9 +26,12 @@ static INIT: Once = Once::new();
 pub fn setup(log_level: &str) {
     let _ = INIT.call_once(|| {
         let _ = env::set_var("RUST_LOG", log_level);
-        if let Err(_) = env_logger::try_init() {
-            // Logger already initialized, that's fine
-        }
+        // `try_init` errors if a global subscriber is already installed; the
+        // `Once` makes that unlikely, but tolerating it keeps `setup` safe to
+        // call from every test as before.
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .try_init();
     });
 }
 

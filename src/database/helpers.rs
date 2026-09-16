@@ -19,7 +19,7 @@ use uuid::Uuid;
 /// that uses it.
 pub fn insert_plugin(tx: &Transaction, plugin: &Plugin) -> Result<Option<String>, DatabaseError> {
     let Some(ref_key) = PluginKey::from_dev_identifier(&plugin.dev_identifier) else {
-        log::warn!(
+        tracing::warn!(
             "Skipping plugin reference with unparseable dev_identifier: {}",
             plugin.dev_identifier
         );

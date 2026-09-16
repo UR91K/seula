@@ -32,7 +32,7 @@ pub fn scan_system_with_progress(
     on_progress: &mut dyn FnMut(usize, usize, &std::path::Path),
 ) -> Result<ScanReport, PluginScanError> {
     let candidates = discovery::discover(roots);
-    log::info!("Found {} plugin candidate(s) to scan", candidates.len());
+    tracing::info!("Found {} plugin candidate(s) to scan", candidates.len());
 
     let spawner = Spawner::new(timeout)?;
     Ok(spawner.scan_with_progress(&candidates, on_progress))

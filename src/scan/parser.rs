@@ -45,7 +45,7 @@
 //! - Early termination for specific data extraction
 
 #[allow(unused_imports)]
-use log::{debug, trace, warn};
+use tracing::{debug, trace, warn};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::{HashMap, HashSet};

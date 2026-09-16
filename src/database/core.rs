@@ -1,6 +1,6 @@
 use crate::error::DatabaseError;
 use chrono::{DateTime, Local, TimeZone};
-use log::{debug, info};
+use tracing::{debug, info};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
 
@@ -69,7 +69,7 @@ impl ProjectDatabase {
             return Ok(conn);
         }
 
-        log::warn!(
+        tracing::warn!(
             "The database at {} uses an older schema and cannot be migrated. Deleting and \
              rebuilding it. Projects will be recovered by the next scan; tags, collections, \
              tasks, notes and stored media are lost.",

@@ -1,5 +1,5 @@
 use chrono::Local;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::HashMap;
 use std::path::PathBuf;

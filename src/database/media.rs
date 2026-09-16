@@ -3,7 +3,7 @@ use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::media::{MediaFile, MediaType};
 use chrono::DateTime;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use rusqlite::{params, OptionalExtension, Row};
 
 impl ProjectDatabase {

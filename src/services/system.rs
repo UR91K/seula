@@ -270,7 +270,7 @@ impl SystemService {
         let config = CONFIG.as_ref().map_err(|e| format!("Config error: {}", e))?;
         for path in &config.paths {
             if let Err(e) = watcher.add_watch_path(PathBuf::from(path)) {
-                log::warn!("Failed to add watch path {}: {}", path, e);
+                tracing::warn!("Failed to add watch path {}: {}", path, e);
             }
         }
 
@@ -309,11 +309,11 @@ impl SystemService {
                     match db.get_project_by_path(&path.to_string_lossy()) {
                         Ok(Some(project)) => {
                             if let Err(e) = db.mark_project_deleted(&project.id) {
-                                log::warn!("Failed to mark project as deleted: {}", e);
+                                tracing::warn!("Failed to mark project as deleted: {}", e);
                             }
                         }
                         Ok(None) => {}
-                        Err(e) => log::warn!("Error looking up project for deleted file: {}", e),
+                        Err(e) => tracing::warn!("Error looking up project for deleted file: {}", e),
                     }
                 }
 
