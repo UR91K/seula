@@ -13,6 +13,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use super::handlers::collections as collection_handlers;
 use super::handlers::projects as project_handlers;
+use super::handlers::search as search_handlers;
 use super::handlers::tags as tag_handlers;
 use super::state::AppState;
 
@@ -167,6 +168,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/collections/:collection_id/batch-remove",
             post(collection_handlers::batch_remove_from_collection),
         )
+        .route("/api/v1/search", get(search_handlers::search))
         .layer(cors)
         .with_state(state)
 }
