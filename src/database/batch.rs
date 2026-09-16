@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::models::{Plugin, PluginKey, Sample};
 
 /// Ableton's name for a reference, recovering it from the identifier when the project
@@ -175,7 +175,7 @@ impl<'a> BatchTransaction<'a> {
         }
     }
 
-    fn collect_items(&mut self, live_sets: &[LiveSet]) -> Result<(), DatabaseError> {
+    fn collect_items(&mut self, live_sets: &[Project]) -> Result<(), DatabaseError> {
         // First load existing items
         self.load_existing_plugins()?;
         self.load_class_index()?;
@@ -354,7 +354,7 @@ impl<'a> BatchTransaction<'a> {
         Ok(())
     }
 
-    fn insert_projects(&mut self, live_sets: &[LiveSet]) -> Result<(), DatabaseError> {
+    fn insert_projects(&mut self, live_sets: &[Project]) -> Result<(), DatabaseError> {
         for live_set in live_sets {
             let project_id = live_set.id.to_string();
 
@@ -365,10 +365,9 @@ impl<'a> BatchTransaction<'a> {
                     last_parsed_at, tempo, time_signature_numerator,
                     time_signature_denominator, key_signature_tonic,
                     key_signature_scale, furthest_bar, duration_seconds,
-                    ableton_version_major, ableton_version_minor,
-                    ableton_version_patch, ableton_version_beta,
+                    daw_type, daw_version_display,
                     notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 params![
                     project_id,
                     live_set.name,
@@ -384,11 +383,25 @@ impl<'a> BatchTransaction<'a> {
                     live_set.key_signature.as_ref().map(|k| k.scale.to_string()),
                     live_set.furthest_bar,
                     live_set.estimated_duration.map(|d| d.num_seconds()),
-                    live_set.ableton_version.major,
-                    live_set.ableton_version.minor,
-                    live_set.ableton_version.patch,
-                    live_set.ableton_version.beta,
+                    live_set.daw_type,
+                    live_set.daw_version_display,
                     None::<String>,
+                ],
+            )?;
+
+            // Ableton's structured version data lives in its own side table
+            // (ADR-0015). `INSERT OR REPLACE` on `projects` above cascade-deletes any
+            // existing row here (ON DELETE CASCADE), so this must run after it.
+            self.tx.execute(
+                "INSERT OR REPLACE INTO project_ableton_metadata (
+                    project_id, version_major, version_minor, version_patch, version_beta
+                ) VALUES (?, ?, ?, ?, ?)",
+                params![
+                    project_id,
+                    live_set.ableton_metadata.major,
+                    live_set.ableton_metadata.minor,
+                    live_set.ableton_metadata.patch,
+                    live_set.ableton_metadata.beta,
                 ],
             )?;
 
@@ -419,7 +432,7 @@ impl<'a> BatchTransaction<'a> {
         Ok(())
     }
 
-    fn update_search_indexes(&self, live_sets: &[LiveSet]) -> Result<(), DatabaseError> {
+    fn update_search_indexes(&self, live_sets: &[Project]) -> Result<(), DatabaseError> {
         debug!("Updating search indexes for {} projects", live_sets.len());
 
         for live_set in live_sets {
@@ -461,11 +474,11 @@ impl<'a> BatchTransaction<'a> {
 /// Manages batch insertion of LiveSets into the database
 pub struct BatchInsertManager<'a> {
     conn: &'a mut Connection,
-    live_sets: Arc<Vec<LiveSet>>,
+    live_sets: Arc<Vec<Project>>,
 }
 
 impl<'a> BatchInsertManager<'a> {
-    pub fn new(conn: &'a mut Connection, live_sets: Arc<Vec<LiveSet>>) -> Self {
+    pub fn new(conn: &'a mut Connection, live_sets: Arc<Vec<Project>>) -> Self {
         Self { conn, live_sets }
     }
 

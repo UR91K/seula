@@ -2,7 +2,7 @@ use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, CollectionCommands};
 use crate::database::LiveSetDatabase;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::models::CollectionStatistics;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;

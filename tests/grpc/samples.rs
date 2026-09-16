@@ -121,7 +121,7 @@ async fn test_get_sample_analytics() {
         for i in 0..5 {
             let project_id = uuid::Uuid::new_v4().to_string();
             db_lock.conn.execute(
-                "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, daw_type, daw_version_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rusqlite::params![
                     project_id,
                     format!("Test Project {}", i),
@@ -133,13 +133,15 @@ async fn test_get_sample_analytics() {
                     120.0,
                     4,
                     4,
-                    11,
-                    0,
-                    0,
-                    false
+                    "Ableton Live",
+                    "11.0.0"
                 ],
             ).unwrap();
-            
+            db_lock.conn.execute(
+                "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+                rusqlite::params![project_id, 11, 0, 0, false],
+            ).unwrap();
+
             // Link sample1 to this project (high usage)
             db_lock.conn.execute(
                 "INSERT INTO project_samples (project_id, sample_id) VALUES (?, ?)",
@@ -150,7 +152,7 @@ async fn test_get_sample_analytics() {
         // Create one more project for sample3 (moderate usage)
         let project_id = uuid::Uuid::new_v4().to_string();
         db_lock.conn.execute(
-            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, daw_type, daw_version_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 project_id,
                 "Test Project for Sample3",
@@ -162,11 +164,13 @@ async fn test_get_sample_analytics() {
                 120.0,
                 4,
                 4,
-                11,
-                0,
-                0,
-                false
+                "Ableton Live",
+                "11.0.0"
             ],
+        ).unwrap();
+        db_lock.conn.execute(
+            "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![project_id, 11, 0, 0, false],
         ).unwrap();
         
         // Link sample3 to project once (moderate usage)
@@ -235,7 +239,7 @@ async fn test_get_all_samples_with_filters() {
         
         // Insert project
         db_lock.conn.execute(
-            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, daw_type, daw_version_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 project_id,
                 "Test Project",
@@ -247,13 +251,15 @@ async fn test_get_all_samples_with_filters() {
                 120.0,
                 4,
                 4,
-                11,
-                0,
-                0,
-                false
+                "Ableton Live",
+                "11.0.0"
             ],
         ).unwrap();
-        
+        db_lock.conn.execute(
+            "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![project_id, 11, 0, 0, false],
+        ).unwrap();
+
         // Insert samples
         db_lock.conn.execute(
             "INSERT INTO samples (id, name, path, is_present) VALUES (?, ?, ?, ?)",
@@ -357,7 +363,7 @@ async fn test_get_all_samples_sorting() {
         
         // Insert project
         db_lock.conn.execute(
-            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, daw_type, daw_version_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 project_id,
                 "Test Project",
@@ -369,13 +375,15 @@ async fn test_get_all_samples_sorting() {
                 120.0,
                 4,
                 4,
-                11,
-                0,
-                0,
-                false
+                "Ableton Live",
+                "11.0.0"
             ],
         ).unwrap();
-        
+        db_lock.conn.execute(
+            "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![project_id, 11, 0, 0, false],
+        ).unwrap();
+
         // Insert samples with different names
         db_lock.conn.execute(
             "INSERT INTO samples (id, name, path, is_present) VALUES (?, ?, ?, ?)",
@@ -406,7 +414,7 @@ async fn test_get_all_samples_sorting() {
         // Create a second project to give sample2 a higher usage count
         let project2_id = uuid::Uuid::new_v4().to_string();
         db_lock.conn.execute(
-            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, hash, created_at, modified_at, last_parsed_at, tempo, time_signature_numerator, time_signature_denominator, daw_type, daw_version_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 project2_id,
                 "Test Project 2",
@@ -418,11 +426,13 @@ async fn test_get_all_samples_sorting() {
                 120.0,
                 4,
                 4,
-                11,
-                0,
-                0,
-                false
+                "Ableton Live",
+                "11.0.0"
             ],
+        ).unwrap();
+        db_lock.conn.execute(
+            "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![project2_id, 11, 0, 0, false],
         ).unwrap();
         
         db_lock.conn.execute(
@@ -525,14 +535,20 @@ async fn test_get_sample_extensions() {
 
 #[tokio::test]
 async fn test_liveset_add_sample_method() {
-    use seula::live_set::LiveSet;
+    use seula::project::Project;
     use std::path::PathBuf;
     use std::collections::HashSet;
     use uuid::Uuid;
     use chrono::Local;
-    
-    // Create a minimal LiveSet for testing
-    let mut live_set = LiveSet {
+
+    // Create a minimal Project for testing
+    let ableton_version = seula::models::AbletonVersion {
+        major: 11,
+        minor: 0,
+        patch: 0,
+        beta: false,
+    };
+    let mut live_set = Project {
         is_active: true,
         id: Uuid::new_v4(),
         file_path: PathBuf::from("/test/path.als"),
@@ -541,12 +557,9 @@ async fn test_liveset_add_sample_method() {
         created_time: Local::now(),
         modified_time: Local::now(),
         last_parsed_timestamp: Local::now(),
-        ableton_version: seula::models::AbletonVersion {
-            major: 11,
-            minor: 0,
-            patch: 0,
-            beta: false,
-        },
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: ableton_version.to_string(),
+        ableton_metadata: ableton_version,
         key_signature: None,
         tempo: 120.0,
         time_signature: seula::models::TimeSignature {

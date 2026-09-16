@@ -58,7 +58,7 @@ A full plugin scan is **2m19s for 276 candidates** (debug build, 2026-09-15). Th
 plugin load time, not ours, so a release build will not change it much — which is why it
 runs once on first use and thereafter only on demand (ADR-0013).
 
-**Schema versioning:** `SCHEMA_VERSION` (now 2) is bumped only for changes to *existing*
+**Schema versioning:** `SCHEMA_VERSION` (now 3) is bumped only for changes to *existing*
 tables. Adding a table needs no bump, because `initialize()` creates missing ones on
 every open — and a bump discards the user's database (ADR-0011).
 
@@ -70,6 +70,7 @@ every open — and a bump discards the user's database (ADR-0011).
 | `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
+| `test_empty_plugin_name`, `test_whitespace_only_plugin_name`, and `test_psp_springbox_plugin_from_real_project` fail on `main` as of the ADR-0006/ADR-0012 work (commit `d762db5`, predates any DAW-generalisation changes). The first two assert a blank plugin name gets filled in "from the database" (`plugin.name == "Pro-Q 3"`) — the Ableton-database lookup that filled that in was removed by ADR-0006, and the test wasn't updated to match. The third filters by `installed = false`, which ADR-0012 made not the same as "never scanned" (`NULL`); an unscanned plugin no longer matches that filter. Discovered while verifying the DAW-generalisation refactor (ADR-0014/0015/0016); not touched by it. | `tests/scan/parser/plugins.rs` | Low, but it keeps the suite red |
 
 ## Documentation triage
 

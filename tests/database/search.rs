@@ -64,8 +64,8 @@ fn setup_test_projects() -> (
         .with_modified_time(rock_modified)
         .build();
 
-    // Convert scan results to LiveSets
-    let edm_project = LiveSet {
+    // Convert scan results to Projects
+    let edm_project = Project {
         is_active: true,
         file_path: PathBuf::from("EDM Project.als"),
         name: String::from("EDM Project.als"),
@@ -78,14 +78,16 @@ fn setup_test_projects() -> (
         key_signature: None,
         furthest_bar: None,
         estimated_duration: None,
-        ableton_version: edm_scan.version,
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: edm_scan.version.to_string(),
+        ableton_metadata: edm_scan.version,
         plugins: edm_scan.plugins,
         samples: edm_scan.samples,
         tags: HashSet::new(),
         id: Uuid::new_v4(),
     };
 
-    let rock_project = LiveSet {
+    let rock_project = Project {
         is_active: true,
         file_path: PathBuf::from("Rock Band.als"),
         name: String::from("Rock Band.als"),
@@ -98,7 +100,9 @@ fn setup_test_projects() -> (
         key_signature: None,
         furthest_bar: None,
         estimated_duration: None,
-        ableton_version: rock_scan.version,
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: rock_scan.version.to_string(),
+        ableton_metadata: rock_scan.version,
         plugins: rock_scan.plugins,
         samples: rock_scan.samples,
         tags: HashSet::new(),

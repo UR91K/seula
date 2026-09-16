@@ -369,9 +369,8 @@ fn a_phantom_row_is_merged_into_the_bundle_that_owns_its_class() {
              INSERT INTO projects (
                  id, path, name, hash, created_at, modified_at, last_parsed_at,
                  tempo, time_signature_numerator, time_signature_denominator,
-                 ableton_version_major, ableton_version_minor, ableton_version_patch,
-                 ableton_version_beta
-             ) VALUES ('{project}', 'C:\\\\p.als', 'p', 'h', 0, 0, 0, 120.0, 4, 4, 11, 0, 0, 0);
+                 daw_type, daw_version_display
+             ) VALUES ('{project}', 'C:\\\\p.als', 'p', 'h', 0, 0, 0, 120.0, 4, 4, 'Ableton Live', '11.0.0');
              INSERT INTO project_plugins (project_id, plugin_id)
              VALUES ('{project}', '{phantom}');",
             phantom = phantom_id,

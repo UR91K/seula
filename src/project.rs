@@ -11,7 +11,7 @@ use crate::utils::metadata::{load_file_hash, load_file_name, load_file_timestamp
 use crate::utils::{decompress_gzip_file, validate_ableton_file};
 
 #[derive(Debug)]
-pub struct LiveSetPreprocessed {
+pub struct ProjectPreprocessed {
     pub path: PathBuf,
     pub name: String,
     pub file_hash: String,
@@ -19,7 +19,7 @@ pub struct LiveSetPreprocessed {
     pub modified_time: DateTime<Local>,
 }
 
-impl LiveSetPreprocessed {
+impl ProjectPreprocessed {
     pub fn new(file_path: PathBuf) -> Result<Self, LiveSetError> {
         validate_ableton_file(&file_path)?;
 
@@ -39,7 +39,7 @@ impl LiveSetPreprocessed {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct LiveSet {
+pub struct Project {
     pub is_active: bool,
 
     pub id: Uuid,
@@ -50,7 +50,20 @@ pub struct LiveSet {
     pub modified_time: DateTime<Local>,
     pub last_parsed_timestamp: DateTime<Local>,
 
-    pub ableton_version: AbletonVersion,
+    /// The DAW this project belongs to, e.g. "Ableton Live". Generic and DAW-agnostic
+    /// (ADR-0015) — every parser populates this the same way.
+    pub daw_type: String,
+    /// A plain string produced by the owning DAW's own version type (here,
+    /// `AbletonVersion`'s `Display` impl). Generic; used for search/display only.
+    /// Structured, queryable version data lives in `ableton_metadata` below, and in
+    /// `project_ableton_metadata` once persisted (ADR-0015).
+    pub daw_version_display: String,
+    /// Ableton's own structured version data. Named concretely rather than wrapped in
+    /// a `DawMetadata` enum, because a second DAW's metadata shape is unknowable until
+    /// that DAW's parser actually exists (ADR-0015's Notes) — this becomes an enum
+    /// then, and the compiler-flagged exhaustive matches are exactly the enforcement
+    /// ADR-0016 chose closed-enum dispatch to get.
+    pub ableton_metadata: AbletonVersion,
 
     pub key_signature: Option<KeySignature>,
     pub tempo: f64,
@@ -63,13 +76,13 @@ pub struct LiveSet {
     pub estimated_duration: Option<chrono::Duration>,
 }
 
-impl LiveSet {
+impl Project {
     pub fn new(file_path: PathBuf) -> Result<Self, LiveSetError> {
-        let preprocessed = LiveSetPreprocessed::new(file_path)?;
+        let preprocessed = ProjectPreprocessed::new(file_path)?;
         Self::from_preprocessed(preprocessed)
     }
 
-    pub fn from_preprocessed(preprocessed: LiveSetPreprocessed) -> Result<Self, LiveSetError> {
+    pub fn from_preprocessed(preprocessed: ProjectPreprocessed) -> Result<Self, LiveSetError> {
         // Scope the xml_data to this block so it's dropped after parsing
         let parse_result = {
             let xml_data = decompress_gzip_file(&preprocessed.path)?;
@@ -80,7 +93,9 @@ impl LiveSet {
             // xml_data is dropped here when the block ends
         };
 
-        let mut live_set = LiveSet {
+        let ableton_version = parse_result.version;
+
+        let mut project = Project {
             is_active: true,
             id: Uuid::new_v4(),
             file_path: preprocessed.path,
@@ -90,7 +105,10 @@ impl LiveSet {
             modified_time: preprocessed.modified_time,
             last_parsed_timestamp: Local::now(),
 
-            ableton_version: parse_result.version,
+            daw_type: "Ableton Live".to_string(),
+            daw_version_display: ableton_version.to_string(),
+            ableton_metadata: ableton_version,
+
             key_signature: parse_result.key_signature,
             tempo: parse_result.tempo,
             time_signature: parse_result.time_signature,
@@ -102,9 +120,9 @@ impl LiveSet {
             estimated_duration: None,
         };
 
-        live_set.calculate_duration()?;
+        project.calculate_duration()?;
 
-        Ok(live_set)
+        Ok(project)
     }
 
     pub fn calculate_duration(&mut self) -> Result<(), LiveSetError> {
@@ -116,18 +134,18 @@ impl LiveSet {
         Ok(())
     }
 
-    /// Add a sample to this LiveSet
+    /// Add a sample to this project
     pub fn add_sample(&mut self, sample: Sample) {
         self.samples.insert(sample);
     }
 
-    /// Add a plugin to this LiveSet
+    /// Add a plugin to this project
     pub fn add_plugin(&mut self, plugin: Plugin) {
         self.plugins.insert(plugin);
     }
 
     pub fn debug_log_info(&self) {
-        println!("{}", "\n=== Live Set Information ===".bold().blue());
+        println!("{}", "\n=== Project Information ===".bold().blue());
 
         // Basic Information
         println!(
@@ -160,10 +178,10 @@ impl LiveSet {
         println!("{}", "\nAbleton Version:".bold().yellow());
         println!(
             "Version: {}.{}.{} {}",
-            self.ableton_version.major.to_string().cyan(),
-            self.ableton_version.minor.to_string().cyan(),
-            self.ableton_version.patch.to_string().cyan(),
-            if self.ableton_version.beta {
+            self.ableton_metadata.major.to_string().cyan(),
+            self.ableton_metadata.minor.to_string().cyan(),
+            self.ableton_metadata.patch.to_string().cyan(),
+            if self.ableton_metadata.beta {
                 "(Beta)".yellow()
             } else {
                 "".normal()

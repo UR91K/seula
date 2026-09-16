@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// Stamped into `PRAGMA user_version`. Bump it for any breaking schema change; a
 /// database at an older version is discarded and rebuilt (ADR-0011), and one at a newer
 /// version is refused rather than destroyed.
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 3;
 
 pub struct LiveSetDatabase {
     pub conn: Connection,
@@ -140,12 +140,25 @@ impl LiveSetDatabase {
                 duration_seconds INTEGER,
                 furthest_bar REAL,
                 
-                ableton_version_major INTEGER NOT NULL,
-                ableton_version_minor INTEGER NOT NULL,
-                ableton_version_patch INTEGER NOT NULL,
-                ableton_version_beta BOOLEAN NOT NULL,
+                -- DAW identification (ADR-0015). daw_version_display is a plain string
+                -- produced by that DAW's own Display impl; structured, queryable
+                -- version data lives in a DAW-specific side table, never here.
+                daw_type TEXT NOT NULL,
+                daw_version_display TEXT NOT NULL,
                 audio_file_id TEXT,
                 FOREIGN KEY (audio_file_id) REFERENCES media_files(id) ON DELETE SET NULL
+            );
+
+            -- Ableton's structured version data (ADR-0015). Kept out of `projects`
+            -- itself so the table stays generic across DAWs; queried via a join on
+            -- this primary key rather than bare columns, e.g. for exact-match
+            -- filtering and numeric sort, which daw_version_display cannot do.
+            CREATE TABLE IF NOT EXISTS project_ableton_metadata (
+                project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                version_major INTEGER NOT NULL,
+                version_minor INTEGER NOT NULL,
+                version_patch INTEGER NOT NULL,
+                version_beta BOOLEAN NOT NULL
             );
 
             -- A row means the plugin exists on this machine and/or in a project
@@ -364,7 +377,7 @@ impl LiveSetDatabase {
                 tempo,                -- Project tempo
                 key_signature,        -- Key signature (C Major, F# Minor, etc.)
                 time_signature,       -- Time signature (4/4, 3/4, etc.)
-                version,              -- Ableton version (11.0.0, 12.0.1, etc.)
+                version,              -- daw_version_display (11.0.0, 12.0.1, etc.)
                 tokenize='porter unicode61'
             );
 
@@ -401,7 +414,7 @@ impl LiveSetDatabase {
                         ELSE ''
                     END,
                     CAST(p.time_signature_numerator AS TEXT) || '/' || CAST(p.time_signature_denominator AS TEXT),
-                    CAST(p.ableton_version_major AS TEXT) || '.' || CAST(p.ableton_version_minor AS TEXT) || '.' || CAST(p.ableton_version_patch AS TEXT)
+                    p.daw_version_display
                 FROM projects p
                 WHERE p.id = new.id;
             END;
@@ -433,7 +446,7 @@ impl LiveSetDatabase {
                         ELSE ''
                     END,
                     CAST(p.time_signature_numerator AS TEXT) || '/' || CAST(p.time_signature_denominator AS TEXT),
-                    CAST(p.ableton_version_major AS TEXT) || '.' || CAST(p.ableton_version_minor AS TEXT) || '.' || CAST(p.ableton_version_patch AS TEXT)
+                    p.daw_version_display
                 FROM projects p
                 WHERE p.id = new.id;
             END;
@@ -555,7 +568,7 @@ impl LiveSetDatabase {
                     ELSE ''
                 END,
                 CAST(p.time_signature_numerator AS TEXT) || '/' || CAST(p.time_signature_denominator AS TEXT),
-                CAST(p.ableton_version_major AS TEXT) || '.' || CAST(p.ableton_version_minor AS TEXT) || '.' || CAST(p.ableton_version_patch AS TEXT)
+                p.daw_version_display
             FROM projects p
             WHERE p.is_active = true
             "#,

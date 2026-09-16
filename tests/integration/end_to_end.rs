@@ -4,7 +4,7 @@ use crate::common::setup;
 use colored::*;
 use std::path::Path;
 use std::time::Instant;
-use seula::live_set::LiveSet;
+use seula::project::Project;
 use seula::utils::decompress_gzip_file;
 
 // TODO: Consider creating comprehensive end-to-end tests here
@@ -18,7 +18,7 @@ fn test_load_real_project() {
     let project_path = Path::new(
         r"C:\Users\judee\Documents\Projects\band with joel\Forkspan Project\Forkspan.als",
     );
-    let live_set = LiveSet::new(project_path.to_path_buf()).expect("Failed to load project");
+    let live_set = Project::new(project_path.to_path_buf()).expect("Failed to load project");
 
     // Basic project validation
     assert!(!live_set.name.is_empty());
@@ -26,8 +26,8 @@ fn test_load_real_project() {
     assert!(!live_set.file_hash.is_empty());
 
     // Version check
-    assert!(live_set.ableton_version.major >= 9);
-    assert!(live_set.ableton_version.beta == false);
+    assert!(live_set.ableton_metadata.major >= 9);
+    assert!(live_set.ableton_metadata.beta == false);
 
     // Musical properties
     assert!(live_set.tempo > 0.0);
@@ -121,7 +121,7 @@ fn test_parse_performance() {
         drop(xml_data);
 
         let start = Instant::now();
-        let live_set = LiveSet::new(path.to_path_buf()).expect("Failed to load project");
+        let live_set = Project::new(path.to_path_buf()).expect("Failed to load project");
         let duration = start.elapsed();
         let duration_secs = duration.as_secs_f64();
         total_time += duration_secs;
@@ -165,22 +165,22 @@ fn test_parse_performance() {
         println!(
             "  - {}: {}",
             "Major".bright_black(),
-            live_set.ableton_version.major
+            live_set.ableton_metadata.major
         );
         println!(
             "  - {}: {}",
             "Minor".bright_black(),
-            live_set.ableton_version.minor
+            live_set.ableton_metadata.minor
         );
         println!(
             "  - {}: {}",
             "Patch".bright_black(),
-            live_set.ableton_version.patch
+            live_set.ableton_metadata.patch
         );
         println!(
             "  - {}: {}",
             "Beta".bright_black(),
-            live_set.ableton_version.beta
+            live_set.ableton_metadata.beta
         );
 
         println!("\n{}", "Musical Properties:".yellow().bold());

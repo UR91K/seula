@@ -14,7 +14,7 @@ use super::super::system::*;
 use super::super::scanning::*;
 use super::super::watcher::*;
 use super::super::common::*;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::process_projects_with_progress;
 use crate::watcher::file_watcher::{FileEvent, FileWatcher};
 
@@ -194,7 +194,7 @@ impl SystemHandler {
         }
 
         // Parse the file
-        match LiveSet::new(file_path.clone()) {
+        match Project::new(file_path.clone()) {
             Ok(live_set) => {
                 debug!("Successfully parsed project: {}", live_set.name);
 
@@ -286,7 +286,7 @@ impl SystemHandler {
             }
 
             // Parse the file
-            match LiveSet::new(file_path.clone()) {
+            match Project::new(file_path.clone()) {
                 Ok(live_set) => {
                     debug!("Successfully parsed project: {}", live_set.name);
 

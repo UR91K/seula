@@ -12,7 +12,7 @@ use uuid::Uuid;
 use super::*;
 use crate::common::{create_test_live_set_from_parse, setup, test_dev_identifier, LiveSetBuilder};
 
-pub fn create_test_live_set() -> LiveSet {
+pub fn create_test_live_set() -> Project {
     let now = Local::now();
     let mut plugins = HashSet::new();
     let mut samples = HashSet::new();
@@ -36,7 +36,14 @@ pub fn create_test_live_set() -> LiveSet {
         is_present: true,
     });
 
-    LiveSet {
+    let ableton_version = AbletonVersion {
+        major: 11,
+        minor: 1,
+        patch: 0,
+        beta: false,
+    };
+
+    Project {
         is_active: true,
         id: Uuid::new_v4(),
         file_path: PathBuf::from("C:/test/test_project.als"),
@@ -46,12 +53,9 @@ pub fn create_test_live_set() -> LiveSet {
         modified_time: now,
         last_parsed_timestamp: now,
 
-        ableton_version: AbletonVersion {
-            major: 11,
-            minor: 1,
-            patch: 0,
-            beta: false,
-        },
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: ableton_version.to_string(),
+        ableton_metadata: ableton_version,
 
         key_signature: Some(KeySignature {
             tonic: Tonic::C,
@@ -131,8 +135,8 @@ pub fn test_insert_and_retrieve_project() {
         original_live_set.furthest_bar
     );
     assert_eq!(
-        retrieved_live_set.ableton_version,
-        original_live_set.ableton_version
+        retrieved_live_set.ableton_metadata,
+        original_live_set.ableton_metadata
     );
 
     // Compare collections

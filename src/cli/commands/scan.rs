@@ -24,9 +24,9 @@ impl TableDisplay for ScanResults {
 }
 use crate::cli::CliError;
 use crate::database::LiveSetDatabase;
-use crate::error::LiveSetError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::process_projects_with_progress;
+use crate::scan::daw::ParseError;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::project_scanner::ProjectPathScanner;
 use std::collections::HashSet;
@@ -185,7 +185,7 @@ impl ScanCommand {
     async fn process_projects_parallel(
         &self,
         paths: Vec<PathBuf>,
-    ) -> Result<Vec<Result<(PathBuf, LiveSet), (PathBuf, LiveSetError)>>, CliError> {
+    ) -> Result<Vec<Result<(PathBuf, Project), (PathBuf, ParseError)>>, CliError> {
         let total = paths.len();
         let num_threads = (total / 2).max(1).min(4);
         let parser = ParallelParser::new(num_threads);
@@ -212,7 +212,7 @@ impl ScanCommand {
     async fn store_results(
         &self,
         db: &Arc<TokioMutex<LiveSetDatabase>>,
-        results: Vec<Result<(PathBuf, LiveSet), (PathBuf, LiveSetError)>>,
+        results: Vec<Result<(PathBuf, Project), (PathBuf, ParseError)>>,
     ) -> Result<(usize, usize), CliError> {
         let mut db_guard = db.lock().await;
         let mut success_count = 0;

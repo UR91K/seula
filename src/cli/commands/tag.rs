@@ -3,7 +3,7 @@ use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable
 use crate::cli::{CliError, TagCommands};
 use crate::database::tags::{TagStatistics, TagUsageInfo};
 use crate::database::LiveSetDatabase;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use comfy_table::Table;

@@ -449,13 +449,10 @@ impl LiveSetDatabase {
     }
 
     pub fn get_ableton_version_stats(&self) -> Result<Vec<(String, i32)>, DatabaseError> {
+        // daw_version_display already includes the beta suffix (ADR-0015,
+        // AbletonVersion::Display), so no per-column reconstruction is needed here.
         let mut stmt = self.conn.prepare(
-            "SELECT 
-                CAST(ableton_version_major AS TEXT) || '.' || 
-                CAST(ableton_version_minor AS TEXT) || '.' || 
-                CAST(ableton_version_patch AS TEXT) ||
-                CASE WHEN ableton_version_beta = true THEN ' beta' ELSE '' END as version,
-                COUNT(*) as count
+            "SELECT daw_version_display as version, COUNT(*) as count
              FROM projects
              WHERE is_active = true
              GROUP BY version
@@ -573,18 +570,22 @@ impl LiveSetDatabase {
             params.push(Box::new(denominator));
         }
 
+        // A subquery rather than a join: `where_clause` below is reused verbatim
+        // across many queries with different FROM shapes (some already joined,
+        // most not), so the version filter must not require any of them to add
+        // project_ableton_metadata to their own FROM clause.
         if let Some(major) = ableton_version_major {
-            conditions.push("ableton_version_major = ?");
+            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_major = ?)");
             params.push(Box::new(major));
         }
 
         if let Some(minor) = ableton_version_minor {
-            conditions.push("ableton_version_minor = ?");
+            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_minor = ?)");
             params.push(Box::new(minor));
         }
 
         if let Some(patch) = ableton_version_patch {
-            conditions.push("ableton_version_patch = ?");
+            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_patch = ?)");
             params.push(Box::new(patch));
         }
 
@@ -821,15 +822,21 @@ impl LiveSetDatabase {
         where_clause: &str,
         params: &[Box<dyn rusqlite::ToSql>],
     ) -> Result<Vec<(String, i32)>, DatabaseError> {
+        // Numeric columns from the side table are required here (unlike
+        // get_ableton_version_stats) because sorting needs real integer order, which
+        // a display string can't give correctly (e.g. "9.1.0" vs "10.0.0" as text).
+        // No beta suffix, preserved as-is from prior behavior.
         let query = format!(
-            "SELECT 
-                CAST(ableton_version_major AS TEXT) || '.' || 
-                CAST(ableton_version_minor AS TEXT) || '.' || 
-                CAST(ableton_version_patch AS TEXT) as version,
+            "SELECT
+                CAST(a.version_major AS TEXT) || '.' ||
+                CAST(a.version_minor AS TEXT) || '.' ||
+                CAST(a.version_patch AS TEXT) as version,
                 COUNT(*) as count
-             FROM projects {}
+             FROM projects p
+             JOIN project_ableton_metadata a ON a.project_id = p.id
+             {}
              GROUP BY version
-             ORDER BY ableton_version_major DESC, ableton_version_minor DESC, ableton_version_patch DESC",
+             ORDER BY a.version_major DESC, a.version_minor DESC, a.version_patch DESC",
             where_clause
         );
 

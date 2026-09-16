@@ -237,7 +237,7 @@ struct ProjectDetails {
 }
 
 impl ProjectDetails {
-    fn from_live_set(p: &crate::LiveSet) -> Self {
+    fn from_live_set(p: &crate::Project) -> Self {
         Self {
             id: p.id.to_string(),
             name: p.name.clone(),
@@ -245,7 +245,7 @@ impl ProjectDetails {
             tempo: p.tempo,
             time_signature: format!("{}/{}", p.time_signature.numerator, p.time_signature.denominator),
             key: p.key_signature.as_ref().map(|k| k.to_string()).unwrap_or_else(|| "".to_string()),
-            ableton_version: p.ableton_version.to_string(),
+            ableton_version: p.daw_version_display.clone(),
             created_at: p.created_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             modified_at: p.modified_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             plugins: p.plugins.len(),

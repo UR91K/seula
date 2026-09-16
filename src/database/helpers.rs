@@ -1,6 +1,6 @@
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Plugin, PluginKey, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
 use rusqlite::{params, OptionalExtension, Row, Transaction};
@@ -166,15 +166,19 @@ pub fn link_project_sample(
     Ok(())
 }
 
-/// Convert a database row to a LiveSet object
-pub fn row_to_live_set(row: &Row) -> rusqlite::Result<LiveSet> {
+/// Convert a database row to a Project object.
+///
+/// Requires the row to come from a query joining `project_ableton_metadata` (ADR-0015)
+/// so `version_major`/`version_minor`/`version_patch`/`version_beta` are present
+/// alongside `daw_type`/`daw_version_display`.
+pub fn row_to_project(row: &Row) -> rusqlite::Result<Project> {
     let id: String = row.get("id")?;
     let created_timestamp: i64 = row.get("created_at")?;
     let modified_timestamp: i64 = row.get("modified_at")?;
     let parsed_timestamp: i64 = row.get("last_parsed_at")?;
     let duration_secs: Option<i64> = row.get("duration_seconds")?;
 
-    Ok(LiveSet {
+    Ok(Project {
         is_active: row.get("is_active")?,
         id: Uuid::parse_str(&id).map_err(|e| {
             rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
@@ -251,11 +255,13 @@ pub fn row_to_live_set(row: &Row) -> rusqlite::Result<LiveSet> {
         },
         furthest_bar: row.get("furthest_bar")?,
 
-        ableton_version: AbletonVersion {
-            major: row.get("ableton_version_major")?,
-            minor: row.get("ableton_version_minor")?,
-            patch: row.get("ableton_version_patch")?,
-            beta: row.get("ableton_version_beta")?,
+        daw_type: row.get("daw_type")?,
+        daw_version_display: row.get("daw_version_display")?,
+        ableton_metadata: AbletonVersion {
+            major: row.get("version_major")?,
+            minor: row.get("version_minor")?,
+            patch: row.get("version_patch")?,
+            beta: row.get("version_beta")?,
         },
 
         estimated_duration: duration_secs.map(chrono::Duration::seconds),

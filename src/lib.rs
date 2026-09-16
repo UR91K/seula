@@ -42,7 +42,7 @@ pub mod config;
 pub mod database;
 pub mod error;
 pub mod grpc;
-pub mod live_set;
+pub mod project;
 pub mod media;
 pub mod models;
 pub mod scan;
@@ -92,14 +92,14 @@ pub use database::LiveSetDatabase;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use seula::LiveSet;
+/// use seula::Project;
 /// use std::path::PathBuf;
 ///
 /// let project_path = PathBuf::from("project.als");
-/// let live_set = LiveSet::new(project_path).expect("Failed to parse project");
-/// println!("Project tempo: {}", live_set.tempo);
+/// let project = Project::new(project_path).expect("Failed to parse project");
+/// println!("Project tempo: {}", project.tempo);
 /// ```
-pub use live_set::LiveSet;
+pub use project::Project;
 
 /// All core data structures and types used throughout the library.
 ///
@@ -127,7 +127,7 @@ pub use utils::decompress_gzip_file;
 // Core processing functions
 use crate::database::batch::BatchInsertManager;
 use crate::error::LiveSetError;
-use crate::live_set::LiveSetPreprocessed;
+use crate::project::ProjectPreprocessed;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::plugins::scan_system_with_progress;
 use crate::scan::project_scanner::ProjectPathScanner;
@@ -424,7 +424,7 @@ where
     };
     // Parser is dropped here, which will close the work channel
 
-    let mut successful_live_sets = Vec::new();
+    let mut successful_projects = Vec::new();
 
     // Collect results from parser with progress tracking
     debug!("Starting to collect parser results");
@@ -437,7 +437,7 @@ where
                 let progress_value = completed_count as f32 / total_projects as f32;
 
                 match result {
-                    Ok((path, live_set)) => {
+                    Ok((path, project)) => {
                         let filename = path
                             .file_name()
                             .and_then(|n| n.to_str())
@@ -457,7 +457,7 @@ where
                             "parsing"
                         );
 
-                        successful_live_sets.push(live_set);
+                        successful_projects.push(project);
                     }
                     Err((path, error)) => {
                         let filename = path
@@ -503,7 +503,7 @@ where
         }
     }
 
-    if successful_live_sets.is_empty() {
+    if successful_projects.is_empty() {
         progress!(
             total_projects as u32,
             total_projects as u32,
@@ -523,10 +523,10 @@ where
     );
 
     // Batch insert the successfully parsed projects
-    let num_live_sets = successful_live_sets.len();
-    info!("Inserting {} projects into database", num_live_sets);
-    let live_sets = std::sync::Arc::new(successful_live_sets);
-    let mut batch_manager = BatchInsertManager::new(&mut db.conn, live_sets);
+    let num_projects = successful_projects.len();
+    info!("Inserting {} projects into database", num_projects);
+    let projects = std::sync::Arc::new(successful_projects);
+    let mut batch_manager = BatchInsertManager::new(&mut db.conn, projects);
     let stats = batch_manager.execute()?;
 
     info!(
@@ -544,7 +544,7 @@ where
         ),
         "completed"
     );
-    info!("Successfully processed {} projects", num_live_sets);
+    info!("Successfully processed {} projects", num_projects);
     Ok(())
 }
 
@@ -561,19 +561,19 @@ where
 ///
 /// # Returns
 ///
-/// Returns a vector of [`LiveSetPreprocessed`] objects containing basic metadata
+/// Returns a vector of [`ProjectPreprocessed`] objects containing basic metadata
 /// for each successfully processed project.
 ///
 /// # Errors
 ///
 /// Returns [`LiveSetError`] if the preprocessing operation fails critically.
 /// Individual project preprocessing failures are logged but don't stop the overall process.
-fn preprocess_projects(paths: HashSet<PathBuf>) -> Result<Vec<LiveSetPreprocessed>, LiveSetError> {
+fn preprocess_projects(paths: HashSet<PathBuf>) -> Result<Vec<ProjectPreprocessed>, LiveSetError> {
     debug!("Preprocessing {} projects", paths.len());
     let mut preprocessed = Vec::with_capacity(paths.len());
 
     for path in paths {
-        match LiveSetPreprocessed::new(path.clone()) {
+        match ProjectPreprocessed::new(path.clone()) {
             Ok(metadata) => {
                 trace!("Successfully preprocessed: {}", metadata.name);
                 preprocessed.push(metadata);
@@ -608,7 +608,7 @@ fn preprocess_projects(paths: HashSet<PathBuf>) -> Result<Vec<LiveSetPreprocesse
 ///
 /// Returns [`LiveSetError`] if database queries fail during the filtering process.
 fn filter_unchanged_projects(
-    preprocessed: Vec<LiveSetPreprocessed>,
+    preprocessed: Vec<ProjectPreprocessed>,
     db: &LiveSetDatabase,
 ) -> Result<Vec<PathBuf>, LiveSetError> {
     let total_count = preprocessed.len();

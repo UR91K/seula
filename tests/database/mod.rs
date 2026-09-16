@@ -12,7 +12,7 @@ pub mod tags;
 
 // Common imports for database tests
 use seula::database::LiveSetDatabase;
-use seula::live_set::LiveSet;
+use seula::project::Project;
 // use crate::common::setup;
 use std::path::PathBuf;
 // use tempfile::tempdir;

@@ -1,5 +1,5 @@
 use crate::error::DatabaseError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
 use log::debug;
@@ -37,7 +37,7 @@ pub struct SearchQuery {
 
 #[derive(Debug)]
 pub struct SearchResult {
-    pub project: LiveSet,
+    pub project: Project,
     pub rank: f64,
     pub match_reason: Vec<MatchReason>,
 }
@@ -225,7 +225,7 @@ impl SearchQuery {
 }
 
 impl LiveSetDatabase {
-    pub fn search_simple(&mut self, query: &str) -> Result<Vec<LiveSet>, DatabaseError> {
+    pub fn search_simple(&mut self, query: &str) -> Result<Vec<Project>, DatabaseError> {
         debug!("Performing search with query: {}", query);
         let tx = self.conn.transaction()?;
 
@@ -266,13 +266,15 @@ impl LiveSetDatabase {
             let project = {
                 let mut stmt = tx.prepare(
                     r#"
-                    SELECT 
-                        id, path, name, hash, created_at, modified_at, last_parsed_at,
-                        tempo, time_signature_numerator, time_signature_denominator,
-                        key_signature_tonic, key_signature_scale, duration_seconds, furthest_bar,
-                        ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta
-                    FROM projects 
-                    WHERE path = ?
+                    SELECT
+                        p.id, p.path, p.name, p.hash, p.created_at, p.modified_at, p.last_parsed_at,
+                        p.tempo, p.time_signature_numerator, p.time_signature_denominator,
+                        p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
+                        p.daw_type, p.daw_version_display,
+                        a.version_major, a.version_minor, a.version_patch, a.version_beta
+                    FROM projects p
+                    JOIN project_ableton_metadata a ON a.project_id = p.id
+                    WHERE p.path = ?
                     "#,
                 )?;
 
@@ -285,7 +287,7 @@ impl LiveSetDatabase {
                     let modified_timestamp: i64 = row.get(5)?;
                     let parsed_timestamp: i64 = row.get(6)?;
 
-                    let mut live_set = LiveSet {
+                    let mut live_set = Project {
                         is_active: true,
                         id: Uuid::parse_str(&project_id).map_err(|_| {
                             rusqlite::Error::InvalidParameterName("Invalid UUID".into())
@@ -336,11 +338,13 @@ impl LiveSetDatabase {
                         },
                         furthest_bar: row.get(13)?,
 
-                        ableton_version: AbletonVersion {
-                            major: row.get(14)?,
-                            minor: row.get(15)?,
-                            patch: row.get(16)?,
-                            beta: row.get(17)?,
+                        daw_type: row.get(14)?,
+                        daw_version_display: row.get(15)?,
+                        ableton_metadata: AbletonVersion {
+                            major: row.get(16)?,
+                            minor: row.get(17)?,
+                            patch: row.get(18)?,
+                            beta: row.get(19)?,
                         },
 
                         estimated_duration: duration_secs.map(chrono::Duration::seconds),

@@ -1,9 +1,9 @@
 use super::helpers::{
-    insert_plugin, insert_sample, link_project_plugin, link_project_sample, row_to_live_set,
+    insert_plugin, insert_sample, link_project_plugin, link_project_sample, row_to_project,
 };
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use crate::utils::metadata::load_file_hash;
 use chrono::{Local, TimeZone, Utc};
@@ -16,20 +16,22 @@ use uuid::Uuid;
 use super::LiveSetDatabase;
 
 impl LiveSetDatabase {
-    pub fn get_project_by_id(&mut self, id: &str) -> Result<Option<LiveSet>, DatabaseError> {
+    pub fn get_project_by_id(&mut self, id: &str) -> Result<Option<Project>, DatabaseError> {
         debug!("Retrieving project by ID: {}", id);
         let tx = self.conn.transaction()?;
 
         // Get project
         let mut stmt = tx.prepare(
             r#"
-            SELECT 
-                id, path, name, hash, created_at, modified_at, last_parsed_at,
-                tempo, time_signature_numerator, time_signature_denominator,
-                key_signature_tonic, key_signature_scale, duration_seconds, furthest_bar,
-                ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta
-            FROM projects 
-            WHERE id = ? AND is_active = true
+            SELECT
+                p.id, p.path, p.name, p.hash, p.created_at, p.modified_at, p.last_parsed_at,
+                p.tempo, p.time_signature_numerator, p.time_signature_denominator,
+                p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
+                p.daw_type, p.daw_version_display,
+                a.version_major, a.version_minor, a.version_patch, a.version_beta
+            FROM projects p
+            JOIN project_ableton_metadata a ON a.project_id = p.id
+            WHERE p.id = ? AND p.is_active = true
             "#,
         )?;
 
@@ -43,8 +45,8 @@ impl LiveSetDatabase {
                 let modified_timestamp: i64 = row.get(5)?;
                 let parsed_timestamp: i64 = row.get(6)?;
 
-                // Create LiveSet instance
-                let live_set = LiveSet {
+                // Create Project instance
+                let live_set = Project {
                     is_active: true,
                     id: Uuid::parse_str(&project_id).map_err(|_| {
                         rusqlite::Error::InvalidParameterName("Invalid UUID".into())
@@ -95,11 +97,13 @@ impl LiveSetDatabase {
                     },
                     furthest_bar: row.get(13)?,
 
-                    ableton_version: AbletonVersion {
-                        major: row.get(14)?,
-                        minor: row.get(15)?,
-                        patch: row.get(16)?,
-                        beta: row.get(17)?,
+                    daw_type: row.get(14)?,
+                    daw_version_display: row.get(15)?,
+                    ableton_metadata: AbletonVersion {
+                        major: row.get(16)?,
+                        minor: row.get(17)?,
+                        patch: row.get(18)?,
+                        beta: row.get(19)?,
                     },
 
                     estimated_duration: duration_secs.map(chrono::Duration::seconds),
@@ -182,21 +186,23 @@ impl LiveSetDatabase {
     pub fn get_project_by_id_any_status(
         &mut self,
         id: &str,
-    ) -> Result<Option<LiveSet>, DatabaseError> {
+    ) -> Result<Option<Project>, DatabaseError> {
         debug!("Retrieving project by ID (any status): {}", id);
         let tx = self.conn.transaction()?;
 
         // Get project (regardless of active status)
         let mut stmt = tx.prepare(
             r#"
-            SELECT 
-                id, path, name, hash, created_at, modified_at, last_parsed_at,
-                tempo, time_signature_numerator, time_signature_denominator,
-                key_signature_tonic, key_signature_scale, duration_seconds, furthest_bar,
-                ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta,
-                is_active
-            FROM projects 
-            WHERE id = ?
+            SELECT
+                p.id, p.path, p.name, p.hash, p.created_at, p.modified_at, p.last_parsed_at,
+                p.tempo, p.time_signature_numerator, p.time_signature_denominator,
+                p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
+                p.daw_type, p.daw_version_display,
+                a.version_major, a.version_minor, a.version_patch, a.version_beta,
+                p.is_active
+            FROM projects p
+            JOIN project_ableton_metadata a ON a.project_id = p.id
+            WHERE p.id = ?
             "#,
         )?;
 
@@ -209,10 +215,10 @@ impl LiveSetDatabase {
                 let created_timestamp: i64 = row.get(4)?;
                 let modified_timestamp: i64 = row.get(5)?;
                 let parsed_timestamp: i64 = row.get(6)?;
-                let is_active: bool = row.get(17)?;
+                let is_active: bool = row.get(20)?;
 
-                // Create LiveSet instance
-                let live_set = LiveSet {
+                // Create Project instance
+                let live_set = Project {
                     is_active,
                     id: Uuid::parse_str(&project_id).map_err(|_| {
                         rusqlite::Error::InvalidParameterName("Invalid UUID".into())
@@ -263,11 +269,13 @@ impl LiveSetDatabase {
                     },
                     furthest_bar: row.get(13)?,
 
-                    ableton_version: AbletonVersion {
-                        major: row.get(14)?,
-                        minor: row.get(15)?,
-                        patch: row.get(16)?,
-                        beta: row.get(17)?,
+                    daw_type: row.get(14)?,
+                    daw_version_display: row.get(15)?,
+                    ableton_metadata: AbletonVersion {
+                        major: row.get(16)?,
+                        minor: row.get(17)?,
+                        patch: row.get(18)?,
+                        beta: row.get(19)?,
                     },
 
                     estimated_duration: duration_secs.map(chrono::Duration::seconds),
@@ -295,7 +303,7 @@ impl LiveSetDatabase {
         debug!("Retrieving plugins for project");
         let mut stmt = tx.prepare(
             r#"
-            SELECT p.* 
+            SELECT p.*
             FROM plugins p
             JOIN project_plugins pp ON pp.plugin_id = p.id
             WHERE pp.project_id = ?
@@ -315,7 +323,7 @@ impl LiveSetDatabase {
         debug!("Retrieving samples for project");
         let mut stmt = tx.prepare(
             r#"
-            SELECT s.* 
+            SELECT s.*
             FROM samples s
             JOIN project_samples ps ON ps.sample_id = s.id
             WHERE ps.project_id = ?
@@ -347,20 +355,22 @@ impl LiveSetDatabase {
         Ok(Some(project))
     }
 
-    pub fn get_project_by_path(&mut self, path: &str) -> Result<Option<LiveSet>, DatabaseError> {
+    pub fn get_project_by_path(&mut self, path: &str) -> Result<Option<Project>, DatabaseError> {
         debug!("Retrieving project by path: {}", path);
         let tx = self.conn.transaction()?;
 
         // Get project
         let mut stmt = tx.prepare(
             r#"
-            SELECT 
-                id, path, name, hash, created_at, modified_at, last_parsed_at,
-                tempo, time_signature_numerator, time_signature_denominator,
-                key_signature_tonic, key_signature_scale, duration_seconds, furthest_bar,
-                ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta
-            FROM projects 
-            WHERE path = ?
+            SELECT
+                p.id, p.path, p.name, p.hash, p.created_at, p.modified_at, p.last_parsed_at,
+                p.tempo, p.time_signature_numerator, p.time_signature_denominator,
+                p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
+                p.daw_type, p.daw_version_display,
+                a.version_major, a.version_minor, a.version_patch, a.version_beta
+            FROM projects p
+            JOIN project_ableton_metadata a ON a.project_id = p.id
+            WHERE p.path = ?
             "#,
         )?;
 
@@ -374,8 +384,8 @@ impl LiveSetDatabase {
                 let modified_timestamp: i64 = row.get(5)?;
                 let parsed_timestamp: i64 = row.get(6)?;
 
-                // Create LiveSet instance
-                let live_set = LiveSet {
+                // Create Project instance
+                let live_set = Project {
                     is_active: true,
                     id: Uuid::parse_str(&project_id).map_err(|_| {
                         rusqlite::Error::InvalidParameterName("Invalid UUID".into())
@@ -426,11 +436,13 @@ impl LiveSetDatabase {
                     },
                     furthest_bar: row.get(13)?,
 
-                    ableton_version: AbletonVersion {
-                        major: row.get(14)?,
-                        minor: row.get(15)?,
-                        patch: row.get(16)?,
-                        beta: row.get(17)?,
+                    daw_type: row.get(14)?,
+                    daw_version_display: row.get(15)?,
+                    ableton_metadata: AbletonVersion {
+                        major: row.get(16)?,
+                        minor: row.get(17)?,
+                        patch: row.get(18)?,
+                        beta: row.get(19)?,
                     },
 
                     estimated_duration: duration_secs.map(chrono::Duration::seconds),
@@ -510,7 +522,7 @@ impl LiveSetDatabase {
         Ok(Some(project))
     }
 
-    pub fn insert_project(&mut self, live_set: &LiveSet) -> Result<(), DatabaseError> {
+    pub fn insert_project(&mut self, live_set: &Project) -> Result<(), DatabaseError> {
         debug!(
             "Inserting project: {} ({})",
             live_set.name,
@@ -528,11 +540,10 @@ impl LiveSetDatabase {
                 last_parsed_at, tempo, time_signature_numerator,
                 time_signature_denominator, key_signature_tonic,
                 key_signature_scale, furthest_bar, duration_seconds,
-                ableton_version_major, ableton_version_minor,
-                ableton_version_patch, ableton_version_beta,
+                daw_type, daw_version_display,
                 notes
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )",
             params![
                 project_id,
@@ -549,11 +560,24 @@ impl LiveSetDatabase {
                 live_set.key_signature.as_ref().map(|k| k.scale.to_string()),
                 live_set.furthest_bar,
                 live_set.estimated_duration.map(|d| d.num_seconds()),
-                live_set.ableton_version.major,
-                live_set.ableton_version.minor,
-                live_set.ableton_version.patch,
-                live_set.ableton_version.beta,
+                live_set.daw_type,
+                live_set.daw_version_display,
                 None::<String>, // notes starts as NULL
+            ],
+        )?;
+
+        // Ableton's structured version data lives in its own side table (ADR-0015),
+        // populated after the projects row so the FK is satisfied.
+        tx.execute(
+            "INSERT OR REPLACE INTO project_ableton_metadata (
+                project_id, version_major, version_minor, version_patch, version_beta
+            ) VALUES (?, ?, ?, ?, ?)",
+            params![
+                project_id,
+                live_set.ableton_metadata.major,
+                live_set.ableton_metadata.minor,
+                live_set.ableton_metadata.patch,
+                live_set.ableton_metadata.beta,
             ],
         )?;
 
@@ -673,15 +697,16 @@ impl LiveSetDatabase {
     pub fn find_deleted_project_by_hash(
         &mut self,
         path: &Path,
-    ) -> Result<Option<LiveSet>, DatabaseError> {
+    ) -> Result<Option<Project>, DatabaseError> {
         let hash = load_file_hash(&path.to_path_buf())?;
 
         self.conn
             .query_row(
-                "SELECT * FROM projects 
-             WHERE is_active = false AND hash = ?",
+                "SELECT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
+             FROM projects p JOIN project_ableton_metadata a ON a.project_id = p.id
+             WHERE p.is_active = false AND p.hash = ?",
                 params![hash],
-                |row| row_to_live_set(row),
+                |row| row_to_project(row),
             )
             .optional()
             .map_err(DatabaseError::from)
@@ -690,21 +715,23 @@ impl LiveSetDatabase {
     pub fn get_all_projects_with_status(
         &self,
         is_active: Option<bool>,
-    ) -> Result<Vec<LiveSet>, DatabaseError> {
+    ) -> Result<Vec<Project>, DatabaseError> {
         let mut results = Vec::new();
 
+        let base_query = "SELECT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta \
+             FROM projects p JOIN project_ableton_metadata a ON a.project_id = p.id";
         let query = match is_active {
             Some(status) => {
-                format!("SELECT * FROM projects WHERE is_active = {}", status)
+                format!("{} WHERE p.is_active = {}", base_query, status)
             }
-            None => "SELECT * FROM projects".to_string(),
+            None => base_query.to_string(),
         };
 
         let mut stmt = self.conn.prepare(&query).map_err(DatabaseError::from)?;
 
         let mut rows = stmt.query([]).map_err(DatabaseError::from)?;
         while let Some(row) = rows.next().map_err(DatabaseError::from)? {
-            let mut live_set = row_to_live_set(row)?;
+            let mut live_set = row_to_project(row)?;
             let project_id_str = live_set.id.to_string();
 
             // Load plugins for this project
@@ -873,7 +900,7 @@ impl LiveSetDatabase {
         sample_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
-    ) -> Result<(Vec<LiveSet>, i32), DatabaseError> {
+    ) -> Result<(Vec<Project>, i32), DatabaseError> {
         // Get total count first
         let total_count: i32 = self.conn.query_row(
             "SELECT COUNT(DISTINCT p.id) FROM projects p 
@@ -885,8 +912,10 @@ impl LiveSetDatabase {
 
         // Get the projects with pagination
         let query = "
-            SELECT DISTINCT p.* FROM projects p 
-            JOIN project_samples ps ON ps.project_id = p.id 
+            SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
+            FROM projects p
+            JOIN project_samples ps ON ps.project_id = p.id
+            JOIN project_ableton_metadata a ON a.project_id = p.id
             WHERE ps.sample_id = ? AND p.is_active = true
             ORDER BY p.name ASC
             LIMIT ? OFFSET ?
@@ -895,7 +924,7 @@ impl LiveSetDatabase {
         let mut stmt = self.conn.prepare(query)?;
         let rows = stmt.query_map(
             params![sample_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| row_to_live_set(row),
+            |row| row_to_project(row),
         )?;
 
         let mut projects = Vec::new();
@@ -957,7 +986,7 @@ impl LiveSetDatabase {
         plugin_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
-    ) -> Result<(Vec<LiveSet>, i32), DatabaseError> {
+    ) -> Result<(Vec<Project>, i32), DatabaseError> {
         // Get total count first
         let total_count: i32 = self.conn.query_row(
             "SELECT COUNT(DISTINCT p.id) FROM projects p 
@@ -969,8 +998,10 @@ impl LiveSetDatabase {
 
         // Get the projects with pagination
         let query = "
-            SELECT DISTINCT p.* FROM projects p 
-            JOIN project_plugins pp ON pp.project_id = p.id 
+            SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
+            FROM projects p
+            JOIN project_plugins pp ON pp.project_id = p.id
+            JOIN project_ableton_metadata a ON a.project_id = p.id
             WHERE pp.plugin_id = ? AND p.is_active = true
             ORDER BY p.name ASC
             LIMIT ? OFFSET ?
@@ -979,7 +1010,7 @@ impl LiveSetDatabase {
         let mut stmt = self.conn.prepare(query)?;
         let rows = stmt.query_map(
             params![plugin_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| row_to_live_set(row),
+            |row| row_to_project(row),
         )?;
 
         let mut projects = Vec::new();
@@ -1056,7 +1087,7 @@ impl LiveSetDatabase {
         modified_after: Option<i64>,
         modified_before: Option<i64>,
         has_audio_file: Option<bool>,
-    ) -> Result<(Vec<LiveSet>, i32), DatabaseError> {
+    ) -> Result<(Vec<Project>, i32), DatabaseError> {
         let sort_column = match sort_by.as_deref() {
             Some("name") => "name",
             Some("path") => "path",
@@ -1064,7 +1095,9 @@ impl LiveSetDatabase {
             Some("modified_at") => "modified_at",
             Some("tempo") => "tempo",
             Some("duration_seconds") => "duration_seconds",
-            Some("ableton_version_major") => "ableton_version_major",
+            // Public sort_by name kept stable; backed by the joined side table now
+            // (ADR-0015) rather than a bare column.
+            Some("ableton_version_major") => "a.version_major",
             _ => "name", // default sort
         };
 
@@ -1109,17 +1142,17 @@ impl LiveSetDatabase {
         }
 
         if let Some(major) = ableton_version_major {
-            conditions.push("ableton_version_major = ?");
+            conditions.push("a.version_major = ?");
             params.push(Box::new(major));
         }
 
         if let Some(minor) = ableton_version_minor {
-            conditions.push("ableton_version_minor = ?");
+            conditions.push("a.version_minor = ?");
             params.push(Box::new(minor));
         }
 
         if let Some(patch) = ableton_version_patch {
-            conditions.push("ableton_version_patch = ?");
+            conditions.push("a.version_patch = ?");
             params.push(Box::new(patch));
         }
 
@@ -1155,7 +1188,8 @@ impl LiveSetDatabase {
 
         // Get total count with filters
         let count_query = format!(
-            "SELECT COUNT(*) FROM projects {}",
+            "SELECT COUNT(*) FROM projects p \
+             JOIN project_ableton_metadata a ON a.project_id = p.id {}",
             where_clause
         );
 
@@ -1167,7 +1201,9 @@ impl LiveSetDatabase {
 
         // Get the projects with pagination and sorting
         let query = format!(
-            "SELECT * FROM projects {} ORDER BY {} {} LIMIT ? OFFSET ?",
+            "SELECT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta \
+             FROM projects p JOIN project_ableton_metadata a ON a.project_id = p.id \
+             {} ORDER BY {} {} LIMIT ? OFFSET ?",
             where_clause, sort_column, sort_order
         );
 
@@ -1180,7 +1216,7 @@ impl LiveSetDatabase {
 
         let rows = stmt.query_map(
             rusqlite::params_from_iter(all_params.iter().map(|p| p.as_ref())),
-            |row| row_to_live_set(row),
+            |row| row_to_project(row),
         )?;
 
         let mut projects = Vec::new();
@@ -1294,7 +1330,7 @@ impl LiveSetDatabase {
         }
 
         // Parse the project file
-        let new_live_set = match crate::LiveSet::new(file_path.clone()) {
+        let new_live_set = match crate::Project::new(file_path.clone()) {
             Ok(live_set) => live_set,
             Err(e) => {
                 return Ok(RescanProjectResult {
@@ -1340,15 +1376,15 @@ impl LiveSetDatabase {
             changes.push(format!("Key signature: {} -> {}", old_key, new_key));
         }
         
-        if new_live_set.ableton_version != existing_project.ableton_version {
+        if new_live_set.ableton_metadata != existing_project.ableton_metadata {
             changes.push(format!(
-                "Ableton version: {}.{}.{} -> {}.{}.{}", 
-                existing_project.ableton_version.major,
-                existing_project.ableton_version.minor,
-                existing_project.ableton_version.patch,
-                new_live_set.ableton_version.major,
-                new_live_set.ableton_version.minor,
-                new_live_set.ableton_version.patch
+                "Ableton version: {}.{}.{} -> {}.{}.{}",
+                existing_project.ableton_metadata.major,
+                existing_project.ableton_metadata.minor,
+                existing_project.ableton_metadata.patch,
+                new_live_set.ableton_metadata.major,
+                new_live_set.ableton_metadata.minor,
+                new_live_set.ableton_metadata.patch
             ));
         }
         
@@ -1375,12 +1411,11 @@ impl LiveSetDatabase {
 
         // Update the project record
         tx.execute(
-            "UPDATE projects SET 
+            "UPDATE projects SET
                 name = ?, path = ?, hash = ?, modified_at = ?, last_parsed_at = ?,
                 tempo = ?, time_signature_numerator = ?, time_signature_denominator = ?,
                 key_signature_tonic = ?, key_signature_scale = ?, furthest_bar = ?,
-                duration_seconds = ?, ableton_version_major = ?, ableton_version_minor = ?,
-                ableton_version_patch = ?, ableton_version_beta = ?
+                duration_seconds = ?, daw_type = ?, daw_version_display = ?
              WHERE id = ?",
             params![
                 new_live_set.name,
@@ -1395,11 +1430,30 @@ impl LiveSetDatabase {
                 new_live_set.key_signature.as_ref().map(|k| k.scale.to_string()),
                 new_live_set.furthest_bar,
                 new_live_set.estimated_duration.map(|d| d.num_seconds()),
-                new_live_set.ableton_version.major,
-                new_live_set.ableton_version.minor,
-                new_live_set.ableton_version.patch,
-                new_live_set.ableton_version.beta,
+                new_live_set.daw_type,
+                new_live_set.daw_version_display,
                 project_id,
+            ],
+        )?;
+
+        // Upsert Ableton's structured version data (ADR-0015). This path updates the
+        // existing projects row rather than recreating it, so an upsert is used
+        // instead of insert-or-replace.
+        tx.execute(
+            "INSERT INTO project_ableton_metadata (
+                project_id, version_major, version_minor, version_patch, version_beta
+            ) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(project_id) DO UPDATE SET
+                version_major = excluded.version_major,
+                version_minor = excluded.version_minor,
+                version_patch = excluded.version_patch,
+                version_beta = excluded.version_beta",
+            params![
+                project_id,
+                new_live_set.ableton_metadata.major,
+                new_live_set.ableton_metadata.minor,
+                new_live_set.ableton_metadata.patch,
+                new_live_set.ableton_metadata.beta,
             ],
         )?;
 
@@ -1470,5 +1524,5 @@ pub struct RescanProjectResult {
     pub was_updated: bool,
     pub scan_summary: String,
     pub error_message: Option<String>,
-    pub updated_project: Option<LiveSet>,
+    pub updated_project: Option<Project>,
 }

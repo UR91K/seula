@@ -7,6 +7,7 @@ use regex::Regex;
 use walkdir::WalkDir;
 
 use crate::error::{LiveSetError, PatternError};
+use crate::scan::daw::AnyDawParser;
 
 /// Scanner for finding Ableton Live project files in directories
 pub struct ProjectPathScanner {
@@ -34,9 +35,9 @@ impl ProjectPathScanner {
         {
             let path = entry.path();
 
-            // Check if it's an .als file
-            if let Some(ext) = path.extension() {
-                if ext == "als" {
+            // Check if it's a file type a known DAW parser handles
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if AnyDawParser::supported_extensions().contains(&ext) {
                     let path_str = path.to_string_lossy();
 
                     // Skip if it's a backup file

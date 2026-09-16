@@ -5,12 +5,13 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use crate::error::LiveSetError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
+use crate::scan::daw::{AnyDawParser, ParseError};
 
 /// Result type for parsing operations
-type ParseResult = Result<(PathBuf, LiveSet), (PathBuf, LiveSetError)>;
+type ParseResult = Result<(PathBuf, Project), (PathBuf, ParseError)>;
 
-/// Worker for parsing individual Live Set files
+/// Worker for parsing individual project files
 pub struct ParserWorker {
     sender: Sender<ParseResult>,
 }
@@ -21,9 +22,13 @@ impl ParserWorker {
     }
 
     fn process_file(&self, path: PathBuf) {
-        let result = LiveSet::new(path.clone())
-            .map(|live_set| (path.clone(), live_set))
-            .map_err(|err| (path, err));
+        let result = match AnyDawParser::for_path(&path) {
+            Some(parser) => parser
+                .parse(&path)
+                .map(|project| (path.clone(), project))
+                .map_err(|err| (path, err)),
+            None => Err((path.clone(), ParseError::UnsupportedFileType(path))),
+        };
 
         // Send result back to coordinator
         let _ = self.sender.send(result);

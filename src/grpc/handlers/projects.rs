@@ -8,7 +8,7 @@ use super::super::common::*;
 use super::utils::convert_live_set_to_proto;
 use crate::database::LiveSetDatabase;
 use crate::error::DatabaseError;
-use crate::LiveSet;
+use crate::Project;
 
 // MOVE FROM server.rs:
 // - get_projects method (lines ~56-98)
@@ -97,7 +97,7 @@ impl ProjectsHandler {
                 Ok(projects) => {
                     let total_count = projects.len() as i32;
                     let projects_iter = projects.into_iter().skip(req.offset.unwrap_or(0) as usize);
-                    let projects_to_convert: Vec<LiveSet> = if let Some(limit) = req.limit {
+                    let projects_to_convert: Vec<Project> = if let Some(limit) = req.limit {
                         projects_iter.take(limit as usize).collect()
                     } else {
                         projects_iter.collect()
@@ -334,7 +334,7 @@ impl ProjectsHandler {
                 let projects_iter = projects.into_iter().skip(req.offset.unwrap_or(0) as usize);
                 let mut proto_projects = Vec::new();
 
-                let projects_to_convert: Vec<LiveSet> = if let Some(limit) = req.limit {
+                let projects_to_convert: Vec<Project> = if let Some(limit) = req.limit {
                     projects_iter.take(limit as usize).collect()
                 } else {
                     projects_iter.collect()

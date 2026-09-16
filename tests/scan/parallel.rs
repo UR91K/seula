@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 use seula::scan::project_scanner::ProjectPathScanner;
 use seula::scan::ParallelParser;
-use seula::{AbletonVersion, LiveSet, CONFIG};
+use seula::project::Project;
+use seula::{AbletonVersion, CONFIG};
 use tempfile::tempdir;
 
 use crate::common::setup;
@@ -26,13 +27,13 @@ struct ProjectStats {
 }
 
 impl ProjectStats {
-    fn add_project(&mut self, path: PathBuf, live_set: &LiveSet) {
+    fn add_project(&mut self, path: PathBuf, live_set: &Project) {
         self.successful_parses += 1;
 
         // Update version count
         *self
             .version_counts
-            .entry(live_set.ableton_version)
+            .entry(live_set.ableton_metadata)
             .or_insert(0) += 1;
 
         // Update plugin counts

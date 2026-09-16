@@ -1,6 +1,6 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::live_set::LiveSet;
+use crate::project::Project;
 use crate::models::{AbletonVersion, CollectionStatistics, KeySignature, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
 use log::debug;
@@ -424,7 +424,7 @@ impl LiveSetDatabase {
     pub fn get_collection_projects(
         &mut self,
         collection_id: &str,
-    ) -> Result<Vec<LiveSet>, DatabaseError> {
+    ) -> Result<Vec<Project>, DatabaseError> {
         debug!("Getting projects in collection: {}", collection_id);
         let tx = self.conn.transaction()?;
         let mut results = Vec::new();
@@ -435,9 +435,11 @@ impl LiveSetDatabase {
                 SELECT p.id, p.path, p.name, p.hash, p.notes, p.created_at, p.modified_at, p.last_parsed_at,
                        p.tempo, p.time_signature_numerator, p.time_signature_denominator,
                        p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
-                       p.ableton_version_major, p.ableton_version_minor, p.ableton_version_patch, p.ableton_version_beta
+                       p.daw_type, p.daw_version_display,
+                       a.version_major, a.version_minor, a.version_patch, a.version_beta
                 FROM projects p
                 JOIN collection_projects cp ON cp.project_id = p.id
+                JOIN project_ableton_metadata a ON a.project_id = p.id
                 WHERE cp.collection_id = ?
                 ORDER BY cp.position
                 "#,
@@ -452,7 +454,7 @@ impl LiveSetDatabase {
                 let modified_timestamp: i64 = row.get(6)?;
                 let parsed_timestamp: i64 = row.get(7)?;
 
-                let mut live_set = LiveSet {
+                let mut live_set = Project {
                     is_active: true,
                     id: Uuid::parse_str(&project_id).map_err(|_| {
                         rusqlite::Error::InvalidParameterName("Invalid UUID".into())
@@ -499,11 +501,13 @@ impl LiveSetDatabase {
                         _ => None,
                     },
                     furthest_bar: row.get(14)?,
-                    ableton_version: AbletonVersion {
-                        major: row.get(15)?,
-                        minor: row.get(16)?,
-                        patch: row.get(17)?,
-                        beta: row.get(18)?,
+                    daw_type: row.get(15)?,
+                    daw_version_display: row.get(16)?,
+                    ableton_metadata: AbletonVersion {
+                        major: row.get(17)?,
+                        minor: row.get(18)?,
+                        patch: row.get(19)?,
+                        beta: row.get(20)?,
                     },
                     estimated_duration: duration_secs.map(chrono::Duration::seconds),
                     plugins: HashSet::new(),

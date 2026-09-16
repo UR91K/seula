@@ -40,7 +40,7 @@ pub async fn create_test_project_in_db(db: &Arc<Mutex<LiveSetDatabase>>) -> Stri
     let unique_id = uuid::Uuid::new_v4();
     let unique_name = format!("Test Project {}.als", unique_id);
 
-    let test_live_set = seula::live_set::LiveSet {
+    let test_live_set = seula::project::Project {
         is_active: true,
         id: unique_id,
         file_path: PathBuf::from(&unique_name),
@@ -54,7 +54,9 @@ pub async fn create_test_project_in_db(db: &Arc<Mutex<LiveSetDatabase>>) -> Stri
         key_signature: test_project.key_signature,
         furthest_bar: test_project.furthest_bar,
         estimated_duration: None,
-        ableton_version: test_project.version,
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: test_project.version.to_string(),
+        ableton_metadata: test_project.version,
         plugins: test_project.plugins,
         samples: test_project.samples,
         tags: std::collections::HashSet::new(),
@@ -87,10 +89,14 @@ pub async fn create_test_project(server: &StudioProjectManagerServer, name: &str
             "INSERT INTO projects (
                 id, name, path, hash, created_at, modified_at, last_parsed_at,
                 tempo, time_signature_numerator, time_signature_denominator,
-                ableton_version_major, ableton_version_minor, ableton_version_patch, ableton_version_beta
-            ) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, ?)",
-            rusqlite::params![project_id, name, path, format!("test_hash_{}", project_id), 120.0, 4, 4, 11, 0, 0, false],
+                daw_type, daw_version_display
+            ) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'), ?, ?, ?, ?, ?)",
+            rusqlite::params![project_id, name, path, format!("test_hash_{}", project_id), 120.0, 4, 4, "Ableton Live", "11.0.0"],
         ).expect("Failed to insert test project");
+        db_lock.conn.execute(
+            "INSERT INTO project_ableton_metadata (project_id, version_major, version_minor, version_patch, version_beta) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![project_id, 11, 0, 0, false],
+        ).expect("Failed to insert test project ableton metadata");
     }
     
     project_id

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once};
 use uuid::Uuid;
 
-use seula::live_set::LiveSet;
+use seula::project::Project;
 use seula::models::{
     AbletonVersion, KeySignature, Plugin, PluginFormat, Sample, TimeSignature,
 };
@@ -201,7 +201,7 @@ pub fn generate_mock_plugin(index: usize) -> Plugin {
     }
 }
 
-pub fn generate_mock_live_set(index: usize) -> LiveSet {
+pub fn generate_mock_live_set(index: usize) -> Project {
     let path = format!("C:/Projects/Test Project {}.als", index);
     let path = Path::new(&path).to_path_buf();
 
@@ -218,7 +218,14 @@ pub fn generate_mock_live_set(index: usize) -> LiveSet {
         })
         .collect();
 
-    LiveSet {
+    let ableton_version = AbletonVersion {
+        major: 11,
+        minor: 0,
+        patch: 0,
+        beta: false,
+    };
+
+    Project {
         is_active: true,
         id: Uuid::new_v4(),
         file_path: path.clone(),
@@ -227,12 +234,9 @@ pub fn generate_mock_live_set(index: usize) -> LiveSet {
         created_time: Local::now(),
         modified_time: Local::now(),
         last_parsed_timestamp: Local::now(),
-        ableton_version: AbletonVersion {
-            major: 11,
-            minor: 0,
-            patch: 0,
-            beta: false,
-        },
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: ableton_version.to_string(),
+        ableton_metadata: ableton_version,
         key_signature: None,
         tempo: 120.0,
         time_signature: TimeSignature {
@@ -247,18 +251,19 @@ pub fn generate_mock_live_set(index: usize) -> LiveSet {
     }
 }
 
-pub fn generate_test_live_sets_vec(count: usize) -> Vec<LiveSet> {
+pub fn generate_test_live_sets_vec(count: usize) -> Vec<Project> {
     (0..count).map(generate_mock_live_set).collect()
 }
 
-pub fn generate_test_live_sets_arc(count: usize) -> Arc<Vec<LiveSet>> {
+pub fn generate_test_live_sets_arc(count: usize) -> Arc<Vec<Project>> {
     Arc::new(generate_test_live_sets_vec(count))
 }
 
 
-pub fn create_test_live_set_from_parse(name: &str, parse_result: ParseResult) -> LiveSet {
+pub fn create_test_live_set_from_parse(name: &str, parse_result: ParseResult) -> Project {
     let now = Local::now();
-    LiveSet {
+    let ableton_version = parse_result.version;
+    Project {
         is_active: true,
         id: Uuid::new_v4(),
         file_path: PathBuf::from(format!("C:/test/{}", name)),
@@ -268,7 +273,9 @@ pub fn create_test_live_set_from_parse(name: &str, parse_result: ParseResult) ->
         modified_time: now,
         last_parsed_timestamp: now,
 
-        ableton_version: parse_result.version,
+        daw_type: "Ableton Live".to_string(),
+        daw_version_display: ableton_version.to_string(),
+        ableton_metadata: ableton_version,
         key_signature: parse_result.key_signature,
         tempo: parse_result.tempo,
         time_signature: parse_result.time_signature,
@@ -414,11 +421,11 @@ mod tests {
 
         // Ableton version
         assert!(
-            live_set.ableton_version.major > 0,
+            live_set.ableton_metadata.major > 0,
             "Should have valid major version"
         );
         assert!(
-            !live_set.ableton_version.beta,
+            !live_set.ableton_metadata.beta,
             "Should not be beta by default"
         );
 

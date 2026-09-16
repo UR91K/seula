@@ -1,10 +1,10 @@
 use crate::database::LiveSetDatabase;
 use crate::error::DatabaseError;
 use super::super::common::{AbletonVersion, KeySignature, Plugin, Project, Sample, TimeSignature, Task, Tag};
-use crate::live_set::LiveSet;
+use crate::project::Project as DomainProject;
 
 pub fn convert_live_set_to_proto(
-    live_set: LiveSet,
+    live_set: DomainProject,
     db: &mut LiveSetDatabase,
 ) -> Result<Project, DatabaseError> {
     let project_id = live_set.id.to_string();
@@ -71,10 +71,10 @@ pub fn convert_live_set_to_proto(
         furthest_bar: live_set.furthest_bar,
 
         ableton_version: Some(AbletonVersion {
-            major: live_set.ableton_version.major,
-            minor: live_set.ableton_version.minor,
-            patch: live_set.ableton_version.patch,
-            beta: live_set.ableton_version.beta,
+            major: live_set.ableton_metadata.major,
+            minor: live_set.ableton_metadata.minor,
+            patch: live_set.ableton_metadata.patch,
+            beta: live_set.ableton_metadata.beta,
         }),
 
         plugins: live_set

@@ -4,7 +4,7 @@
 //! samples with unicode control characters and encoding issues.
 
 use std::path::PathBuf;
-use seula::LiveSet;
+use seula::Project;
 
 use crate::{common::setup, scan::parser::macos_sample_paths};
 
@@ -24,7 +24,7 @@ fn test_play_project_unicode_encoding() {
     println!("Testing unicode encoding issues in Play.als project...");
 
     // Parse the project
-    match LiveSet::new(project_path) {
+    match Project::new(project_path) {
         Ok(live_set) => {
             println!("Successfully parsed Play.als project");
             println!("Project name: {}", live_set.name);
@@ -80,7 +80,7 @@ fn test_play_project_unicode_encoding() {
     }
 }
 
-fn test_reverse_lookup(live_set: &LiveSet) {
+fn test_reverse_lookup(live_set: &Project) {
     println!("\nTesting reverse lookup for problematic samples...");
 
     // Find samples with unicode issues

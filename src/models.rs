@@ -1076,7 +1076,11 @@ impl Default for KeySignature {
 
 impl fmt::Display for AbletonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ableton {}.{}.{}", self.major, self.minor, self.patch)
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)?;
+        if self.beta {
+            write!(f, " beta")?;
+        }
+        Ok(())
     }
 }
 

@@ -448,7 +448,7 @@ fn test_psp_springbox_plugin_from_real_project() {
     // 2. Preprocess projects (same as library)
     let mut preprocessed = Vec::new();
     for path in found_projects {
-        match seula::live_set::LiveSetPreprocessed::new(path.clone()) {
+        match seula::project::ProjectPreprocessed::new(path.clone()) {
             Ok(metadata) => {
                 println!("Successfully preprocessed: {}", metadata.name);
                 preprocessed.push(metadata);
@@ -467,7 +467,7 @@ fn test_psp_springbox_plugin_from_real_project() {
     // 3. Parse projects (same as library)
     let mut successful_live_sets = Vec::new();
     for preprocessed_project in preprocessed {
-        match seula::live_set::LiveSet::from_preprocessed(preprocessed_project) {
+        match seula::project::Project::from_preprocessed(preprocessed_project) {
             Ok(live_set) => {
                 println!("Successfully parsed: {}", live_set.name);
                 
