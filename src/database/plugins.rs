@@ -507,14 +507,19 @@ impl ProjectDatabase {
         let query = format!(
             r#"
             WITH vendor_stats AS (
-                SELECT 
+                SELECT
                     p.vendor,
-                    COUNT(*) as plugin_count,
-                    SUM(CASE WHEN p.installed = 1 THEN 1 ELSE 0 END) as installed_plugins,
-                    SUM(CASE WHEN p.installed = 0 THEN 1 ELSE 0 END) as missing_plugins,
+                    -- Distinct plugin ids: usage_stats has one row per (plugin, project)
+                    -- pair, so a plugin used in several projects joins to several rows
+                    -- here. COUNT(*)/plain SUM would count it once per project instead
+                    -- of once; COUNT(DISTINCT ... p.id) and the CASE-guarded variants
+                    -- below collapse back to one count per plugin regardless.
+                    COUNT(DISTINCT p.id) as plugin_count,
+                    COUNT(DISTINCT CASE WHEN p.installed = 1 THEN p.id END) as installed_plugins,
+                    COUNT(DISTINCT CASE WHEN p.installed = 0 THEN p.id END) as missing_plugins,
                     -- Never scanned for (ADR-0012). Counted explicitly rather than left
                     -- out, so installed + missing + unknown == plugin_count.
-                    SUM(CASE WHEN p.installed IS NULL THEN 1 ELSE 0 END) as unknown_plugins,
+                    COUNT(DISTINCT CASE WHEN p.installed IS NULL THEN p.id END) as unknown_plugins,
                     COALESCE(SUM(usage_stats.usage_count), 0) as total_usage_count,
                     COALESCE(COUNT(DISTINCT usage_stats.project_id), 0) as unique_projects_using
                 FROM plugins p
@@ -612,14 +617,19 @@ impl ProjectDatabase {
         let query = format!(
             r#"
             WITH format_stats AS (
-                SELECT 
+                SELECT
                     p.format,
-                    COUNT(*) as plugin_count,
-                    SUM(CASE WHEN p.installed = 1 THEN 1 ELSE 0 END) as installed_plugins,
-                    SUM(CASE WHEN p.installed = 0 THEN 1 ELSE 0 END) as missing_plugins,
+                    -- Distinct plugin ids: usage_stats has one row per (plugin, project)
+                    -- pair, so a plugin used in several projects joins to several rows
+                    -- here. COUNT(*)/plain SUM would count it once per project instead
+                    -- of once; COUNT(DISTINCT ... p.id) and the CASE-guarded variants
+                    -- below collapse back to one count per plugin regardless.
+                    COUNT(DISTINCT p.id) as plugin_count,
+                    COUNT(DISTINCT CASE WHEN p.installed = 1 THEN p.id END) as installed_plugins,
+                    COUNT(DISTINCT CASE WHEN p.installed = 0 THEN p.id END) as missing_plugins,
                     -- Never scanned for (ADR-0012). Counted explicitly rather than left
                     -- out, so installed + missing + unknown == plugin_count.
-                    SUM(CASE WHEN p.installed IS NULL THEN 1 ELSE 0 END) as unknown_plugins,
+                    COUNT(DISTINCT CASE WHEN p.installed IS NULL THEN p.id END) as unknown_plugins,
                     COALESCE(SUM(usage_stats.usage_count), 0) as total_usage_count,
                     COALESCE(COUNT(DISTINCT usage_stats.project_id), 0) as unique_projects_using
                 FROM plugins p

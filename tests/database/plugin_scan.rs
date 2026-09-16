@@ -550,14 +550,16 @@ fn app_state_round_trips_and_overwrites() {
 // ---------------------------------------------------------------- aggregates
 
 /// Insert a plugin row directly, so the test can set all three install states —
-/// including `NULL`, which no write path produces on demand.
-fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, installed: Option<bool>) {
+/// including `NULL`, which no write path produces on demand. Returns the generated id
+/// so callers can link it into `project_plugins`.
+fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, installed: Option<bool>) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
     db.conn
         .execute(
             "INSERT INTO plugins (id, plugin_kind, uid, name, format, vendor, installed)
              VALUES (?, 'VST3', ?, ?, ?, ?, ?)",
             rusqlite::params![
-                uuid::Uuid::new_v4().to_string(),
+                id,
                 format!("{:032x}", name.len() as u128 + vendor.len() as u128 * 997 + format.len() as u128 * 31),
                 name,
                 format,
@@ -566,6 +568,72 @@ fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, i
             ],
         )
         .unwrap();
+    id
+}
+
+/// Insert a bare project row, so the test can link it to plugins via `project_plugins`.
+fn insert_project(db: &ProjectDatabase, path: &str) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    db.conn
+        .execute(
+            "INSERT INTO projects (
+                 id, path, name, hash, created_at, modified_at, last_parsed_at,
+                 tempo, time_signature_numerator, time_signature_denominator,
+                 daw_type, daw_version_display
+             ) VALUES (?, ?, 'p', 'h', 0, 0, 0, 120.0, 4, 4, 'Ableton Live', '11.0.0')",
+            rusqlite::params![id, path],
+        )
+        .unwrap();
+    id
+}
+
+/// Link a plugin into a project's `project_plugins`.
+fn link_plugin_to_project(db: &ProjectDatabase, project_id: &str, plugin_id: &str) {
+    db.conn
+        .execute(
+            "INSERT INTO project_plugins (project_id, plugin_id) VALUES (?, ?)",
+            rusqlite::params![project_id, plugin_id],
+        )
+        .unwrap();
+}
+
+/// A plugin used in several projects must still count once toward `plugin_count`. The
+/// usage subquery groups by `(plugin_id, project_id)` so it has one row per project;
+/// joining that straight onto `plugins` fans a single plugin row out into one per
+/// project, and the outer `COUNT(*)` counts the fanned-out rows instead of plugins.
+/// Found 2026-09-16 (docs/status.md), alongside the unscanned-count aggregates.
+#[test]
+fn vendor_and_format_plugin_count_does_not_inflate_with_project_usage() {
+    setup("error");
+    let (_dir, db) = temp_db();
+
+    let widely_used = insert_plugin(&db, "Everywhere", "Acme", "VST3 AudioFx", Some(true));
+    let _rarely_used = insert_plugin(&db, "OnceOnly", "Acme", "VST3 AudioFx", Some(true));
+
+    let project_a = insert_project(&db, "C:\\a.als");
+    let project_b = insert_project(&db, "C:\\b.als");
+    let project_c = insert_project(&db, "C:\\c.als");
+
+    // The same plugin used in three separate projects...
+    link_plugin_to_project(&db, &project_a, &widely_used);
+    link_plugin_to_project(&db, &project_b, &widely_used);
+    link_plugin_to_project(&db, &project_c, &widely_used);
+    // ...plus a second, unrelated plugin, used once, from the same vendor and format.
+    link_plugin_to_project(&db, &project_a, &_rarely_used);
+
+    let (vendors, _) = db.get_plugin_vendors(None, None, None, None).unwrap();
+    let acme = vendors.iter().find(|v| v.vendor == "Acme").unwrap();
+    // Two distinct plugins exist for this vendor, regardless of how many projects use
+    // either of them.
+    assert_eq!(acme.plugin_count, 2);
+    assert_eq!(acme.unique_projects_using, 3);
+    assert_eq!(acme.total_usage_count, 4);
+
+    let (formats, _) = db.get_plugin_formats(None, None, None, None).unwrap();
+    let audiofx = formats.iter().find(|f| f.format == "VST3 AudioFx").unwrap();
+    assert_eq!(audiofx.plugin_count, 2);
+    assert_eq!(audiofx.unique_projects_using, 3);
+    assert_eq!(audiofx.total_usage_count, 4);
 }
 
 /// The vendor and format aggregates must account for every row, not just the ones a

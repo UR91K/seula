@@ -75,7 +75,21 @@ pass. See CLAUDE.md.
 | `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. Both are now `#[ignore]`d (2026-09-16, CLAUDE.md) so this only surfaces under `cargo test --tests -- --ignored`. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
-| `plugin_count` in the `plugin vendors` / `plugin formats` aggregates counts plugin-project pairs, not plugins — the usage subquery groups by `(plugin_id, project_id)`, the `LEFT JOIN` multiplies each plugin row by its project count, and `COUNT(*)` counts the multiplied rows. A plugin used in 5 projects counts as 5. Found 2026-09-16 while adding the unscanned count to these two aggregates (`61cfc23`, ADR-0025's follow-up); the new reconciliation test (`vendor_and_format_aggregates_account_for_unscanned_plugins`) doesn't catch it because installed/missing/unknown all inflate together and still sum to the (wrong) `plugin_count`. `seula plugin stats` counts correctly and disagrees with both. Fix is grouping the usage subquery by `plugin_id` alone and computing `unique_projects_using` inside it. | `src/database/plugins.rs` (`vendor_stats`/`format_stats` CTEs) | Medium — user-visible wrong numbers, not just a red test |
+
+Resolved:
+
+- **`plugin_count` inflation in the `plugin vendors` / `plugin formats` aggregates**
+  (found 2026-09-16, fixed 2026-09-16). The `usage_stats` subquery has one row per
+  `(plugin_id, project_id)` pair; the outer `LEFT JOIN` fanned each plugin row out once
+  per project it's used in, so `COUNT(*)` and the installed/missing/unknown `SUM(CASE
+  ...)`s counted that plugin once per project instead of once. `total_usage_count` and
+  `unique_projects_using` were unaffected — they already summed/`COUNT(DISTINCT)`ed
+  correctly over the fanned rows. Fixed by switching `plugin_count` and the three status
+  counts to `COUNT(DISTINCT p.id)` / `COUNT(DISTINCT CASE WHEN ... THEN p.id END)`,
+  which collapse back to one count per plugin regardless of the fan-out. Regression test:
+  `vendor_and_format_plugin_count_does_not_inflate_with_project_usage`
+  (`tests/database/plugin_scan.rs`) — a plugin used in three projects must still count
+  once. `src/database/plugins.rs` (`vendor_stats`/`format_stats` CTEs). ADR-0026.
 
 ## Documentation triage
 
