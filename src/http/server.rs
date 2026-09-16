@@ -1,16 +1,17 @@
 //! HTTP route table (ADR-0024).
 //!
-//! Skeleton step: only `/health` exists. Domain routes (tags, projects, ...) are
-//! added incrementally in later steps, one domain at a time, per the ADR's
-//! implementation order.
+//! `/health` plus the tags domain (the pattern-proof domain). Remaining CRUD
+//! domains and the streaming endpoints are added incrementally, one at a time,
+//! per the ADR's implementation order.
 
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+use super::handlers::tags as tag_handlers;
 use super::state::AppState;
 
 /// Builds the axum router for the HTTP adapter.
@@ -38,6 +39,37 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(health))
+        .route(
+            "/api/v1/tags",
+            get(tag_handlers::list_tags).post(tag_handlers::create_tag),
+        )
+        .route("/api/v1/tags/search", get(tag_handlers::search_tags))
+        .route(
+            "/api/v1/tags/statistics",
+            get(tag_handlers::get_tag_statistics),
+        )
+        .route(
+            "/api/v1/tags/with-usage",
+            get(tag_handlers::get_all_tags_with_usage),
+        )
+        .route(
+            "/api/v1/tags/batch-tag",
+            post(tag_handlers::batch_tag_projects),
+        )
+        .route(
+            "/api/v1/tags/batch-untag",
+            post(tag_handlers::batch_untag_projects),
+        )
+        .route(
+            "/api/v1/tags/:tag_id",
+            get(tag_handlers::get_tag)
+                .put(tag_handlers::update_tag)
+                .delete(tag_handlers::delete_tag),
+        )
+        .route(
+            "/api/v1/projects/:project_id/tags/:tag_id",
+            post(tag_handlers::tag_project).delete(tag_handlers::untag_project),
+        )
         .layer(cors)
         .with_state(state)
 }
