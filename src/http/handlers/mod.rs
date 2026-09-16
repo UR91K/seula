@@ -2,6 +2,7 @@
 //! `src/grpc/handlers/`.
 
 pub mod collections;
+pub mod config;
 pub mod plugins;
 pub mod projects;
 pub mod samples;

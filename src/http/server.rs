@@ -12,6 +12,7 @@ use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use super::handlers::collections as collection_handlers;
+use super::handlers::config as config_handlers;
 use super::handlers::plugins as plugin_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::samples as sample_handlers;
@@ -265,6 +266,34 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/samples/:sample_id/projects",
             get(sample_handlers::get_projects_by_sample),
+        )
+        .route(
+            "/api/v1/config",
+            get(config_handlers::get_config),
+        )
+        .route(
+            "/api/v1/config/status",
+            get(config_handlers::get_config_status),
+        )
+        .route(
+            "/api/v1/config/paths",
+            put(config_handlers::update_paths).post(config_handlers::add_path),
+        )
+        .route(
+            "/api/v1/config/paths/remove",
+            post(config_handlers::remove_path),
+        )
+        .route(
+            "/api/v1/config/settings",
+            put(config_handlers::update_settings),
+        )
+        .route(
+            "/api/v1/config/reload",
+            post(config_handlers::reload_config),
+        )
+        .route(
+            "/api/v1/config/validate",
+            get(config_handlers::validate_config),
         )
         .layer(cors)
         .with_state(state)
