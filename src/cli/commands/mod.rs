@@ -14,12 +14,14 @@ use crate::grpc::handlers::*;
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
 use crate::cli::CliError;
+use crate::services::Services;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// CLI command execution context
 pub struct CliContext {
     pub db: Arc<Mutex<ProjectDatabase>>,
+    pub services: Services,
     pub config: &'static crate::config::Config,
     pub output_format: crate::cli::OutputFormat,
     pub no_color: bool,
@@ -32,9 +34,11 @@ impl CliContext {
             config.database_path.clone().expect("Database path must be set by config initialization"),
         );
         let db = Arc::new(Mutex::new(ProjectDatabase::new(db_path)?));
+        let services = Services::new(Arc::clone(&db));
 
         Ok(Self {
             db,
+            services,
             config,
             output_format,
             no_color,

@@ -46,6 +46,7 @@ pub mod project;
 pub mod media;
 pub mod models;
 pub mod scan;
+pub mod services;
 pub mod tray;
 pub mod utils;
 pub mod watcher;

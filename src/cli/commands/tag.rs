@@ -1,15 +1,11 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TagCommands};
-use crate::database::tags::{TagStatistics, TagUsageInfo};
-use crate::database::ProjectDatabase;
-use crate::project::Project;
+use crate::services::TagsService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use comfy_table::Table;
 use serde::Serialize;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex;
 
 pub struct TagCommand;
 
@@ -29,23 +25,23 @@ impl CliCommand for TagCommands {
 
         match self {
             TagCommands::List => {
-                let tags_list = self.get_tags_list(&ctx.db).await?;
+                let tags_list = self.get_tags_list(&ctx.services.tags).await?;
                 formatter.print(&tags_list)?;
             }
             TagCommands::Create { name, color } => {
-                let create_result = self.create_tag(&ctx.db, name, color.as_deref()).await?;
+                let create_result = self.create_tag(&ctx.services.tags, name, color.as_deref()).await?;
                 formatter.print(&create_result)?;
             }
             TagCommands::Assign { project_id, tag_id } => {
-                let assign_result = self.assign_tag(&ctx.db, project_id, tag_id).await?;
+                let assign_result = self.assign_tag(&ctx.services.tags, project_id, tag_id).await?;
                 formatter.print(&assign_result)?;
             }
             TagCommands::Remove { project_id, tag_id } => {
-                let remove_result = self.remove_tag(&ctx.db, project_id, tag_id).await?;
+                let remove_result = self.remove_tag(&ctx.services.tags, project_id, tag_id).await?;
                 formatter.print(&remove_result)?;
             }
             TagCommands::Search { tag } => {
-                let search_results = self.search_by_tag(&ctx.db, tag).await?;
+                let search_results = self.search_by_tag(&ctx.services.tags, tag).await?;
                 formatter.print(&search_results)?;
             }
         }
@@ -55,12 +51,8 @@ impl CliCommand for TagCommands {
 }
 
 impl TagCommands {
-    async fn get_tags_list(
-        &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
-    ) -> Result<TagsList, CliError> {
-        let mut db_guard = db.lock().await;
-        let (tags, total_count) = db_guard.get_all_tags_with_usage(None, None, None, None, None)?;
+    async fn get_tags_list(&self, tags: &TagsService) -> Result<TagsList, CliError> {
+        let (tags, total_count) = tags.get_all_tags_with_usage(None, None, None, None, None).await?;
 
         let displayed = tags
             .into_iter()
@@ -80,12 +72,11 @@ impl TagCommands {
 
     async fn create_tag(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tags: &TagsService,
         name: &str,
         _color: Option<&str>, // Color is not stored in current database schema
     ) -> Result<TagCreateResult, CliError> {
-        let mut db_guard = db.lock().await;
-        let tag_id = db_guard.add_tag(name)?;
+        let (tag_id, _, _) = tags.create_tag(name).await?;
 
         Ok(TagCreateResult {
             id: tag_id[..8].to_string(),
@@ -96,25 +87,11 @@ impl TagCommands {
 
     async fn assign_tag(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tags: &TagsService,
         project_id: &str,
         tag_id: &str,
     ) -> Result<TagAssignResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify tag exists
-        let tag_data = db_guard.get_tag_by_id(tag_id)?;
-        let tag_name = match tag_data {
-            Some((_, name, _)) => name,
-            None => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Tag {} not found", tag_id)
-                )) as CliError);
-            }
-        };
-
-        db_guard.tag_project(project_id, tag_id)?;
+        let (_, tag_name, _) = tags.tag_project(project_id, tag_id).await?;
 
         Ok(TagAssignResult {
             project_id: project_id[..8].to_string(),
@@ -127,25 +104,11 @@ impl TagCommands {
 
     async fn remove_tag(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tags: &TagsService,
         project_id: &str,
         tag_id: &str,
     ) -> Result<TagAssignResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify tag exists
-        let tag_data = db_guard.get_tag_by_id(tag_id)?;
-        let tag_name = match tag_data {
-            Some((_, name, _)) => name,
-            None => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Tag {} not found", tag_id)
-                )) as CliError);
-            }
-        };
-
-        db_guard.untag_project(project_id, tag_id)?;
+        let (_, tag_name, _) = tags.untag_project(project_id, tag_id).await?;
 
         Ok(TagAssignResult {
             project_id: project_id[..8].to_string(),
@@ -156,21 +119,15 @@ impl TagCommands {
         })
     }
 
-    async fn search_by_tag(
-        &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
-        tag: &str,
-    ) -> Result<TagSearchResults, CliError> {
-        let mut db_guard = db.lock().await;
-        
+    async fn search_by_tag(&self, tags: &TagsService, tag: &str) -> Result<TagSearchResults, CliError> {
         // First try to find the tag by name or ID
         let tag_id = if tag.len() == 8 || tag.len() == 36 {
             // Looks like a UUID (shortened or full)
             tag.to_string()
         } else {
             // Search by name
-            let (tags, _) = db_guard.search_tags(tag, Some(1), Some(0))?;
-            if tags.is_empty() {
+            let (found, _) = tags.search_tags(tag, Some(1), Some(0)).await?;
+            if found.is_empty() {
                 return Ok(TagSearchResults {
                     query: tag.to_string(),
                     tag_name: None,
@@ -178,15 +135,25 @@ impl TagCommands {
                     total_count: 0,
                 });
             }
-            tags[0].0.clone() // Use the first matching tag's ID
+            found[0].0.clone() // Use the first matching tag's ID
         };
 
         // Get the tag info for display
-        let tag_data = db_guard.get_tag_by_id(&tag_id)?;
-        let tag_name = tag_data.as_ref().map(|(_, name, _)| name.clone());
+        let tag_data = tags.get_tag(&tag_id).await?;
+        let tag_name = match tag_data.as_ref() {
+            Some((_, name, _)) => name.clone(),
+            None => {
+                return Ok(TagSearchResults {
+                    query: tag.to_string(),
+                    tag_name: None,
+                    projects: Vec::new(),
+                    total_count: 0,
+                });
+            }
+        };
 
         // Get projects with this tag
-        let projects = db_guard.get_projects_by_tag(&tag_id)?;
+        let projects = tags.get_projects_by_tag(&tag_id).await?;
         let project_rows = projects
             .into_iter()
             .map(|project| ProjectWithTagRow {
@@ -202,7 +169,7 @@ impl TagCommands {
 
         Ok(TagSearchResults {
             query: tag.to_string(),
-            tag_name,
+            tag_name: Some(tag_name),
             projects: project_rows,
             total_count,
         })

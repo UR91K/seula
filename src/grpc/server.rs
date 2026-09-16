@@ -8,6 +8,7 @@ use tonic::{Request, Response, Status};
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
 use crate::media::{MediaConfig, MediaStorageManager};
+use crate::services::Services;
 
 use super::handlers::*;
 use super::common::*;
@@ -64,12 +65,13 @@ impl StudioProjectManagerServer {
         let watcher = Arc::new(Mutex::new(None));
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
+        let services = Services::new(Arc::clone(&db));
 
         Ok(Self {
             projects_handler: ProjectsHandler::new(Arc::clone(&db)),
             search_handler: SearchHandler::new(Arc::clone(&db)),
             collections_handler: CollectionsHandler::new(Arc::clone(&db)),
-            tags_handler: TagsHandler::new(Arc::clone(&db)),
+            tags_handler: TagsHandler::new(services.tags.clone()),
             tasks_handler: TasksHandler::new(Arc::clone(&db)),
             media_handler: MediaHandler::new(Arc::clone(&db), Arc::clone(&media_storage)),
             system_handler: SystemHandler::new(
@@ -94,12 +96,13 @@ impl StudioProjectManagerServer {
         let watcher = Arc::new(Mutex::new(None));
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
+        let services = Services::new(Arc::clone(&db));
 
         Self {
             projects_handler: ProjectsHandler::new(Arc::clone(&db)),
             search_handler: SearchHandler::new(Arc::clone(&db)),
             collections_handler: CollectionsHandler::new(Arc::clone(&db)),
-            tags_handler: TagsHandler::new(Arc::clone(&db)),
+            tags_handler: TagsHandler::new(services.tags.clone()),
             tasks_handler: TasksHandler::new(Arc::clone(&db)),
             media_handler: MediaHandler::new(Arc::clone(&db), Arc::clone(&media_storage)),
             system_handler: SystemHandler::new(
