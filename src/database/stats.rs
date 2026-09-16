@@ -1,9 +1,9 @@
 use crate::error::DatabaseError;
 use rusqlite::OptionalExtension;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     // Statistics methods
     pub fn get_basic_counts(&self) -> Result<(i32, i32, i32, i32, i32, i32), DatabaseError> {
         let total_projects: i32 = self.conn.query_row(

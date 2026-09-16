@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use rusqlite::Connection;
 use seula::database::plugin_scan::PLUGIN_SCAN_COMPLETED_KEY;
 use seula::database::SCHEMA_VERSION;
-use seula::database::LiveSetDatabase;
+use seula::database::ProjectDatabase;
 use seula::models::PluginKey;
 use seula::scan::plugins::{PluginScanResult, ScanReport};
 use tempfile::TempDir;
@@ -84,14 +84,14 @@ fn report_of(plugins: Vec<PluginMeta>) -> ScanReport {
     }
 }
 
-fn temp_db() -> (TempDir, LiveSetDatabase) {
+fn temp_db() -> (TempDir, ProjectDatabase) {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("seula.db");
-    let db = LiveSetDatabase::new(path).expect("fresh database");
+    let db = ProjectDatabase::new(path).expect("fresh database");
     (dir, db)
 }
 
-fn installed_state(db: &LiveSetDatabase, uid: &str) -> Option<bool> {
+fn installed_state(db: &ProjectDatabase, uid: &str) -> Option<bool> {
     db.conn
         .query_row(
             "SELECT installed FROM plugins WHERE uid = ?",
@@ -131,7 +131,7 @@ fn a_database_from_before_versioning_is_discarded() {
         .unwrap();
     }
 
-    let db = LiveSetDatabase::new(path.clone()).expect("stale database should be rebuilt");
+    let db = ProjectDatabase::new(path.clone()).expect("stale database should be rebuilt");
 
     let survivors: i64 = db
         .conn
@@ -167,7 +167,7 @@ fn a_database_from_a_newer_build_is_refused_not_destroyed() {
     }
 
     assert!(
-        LiveSetDatabase::new(path.clone()).is_err(),
+        ProjectDatabase::new(path.clone()).is_err(),
         "a newer schema must not be opened"
     );
 

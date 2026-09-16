@@ -2,7 +2,7 @@ use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TagCommands};
 use crate::database::tags::{TagStatistics, TagUsageInfo};
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::project::Project;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
@@ -57,7 +57,7 @@ impl CliCommand for TagCommands {
 impl TagCommands {
     async fn get_tags_list(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
     ) -> Result<TagsList, CliError> {
         let mut db_guard = db.lock().await;
         let (tags, total_count) = db_guard.get_all_tags_with_usage(None, None, None, None, None)?;
@@ -80,7 +80,7 @@ impl TagCommands {
 
     async fn create_tag(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         name: &str,
         _color: Option<&str>, // Color is not stored in current database schema
     ) -> Result<TagCreateResult, CliError> {
@@ -96,7 +96,7 @@ impl TagCommands {
 
     async fn assign_tag(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         project_id: &str,
         tag_id: &str,
     ) -> Result<TagAssignResult, CliError> {
@@ -127,7 +127,7 @@ impl TagCommands {
 
     async fn remove_tag(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         project_id: &str,
         tag_id: &str,
     ) -> Result<TagAssignResult, CliError> {
@@ -158,7 +158,7 @@ impl TagCommands {
 
     async fn search_by_tag(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         tag: &str,
     ) -> Result<TagSearchResults, CliError> {
         let mut db_guard = db.lock().await;

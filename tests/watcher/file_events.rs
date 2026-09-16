@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use seula::database::LiveSetDatabase;
+use seula::database::ProjectDatabase;
 use seula::watcher::file_watcher::{FileEvent, FileWatcher};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
@@ -19,7 +19,7 @@ struct TestEnvironment {
     temp_dir: TempDir,
     watcher: FileWatcher,
     rx: std::sync::mpsc::Receiver<FileEvent>,
-    _db: Arc<Mutex<LiveSetDatabase>>,
+    _db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl TestEnvironment {
@@ -29,7 +29,7 @@ impl TestEnvironment {
         debug!("Created temp directory at {:?}", temp_dir.path());
 
         let db = Arc::new(Mutex::new(
-            LiveSetDatabase::new(PathBuf::from(":memory:"))
+            ProjectDatabase::new(PathBuf::from(":memory:"))
                 .expect("Failed to create test database"),
         ));
         debug!("Created in-memory test database");

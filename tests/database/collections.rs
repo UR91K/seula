@@ -9,7 +9,7 @@ use crate::common::{create_test_live_set_from_parse, setup, LiveSetBuilder};
 fn test_collections() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create three test projects with different characteristics
     let edm_project = create_test_live_set_from_parse(
@@ -119,7 +119,7 @@ fn test_collections() {
 fn test_duplicate_collection() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test projects
     let project1 = create_test_live_set_from_parse(

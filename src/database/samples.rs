@@ -4,9 +4,9 @@ use rusqlite::params;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     /// Get all samples with pagination and sorting
     pub fn get_all_samples(
         &self,

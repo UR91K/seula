@@ -13,7 +13,7 @@ use vst_meta::meta::{FormatExtra, PluginMeta};
 use vst_meta::protocol::Outcome;
 
 use super::models::SqlDateTime;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use crate::models::PluginKey;
 use crate::scan::plugins::ScanReport;
@@ -38,7 +38,7 @@ pub struct PluginScanPersist {
     pub skipped: usize,
 }
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     /// Write a scan report into the database.
     ///
     /// `full_scan` must be false when the scan was narrowed (`--paths`) or cut short

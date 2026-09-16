@@ -17,7 +17,7 @@ pub mod tags;
 pub mod tasks;
 
 // Common imports for gRPC tests
-use seula::database::LiveSetDatabase;
+use seula::database::ProjectDatabase;
 use seula::grpc::projects::*;
 use seula::grpc::collections::*;
 use seula::grpc::tags::*;

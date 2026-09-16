@@ -6,7 +6,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use crate::config::CONFIG;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::media::{MediaConfig, MediaStorageManager};
 
 use super::handlers::*;
@@ -49,7 +49,7 @@ impl StudioProjectManagerServer {
             .as_ref()
             .expect("Database path should be set by config initialization");
         let db_path = PathBuf::from(database_path);
-        let db = LiveSetDatabase::new(db_path)
+        let db = ProjectDatabase::new(db_path)
             .map_err(|e| format!("Failed to initialize database: {}", e))?;
         let db = Arc::new(Mutex::new(db));
 
@@ -86,7 +86,7 @@ impl StudioProjectManagerServer {
         })
     }
 
-    pub fn new_for_test(db: LiveSetDatabase, media_storage: MediaStorageManager) -> Self {
+    pub fn new_for_test(db: ProjectDatabase, media_storage: MediaStorageManager) -> Self {
         let db = Arc::new(Mutex::new(db));
         let media_storage = Arc::new(media_storage);
         let scan_status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
@@ -116,7 +116,7 @@ impl StudioProjectManagerServer {
         }
     }
 
-    pub fn db(&self) -> &Arc<Mutex<LiveSetDatabase>> {
+    pub fn db(&self) -> &Arc<Mutex<ProjectDatabase>> {
         &self.projects_handler.db
     }
 

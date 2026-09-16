@@ -1,4 +1,4 @@
-use super::core::LiveSetDatabase;
+use super::core::ProjectDatabase;
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::media::{MediaFile, MediaType};
@@ -6,7 +6,7 @@ use chrono::DateTime;
 use log::{debug, info, warn};
 use rusqlite::{params, OptionalExtension, Row};
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     /// Insert a new media file record into the database
     pub fn insert_media_file(&mut self, media_file: &MediaFile) -> Result<(), DatabaseError> {
         debug!(

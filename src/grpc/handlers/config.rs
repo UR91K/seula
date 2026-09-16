@@ -4,16 +4,16 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Response, Status};
 
 use crate::config::{Config, CONFIG};
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use super::super::config::*;
 
 #[derive(Clone)]
 pub struct ConfigHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl ConfigHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

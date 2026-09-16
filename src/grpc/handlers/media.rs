@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use super::super::media::*;
 use super::super::collections::*;
 use super::super::common::*;
@@ -12,12 +12,12 @@ use crate::media::{MediaStorageManager, MediaType};
 
 #[derive(Clone)]
 pub struct MediaHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
     pub media_storage: Arc<MediaStorageManager>,
 }
 
 impl MediaHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>, media_storage: Arc<MediaStorageManager>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>, media_storage: Arc<MediaStorageManager>) -> Self {
         Self { db, media_storage }
     }
     // Media Management - Streaming implementations

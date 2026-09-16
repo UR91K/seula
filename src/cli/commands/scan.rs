@@ -23,7 +23,7 @@ impl TableDisplay for ScanResults {
     }
 }
 use crate::cli::CliError;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::project::Project;
 use crate::process_projects_with_progress;
 use crate::scan::daw::ParseError;
@@ -161,7 +161,7 @@ impl ScanCommand {
 
     async fn filter_existing_projects(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         project_paths: Vec<PathBuf>,
     ) -> Result<Vec<PathBuf>, CliError> {
         let mut db_guard = db.lock().await;
@@ -211,7 +211,7 @@ impl ScanCommand {
 
     async fn store_results(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         results: Vec<Result<(PathBuf, Project), (PathBuf, ParseError)>>,
     ) -> Result<(usize, usize), CliError> {
         let mut db_guard = db.lock().await;

@@ -9,14 +9,14 @@ use seula::database::search::{MatchReason, SearchQuery};
 use uuid::Uuid;
 
 fn setup_test_projects() -> (
-    LiveSetDatabase,
+    ProjectDatabase,
     DateTime<Local>,
     DateTime<Local>,
     DateTime<Local>,
     DateTime<Local>,
 ) {
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create timestamps for testing
     let edm_created = Local

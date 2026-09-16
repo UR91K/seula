@@ -15,7 +15,7 @@ pub mod tags;
 pub mod tasks;
 
 pub use batch::BatchInsertManager;
-pub use core::{LiveSetDatabase, SCHEMA_VERSION};
+pub use core::{ProjectDatabase, SCHEMA_VERSION};
 pub use plugin_scan::PluginScanPersist;
 pub use plugins::PluginStats;
 pub use samples::{SampleStats, SampleUsageInfo};

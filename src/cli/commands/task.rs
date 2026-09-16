@@ -2,7 +2,7 @@ use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TaskCommands};
 use crate::database::tasks::TaskAnalytics;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use serde::Serialize;
@@ -51,7 +51,7 @@ impl CliCommand for TaskCommands {
 impl TaskCommands {
     async fn get_tasks_list(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         project_id: Option<&str>,
         show_completed: bool,
     ) -> Result<TasksList, CliError> {
@@ -96,7 +96,7 @@ impl TaskCommands {
 
     async fn create_task(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         project_id: &str,
         description: &str,
         _priority: u8, // Priority is not stored in current database schema
@@ -114,7 +114,7 @@ impl TaskCommands {
 
     async fn complete_task(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         task_id: &str,
     ) -> Result<TaskActionResult, CliError> {
         let mut db_guard = db.lock().await;
@@ -155,7 +155,7 @@ impl TaskCommands {
 
     async fn delete_task(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         task_id: &str,
     ) -> Result<TaskActionResult, CliError> {
         let mut db_guard = db.lock().await;

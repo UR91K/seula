@@ -1,11 +1,11 @@
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use super::super::common::{AbletonVersion, KeySignature, Plugin, Project, Sample, TimeSignature, Task, Tag};
 use crate::project::Project as DomainProject;
 
 pub fn convert_live_set_to_proto(
     live_set: DomainProject,
-    db: &mut LiveSetDatabase,
+    db: &mut ProjectDatabase,
 ) -> Result<Project, DatabaseError> {
     let project_id = live_set.id.to_string();
 

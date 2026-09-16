@@ -1,7 +1,7 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, SampleCommands};
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::models::Sample;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
@@ -52,7 +52,7 @@ impl CliCommand for SampleCommands {
 impl SampleCommands {
     async fn get_samples_list(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         limit: usize,
         offset: usize,
     ) -> Result<SamplesList, CliError> {
@@ -89,7 +89,7 @@ impl SampleCommands {
 
     async fn search_samples(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         query: &str,
         limit: usize,
     ) -> Result<SamplesSearchResults, CliError> {
@@ -119,7 +119,7 @@ impl SampleCommands {
         })
     }
 
-    async fn get_sample_stats(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<SampleStatsDisplay, CliError> {
+    async fn get_sample_stats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<SampleStatsDisplay, CliError> {
         let db_guard = db.lock().await;
         let stats = db_guard.get_sample_stats()?;
         let analytics = db_guard.get_sample_analytics()?;
@@ -130,7 +130,7 @@ impl SampleCommands {
         })
     }
 
-    async fn check_sample_presence(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<SamplePresenceCheckResult, CliError> {
+    async fn check_sample_presence(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<SamplePresenceCheckResult, CliError> {
         let mut db_guard = db.lock().await;
         let refresh_result = db_guard.refresh_sample_presence_status()?;
 

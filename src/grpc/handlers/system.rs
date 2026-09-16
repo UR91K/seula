@@ -9,7 +9,7 @@ use tonic::{Code, Request, Response, Status};
 
 use super::utils::convert_live_set_to_proto;
 use crate::config::CONFIG;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use super::super::system::*;
 use super::super::scanning::*;
 use super::super::watcher::*;
@@ -20,7 +20,7 @@ use crate::watcher::file_watcher::{FileEvent, FileWatcher};
 
 #[derive(Clone)]
 pub struct SystemHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
     pub scan_status: Arc<Mutex<ScanStatus>>,
     pub scan_progress: Arc<Mutex<Option<ScanProgressResponse>>>,
     pub watcher: Arc<Mutex<Option<FileWatcher>>>,
@@ -30,7 +30,7 @@ pub struct SystemHandler {
 
 impl SystemHandler {
     pub fn new(
-        db: Arc<Mutex<LiveSetDatabase>>,
+        db: Arc<Mutex<ProjectDatabase>>,
         scan_status: Arc<Mutex<ScanStatus>>,
         scan_progress: Arc<Mutex<Option<ScanProgressResponse>>>,
         watcher: Arc<Mutex<Option<FileWatcher>>>,

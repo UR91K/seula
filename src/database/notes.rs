@@ -2,9 +2,9 @@ use crate::error::DatabaseError;
 use log::debug;
 use rusqlite::params;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn set_project_notes(
         &mut self,
         project_id: &str,

@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 /// version is refused rather than destroyed.
 pub const SCHEMA_VERSION: i32 = 3;
 
-pub struct LiveSetDatabase {
+pub struct ProjectDatabase {
     pub conn: Connection,
 }
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn new(db_path: PathBuf) -> Result<Self, DatabaseError> {
         debug!("Opening database at {:?}", db_path);
 

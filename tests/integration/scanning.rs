@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use seula::{
-    config::CONFIG, database::LiveSetDatabase, process_projects, process_projects_with_progress,
+    config::CONFIG, database::ProjectDatabase, process_projects, process_projects_with_progress,
     scan::project_scanner::ProjectPathScanner,
 };
 
@@ -46,7 +46,7 @@ fn test_process_projects_integration() {
         .database_path
         .as_ref()
         .expect("Database path should be set by config initialization");
-    let db = LiveSetDatabase::new(PathBuf::from(database_path)).expect("Failed to open database");
+    let db = ProjectDatabase::new(PathBuf::from(database_path)).expect("Failed to open database");
 
     // Get actual project names from database
     let mut stmt = db

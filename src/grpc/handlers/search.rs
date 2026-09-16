@@ -6,15 +6,15 @@ use tonic::{Request, Response, Status};
 use super::super::search::*;
 use super::utils::convert_live_set_to_proto;
 use crate::database::search::SearchQuery;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 
 #[derive(Clone)]
 pub struct SearchHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl SearchHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

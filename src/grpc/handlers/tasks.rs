@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Response, Status};
 
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use super::super::tasks::*;
 use super::super::common::*;
 
@@ -27,11 +27,11 @@ use super::super::common::*;
 
 #[derive(Clone)]
 pub struct TasksHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl TasksHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

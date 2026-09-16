@@ -6,7 +6,7 @@ use tonic::{Code, Request, Response, Status};
 use super::super::projects::*;
 use super::super::common::*;
 use super::utils::convert_live_set_to_proto;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use crate::Project;
 
@@ -29,11 +29,11 @@ use crate::Project;
 
 #[derive(Clone)]
 pub struct ProjectsHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl ProjectsHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

@@ -1,7 +1,7 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, OutputFormat, PluginCommands};
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::database::plugins::{PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
 use crate::models::{Plugin, GrpcPlugin};
 use crate::{colored_cell, simple_table_row};
@@ -90,7 +90,7 @@ impl CliCommand for PluginCommands {
 impl PluginCommands {
     async fn get_plugins_list(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         vendor: &Option<String>,
         format: &Option<String>,
         installed: &Option<bool>,
@@ -134,7 +134,7 @@ impl PluginCommands {
 
     async fn search_plugins(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         query: &str,
         vendor: &Option<String>,
         format: &Option<String>,
@@ -173,7 +173,7 @@ impl PluginCommands {
 
     async fn get_plugin_details(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         plugin_id: &str,
     ) -> Result<PluginDetails, CliError> {
         let db_guard = db.lock().await;
@@ -189,21 +189,21 @@ impl PluginCommands {
         }
     }
 
-    async fn get_plugin_stats(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<PluginStatsDisplay, CliError> {
+    async fn get_plugin_stats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginStatsDisplay, CliError> {
         let db_guard = db.lock().await;
         let stats = db_guard.get_plugin_stats()?;
 
         Ok(PluginStatsDisplay { stats })
     }
 
-    async fn refresh_plugin_installation_status(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<PluginRefreshDisplay, CliError> {
+    async fn refresh_plugin_installation_status(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginRefreshDisplay, CliError> {
         let mut db_guard = db.lock().await;
         let result = db_guard.refresh_plugin_installation_status()?;
 
         Ok(PluginRefreshDisplay { result })
     }
 
-    async fn get_plugin_vendors(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<PluginVendorsDisplay, CliError> {
+    async fn get_plugin_vendors(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginVendorsDisplay, CliError> {
         let db_guard = db.lock().await;
         let (vendors, total_count) = db_guard.get_plugin_vendors(
             Some(50), // limit
@@ -218,7 +218,7 @@ impl PluginCommands {
         })
     }
 
-    async fn get_plugin_formats(&self, db: &Arc<TokioMutex<LiveSetDatabase>>) -> Result<PluginFormatsDisplay, CliError> {
+    async fn get_plugin_formats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginFormatsDisplay, CliError> {
         let db_guard = db.lock().await;
         let (formats, total_count) = db_guard.get_plugin_formats(
             Some(50), // limit

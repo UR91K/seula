@@ -9,9 +9,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn add_tag(&mut self, name: &str) -> Result<String, DatabaseError> {
         debug!("Adding tag: {}", name);
         let tag_id = Uuid::new_v4().to_string();

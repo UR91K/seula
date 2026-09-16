@@ -75,13 +75,13 @@ pub use config::CONFIG;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use seula::LiveSetDatabase;
+/// use seula::ProjectDatabase;
 /// use std::path::PathBuf;
 ///
-/// let db = LiveSetDatabase::new(PathBuf::from("projects.db"))
+/// let db = ProjectDatabase::new(PathBuf::from("projects.db"))
 ///     .expect("Failed to create database");
 /// ```
-pub use database::LiveSetDatabase;
+pub use database::ProjectDatabase;
 
 /// Represents a parsed Ableton Live project with all extracted metadata.
 ///
@@ -275,7 +275,7 @@ where
 
     // Initialize database early to use for filtering
     debug!("Initializing database at {}", database_path);
-    let mut db = LiveSetDatabase::new(PathBuf::from(database_path))?;
+    let mut db = ProjectDatabase::new(PathBuf::from(database_path))?;
 
     let scanner = ProjectPathScanner::new()?;
     let mut found_projects = HashSet::new();
@@ -609,7 +609,7 @@ fn preprocess_projects(paths: HashSet<PathBuf>) -> Result<Vec<ProjectPreprocesse
 /// Returns [`LiveSetError`] if database queries fail during the filtering process.
 fn filter_unchanged_projects(
     preprocessed: Vec<ProjectPreprocessed>,
-    db: &LiveSetDatabase,
+    db: &ProjectDatabase,
 ) -> Result<Vec<PathBuf>, LiveSetError> {
     let total_count = preprocessed.len();
     debug!("Filtering {} preprocessed projects", total_count);

@@ -5,9 +5,9 @@ use log::debug;
 use rusqlite::params;
 use uuid::Uuid;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn add_task(
         &mut self,
         project_id: &str,

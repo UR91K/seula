@@ -5,7 +5,7 @@ use tonic::{Code, Request, Response, Status};
 
 use super::super::collections::*;
 use super::super::common::*;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 
 // MOVE FROM server.rs:
 // - get_collections method (lines ~300-342)
@@ -30,11 +30,11 @@ use crate::database::LiveSetDatabase;
 
 #[derive(Clone)]
 pub struct CollectionsHandler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl CollectionsHandler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

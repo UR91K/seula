@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use seula::database::LiveSetDatabase;
+use seula::database::ProjectDatabase;
 use seula::media::{MediaFile, MediaType};
 
 use crate::common::setup;
@@ -38,7 +38,7 @@ fn create_test_media_file(
 fn test_media_file_crud() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test media file
     let media_file = create_test_media_file(MediaType::CoverArt, "cover.jpg", 1024, "image/jpeg");
@@ -63,7 +63,7 @@ fn test_media_file_crud() {
 fn test_collection_cover_art_management() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test collection
     let collection_id = db.create_collection("Test Collection", None, None).unwrap();
@@ -95,7 +95,7 @@ fn test_collection_cover_art_management() {
 fn test_project_audio_file_management() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test collection and project
     let test_project = create_test_live_set();
@@ -133,7 +133,7 @@ fn test_project_audio_file_management() {
 fn test_media_file_types_separation() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create one of each media type
     let cover_art = create_test_media_file(MediaType::CoverArt, "cover.jpg", 1024, "image/jpeg");
@@ -159,7 +159,7 @@ fn test_media_file_types_separation() {
 fn test_media_file_statistics() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test media files
     let cover1 = create_test_media_file(MediaType::CoverArt, "cover1.jpg", 1024, "image/jpeg");
@@ -198,7 +198,7 @@ fn test_media_file_statistics() {
 fn test_orphaned_media_files() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test collection and project
     let collection_id = db.create_collection("Test Collection", None, None).unwrap();
@@ -241,7 +241,7 @@ fn test_orphaned_media_files() {
 fn test_media_file_database_constraints() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     let media_file = create_test_media_file(MediaType::CoverArt, "test.jpg", 1024, "image/jpeg");
 
@@ -257,7 +257,7 @@ fn test_media_file_database_constraints() {
 fn test_media_file_cascade_deletion() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test collection
     let collection_id = db.create_collection("Test Collection", None, None).unwrap();
@@ -288,7 +288,7 @@ fn test_media_file_cascade_deletion() {
 fn test_media_file_cleanup_on_association_removal() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create test collection
     let collection_id = db.create_collection("Test Collection", None, None).unwrap();
@@ -339,7 +339,7 @@ fn test_media_type_conversion() {
 fn test_media_file_validation_edge_cases() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Test with empty filename
     let media_file = MediaFile {
@@ -378,7 +378,7 @@ fn test_media_file_validation_edge_cases() {
 fn test_media_file_foreign_key_constraints() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Try to set cover art for non-existent collection
     let result =

@@ -11,7 +11,7 @@ pub async fn create_test_server() -> StudioProjectManagerServer {
 
     // Create in-memory database
     let db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create test database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create test database");
 
     // Create a test media config (use defaults)
     let media_config = MediaConfig::default();
@@ -24,7 +24,7 @@ pub async fn create_test_server() -> StudioProjectManagerServer {
     StudioProjectManagerServer::new_for_test(db, media_storage)
 }
 
-pub async fn create_test_project_in_db(db: &Arc<Mutex<LiveSetDatabase>>) -> String {
+pub async fn create_test_project_in_db(db: &Arc<Mutex<ProjectDatabase>>) -> String {
     let test_project = LiveSetBuilder::new()
         .with_plugin("Serum")
         .with_sample("kick.wav")
@@ -72,7 +72,7 @@ pub async fn create_test_project_in_db(db: &Arc<Mutex<LiveSetDatabase>>) -> Stri
 }
 
 /// Setup test server and return both server and database reference
-pub async fn setup_test_server() -> (StudioProjectManagerServer, Arc<Mutex<LiveSetDatabase>>) {
+pub async fn setup_test_server() -> (StudioProjectManagerServer, Arc<Mutex<ProjectDatabase>>) {
     let server = create_test_server().await;
     let db = server.db().clone();
     (server, db)

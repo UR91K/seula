@@ -12,14 +12,14 @@ pub mod plugin;
 
 use crate::grpc::handlers::*;
 use crate::config::CONFIG;
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::cli::CliError;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// CLI command execution context
 pub struct CliContext {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
     pub config: &'static crate::config::Config,
     pub output_format: crate::cli::OutputFormat,
     pub no_color: bool,
@@ -31,7 +31,7 @@ impl CliContext {
         let db_path = std::path::PathBuf::from(
             config.database_path.clone().expect("Database path must be set by config initialization"),
         );
-        let db = Arc::new(Mutex::new(LiveSetDatabase::new(db_path)?));
+        let db = Arc::new(Mutex::new(ProjectDatabase::new(db_path)?));
 
         Ok(Self {
             db,
@@ -55,12 +55,12 @@ pub async fn execute_command(command: &impl CliCommand, output_format: crate::cl
 }
 
 /// Helper to create database connection for CLI commands
-pub async fn create_db_connection() -> Result<Arc<Mutex<LiveSetDatabase>>, CliError> {
+pub async fn create_db_connection() -> Result<Arc<Mutex<ProjectDatabase>>, CliError> {
     let config = CONFIG.as_ref()?;
     let db_path = std::path::PathBuf::from(
         config.database_path.clone().expect("Database path must be set by config initialization"),
     );
-    let db = LiveSetDatabase::new(db_path)?;
+    let db = ProjectDatabase::new(db_path)?;
     let db = Arc::new(Mutex::new(db));
     Ok(db)
 }

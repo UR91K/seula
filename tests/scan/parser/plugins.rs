@@ -408,7 +408,7 @@ fn test_psp_springbox_xml_parsing() {
 fn test_psp_springbox_plugin_from_real_project() {
     use std::path::PathBuf;
     use std::collections::HashSet;
-    use seula::database::LiveSetDatabase;
+    use seula::database::ProjectDatabase;
     use seula::scan::project_scanner::ProjectPathScanner;
     use seula::database::batch::BatchInsertManager;
     use std::sync::Arc;
@@ -426,7 +426,7 @@ fn test_psp_springbox_plugin_from_real_project() {
     
     // Create a temporary database for testing
     let temp_db_path = std::env::temp_dir().join("test_psp_springbox.db");
-    let mut db = LiveSetDatabase::new(temp_db_path.clone()).expect("Failed to create test database");
+    let mut db = ProjectDatabase::new(temp_db_path.clone()).expect("Failed to create test database");
     
     // Use the same logic as the actual library
     // 1. Create a scanner and scan the directory

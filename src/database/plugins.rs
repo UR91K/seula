@@ -2,9 +2,9 @@ use crate::error::DatabaseError;
 use crate::models::{Plugin, GrpcPlugin};
 use rusqlite::params;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     /// Get all plugins with pagination, sorting, and filtering, including usage data
     pub fn get_all_plugins(
         &self,

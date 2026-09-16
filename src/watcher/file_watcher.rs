@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use log::{debug, info, warn};
 use notify::{
     self,
@@ -18,7 +18,7 @@ pub struct FileWatcher {
     watcher: notify::RecommendedWatcher,
     watch_paths: HashSet<PathBuf>,
     event_tx: mpsc::Sender<FileEvent>,
-    db: Arc<Mutex<LiveSetDatabase>>,
+    db: Arc<Mutex<ProjectDatabase>>,
 }
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ pub enum FileEvent {
 impl FileWatcher {
     /// Creates a new FileWatcher instance
     pub fn new(
-        db: Arc<Mutex<LiveSetDatabase>>,
+        db: Arc<Mutex<ProjectDatabase>>,
     ) -> notify::Result<(Self, mpsc::Receiver<FileEvent>)> {
         debug!("Creating new FileWatcher instance");
         let (tx, rx) = mpsc::channel();

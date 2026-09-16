@@ -13,8 +13,8 @@ fn test_batch_insert() {
     let temp_dir = tempdir().expect("Failed to create temp dir");
     let db_path = temp_dir.path().join("test.db");
 
-    // Initialize database with schema from LiveSetDatabase
-    let mut live_set_db = LiveSetDatabase::new(db_path.clone()).expect("Failed to create database");
+    // Initialize database with schema from ProjectDatabase
+    let mut live_set_db = ProjectDatabase::new(db_path.clone()).expect("Failed to create database");
 
     // Get connection for batch insert
     let mut conn = &mut live_set_db.conn;

@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
 #[derive(Debug, Default)]
 #[allow(unused)]
@@ -224,7 +224,7 @@ impl SearchQuery {
     }
 }
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn search_simple(&mut self, query: &str) -> Result<Vec<Project>, DatabaseError> {
         debug!("Performing search with query: {}", query);
         let tx = self.conn.transaction()?;

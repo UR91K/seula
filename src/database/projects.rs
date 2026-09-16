@@ -13,9 +13,9 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use super::LiveSetDatabase;
+use super::ProjectDatabase;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn get_project_by_id(&mut self, id: &str) -> Result<Option<Project>, DatabaseError> {
         debug!("Retrieving project by ID: {}", id);
         let tx = self.conn.transaction()?;

@@ -11,7 +11,7 @@ pub mod search;
 pub mod tags;
 
 // Common imports for database tests
-use seula::database::LiveSetDatabase;
+use seula::database::ProjectDatabase;
 use seula::project::Project;
 // use crate::common::setup;
 use std::path::PathBuf;

@@ -112,10 +112,10 @@ let services = [
 **File**: `src/database/{service_name}.rs`
 
 ```rust
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 
-impl LiveSetDatabase {
+impl ProjectDatabase {
     pub fn get_item(&mut self, item_id: &str) -> Result<Option<ItemData>, DatabaseError> {
         // Database implementation
     }
@@ -144,17 +144,17 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Response, Status};
 
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use super::super::{service_name}::*;
 use super::super::common::*;
 
 #[derive(Clone)]
 pub struct {ServiceName}Handler {
-    pub db: Arc<Mutex<LiveSetDatabase>>,
+    pub db: Arc<Mutex<ProjectDatabase>>,
 }
 
 impl {ServiceName}Handler {
-    pub fn new(db: Arc<Mutex<LiveSetDatabase>>) -> Self {
+    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
         Self { db }
     }
 

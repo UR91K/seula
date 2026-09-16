@@ -77,7 +77,7 @@ pub fn create_test_live_set() -> Project {
 #[test]
 pub fn test_database_initialization() {
     setup("error");
-    let db = LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+    let db = ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Verify tables exist
     let tables = db
@@ -100,7 +100,7 @@ pub fn test_database_initialization() {
 pub fn test_insert_and_retrieve_project() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create and insert a test project
     let original_live_set = create_test_live_set();
@@ -177,7 +177,7 @@ pub fn test_insert_and_retrieve_project() {
 pub fn test_multiple_projects() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create three different projects with distinct characteristics
     let edm_project = create_test_live_set_from_parse(
@@ -261,7 +261,7 @@ pub fn test_multiple_projects() {
 fn test_notes_and_tasks() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create a test project
     let project = create_test_live_set();
@@ -393,7 +393,7 @@ fn test_notes_and_tasks() {
 fn test_mark_project_deleted() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create and insert a test project
     let live_set = create_test_live_set();
@@ -424,7 +424,7 @@ fn test_mark_project_deleted() {
 fn test_find_deleted_by_hash() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create and insert a test project
     let live_set = create_test_live_set();
@@ -455,7 +455,7 @@ fn test_find_deleted_by_hash() {
 fn test_reactivate_project() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create and insert a test project
     let live_set = create_test_live_set();
@@ -492,7 +492,7 @@ fn test_reactivate_project() {
 fn test_permanent_deletion() {
     setup("error");
     let mut db =
-        LiveSetDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
+        ProjectDatabase::new(PathBuf::from(":memory:")).expect("Failed to create database");
 
     // Create and insert a test project
     let live_set = create_test_live_set();

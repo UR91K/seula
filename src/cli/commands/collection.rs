@@ -1,7 +1,7 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, CollectionCommands};
-use crate::database::LiveSetDatabase;
+use crate::database::ProjectDatabase;
 use crate::project::Project;
 use crate::models::CollectionStatistics;
 use crate::{colored_cell, simple_table_row};
@@ -56,7 +56,7 @@ impl CliCommand for CollectionCommands {
 impl CollectionCommands {
     async fn get_collections_list(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
     ) -> Result<CollectionsList, CliError> {
         let mut db_guard = db.lock().await;
         let (collections, total_count) = db_guard.list_collections(None, None, None, None)?;
@@ -78,7 +78,7 @@ impl CollectionCommands {
 
     async fn get_collection_details(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         collection_id: &str,
     ) -> Result<CollectionDetails, CliError> {
         let mut db_guard = db.lock().await;
@@ -125,7 +125,7 @@ impl CollectionCommands {
 
     async fn create_collection(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         name: &str,
         description: Option<&str>,
     ) -> Result<CollectionCreateResult, CliError> {
@@ -141,7 +141,7 @@ impl CollectionCommands {
 
     async fn add_project_to_collection(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
@@ -168,7 +168,7 @@ impl CollectionCommands {
 
     async fn remove_project_from_collection(
         &self,
-        db: &Arc<TokioMutex<LiveSetDatabase>>,
+        db: &Arc<TokioMutex<ProjectDatabase>>,
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
