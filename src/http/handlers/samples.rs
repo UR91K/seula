@@ -1,0 +1,142 @@
+//! Samples domain HTTP handlers (ADR-0024). Thin over `SamplesService`,
+//! mirroring `src/grpc/handlers/samples.rs`.
+
+use axum::extract::{Path, Query, State};
+use axum::response::IntoResponse;
+use axum::Json;
+
+use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
+use crate::http::dto::samples::{
+    ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto, SampleListResponse,
+    SearchSamplesQuery,
+};
+use crate::http::error::ApiError;
+use crate::http::state::AppState;
+
+pub async fn get_all_samples(
+    State(state): State<AppState>,
+    Query(query): Query<GetAllSamplesQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let (samples, total_count) = state
+        .services
+        .samples
+        .get_all_samples(
+            query.limit,
+            query.offset,
+            query.sort_by,
+            query.sort_desc,
+            query.present_only,
+            query.missing_only,
+            query.extension_filter,
+            query.min_usage_count,
+            query.max_usage_count,
+        )
+        .await?;
+
+    Ok(Json(SampleListResponse {
+        samples: samples.into_iter().map(SampleDto::from).collect(),
+        total_count,
+    }))
+}
+
+pub async fn get_sample(
+    State(state): State<AppState>,
+    Path(sample_id): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let sample = state
+        .services
+        .samples
+        .get_sample(&sample_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Sample not found with ID: {}", sample_id)))?;
+
+    Ok(Json(SampleDto::from(sample)))
+}
+
+pub async fn get_samples_by_presence(
+    State(state): State<AppState>,
+    Query(query): Query<ByPresenceQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let (samples, total_count) = state
+        .services
+        .samples
+        .get_samples_by_presence(
+            query.is_present,
+            query.limit,
+            query.offset,
+            query.sort_by,
+            query.sort_desc,
+        )
+        .await?;
+
+    Ok(Json(SampleListResponse {
+        samples: samples.into_iter().map(SampleDto::from).collect(),
+        total_count,
+    }))
+}
+
+pub async fn search_samples(
+    State(state): State<AppState>,
+    Query(query): Query<SearchSamplesQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let (samples, total_count) = state
+        .services
+        .samples
+        .search_samples(&query.query, query.limit, query.offset, query.present_only, query.extension_filter)
+        .await?;
+
+    Ok(Json(SampleListResponse {
+        samples: samples.into_iter().map(SampleDto::from).collect(),
+        total_count,
+    }))
+}
+
+pub async fn get_sample_stats(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let stats = state.services.samples.get_sample_stats().await?;
+    Ok(Json(stats))
+}
+
+pub async fn get_all_sample_usage_numbers(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let usage_info = state.services.samples.get_all_sample_usage_numbers().await?;
+    Ok(Json(usage_info))
+}
+
+pub async fn get_projects_by_sample(
+    State(state): State<AppState>,
+    Path(sample_id): Path<String>,
+    Query(query): Query<ProjectsBySampleQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let (projects, total_count) = state
+        .services
+        .samples
+        .get_projects_by_sample(&sample_id, query.limit, query.offset)
+        .await?;
+
+    let db_arc = state.services.samples.db_handle();
+    let mut db = db_arc.lock().await;
+    let projects = projects
+        .into_iter()
+        .map(|p| project_to_dto(p, &mut db))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(Json(ProjectListResponse { projects, total_count }))
+}
+
+pub async fn refresh_sample_presence_status(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let result = state.services.samples.refresh_sample_presence_status().await?;
+    Ok(Json(result))
+}
+
+pub async fn get_sample_analytics(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let analytics = state.services.samples.get_sample_analytics().await?;
+    Ok(Json(analytics))
+}
+
+pub async fn get_sample_extensions(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let extensions = state.services.samples.get_sample_extensions().await?;
+    Ok(Json(extensions))
+}

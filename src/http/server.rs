@@ -14,6 +14,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use super::handlers::collections as collection_handlers;
 use super::handlers::plugins as plugin_handlers;
 use super::handlers::projects as project_handlers;
+use super::handlers::samples as sample_handlers;
 use super::handlers::search as search_handlers;
 use super::handlers::tags as tag_handlers;
 use super::handlers::tasks as task_handlers;
@@ -227,6 +228,43 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/plugins/:plugin_id/projects",
             get(plugin_handlers::get_projects_by_plugin),
+        )
+        .route("/api/v1/samples", get(sample_handlers::get_all_samples))
+        .route(
+            "/api/v1/samples/by-presence",
+            get(sample_handlers::get_samples_by_presence),
+        )
+        .route(
+            "/api/v1/samples/search",
+            get(sample_handlers::search_samples),
+        )
+        .route(
+            "/api/v1/samples/stats",
+            get(sample_handlers::get_sample_stats),
+        )
+        .route(
+            "/api/v1/samples/usage",
+            get(sample_handlers::get_all_sample_usage_numbers),
+        )
+        .route(
+            "/api/v1/samples/analytics",
+            get(sample_handlers::get_sample_analytics),
+        )
+        .route(
+            "/api/v1/samples/extensions",
+            get(sample_handlers::get_sample_extensions),
+        )
+        .route(
+            "/api/v1/samples/refresh-presence-status",
+            post(sample_handlers::refresh_sample_presence_status),
+        )
+        .route(
+            "/api/v1/samples/:sample_id",
+            get(sample_handlers::get_sample),
+        )
+        .route(
+            "/api/v1/samples/:sample_id/projects",
+            get(sample_handlers::get_projects_by_sample),
         )
         .layer(cors)
         .with_state(state)
