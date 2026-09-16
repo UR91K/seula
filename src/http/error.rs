@@ -12,6 +12,7 @@ use axum::Json;
 use serde::Serialize;
 
 use crate::error::DatabaseError;
+use crate::media::MediaError;
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -31,6 +32,19 @@ impl From<DatabaseError> for ApiError {
             DatabaseError::NotFound(msg) => ApiError::NotFound(msg),
             DatabaseError::InvalidOperation(msg) => ApiError::InvalidRequest(msg),
             other => ApiError::Internal(format!("Database error: {}", other)),
+        }
+    }
+}
+
+impl From<MediaError> for ApiError {
+    fn from(err: MediaError) -> Self {
+        match err {
+            MediaError::FileNotFound(msg) => ApiError::NotFound(msg),
+            MediaError::FileTooLarge { .. }
+            | MediaError::UnsupportedFormat { .. }
+            | MediaError::InvalidMediaType(_)
+            | MediaError::InvalidFileId(_) => ApiError::InvalidRequest(err.to_string()),
+            other => ApiError::Internal(other.to_string()),
         }
     }
 }

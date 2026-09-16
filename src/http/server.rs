@@ -13,6 +13,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use super::handlers::collections as collection_handlers;
 use super::handlers::config as config_handlers;
+use super::handlers::media as media_handlers;
 use super::handlers::plugins as plugin_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::samples as sample_handlers;
@@ -294,6 +295,45 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/config/validate",
             get(config_handlers::validate_config),
+        )
+        .route(
+            "/api/v1/media/cover-art",
+            post(media_handlers::upload_cover_art),
+        )
+        .route(
+            "/api/v1/media/audio-file",
+            post(media_handlers::upload_audio_file),
+        )
+        .route("/api/v1/media", get(media_handlers::list_media_files))
+        .route(
+            "/api/v1/media/by-type",
+            get(media_handlers::get_media_files_by_type),
+        )
+        .route(
+            "/api/v1/media/orphaned",
+            get(media_handlers::get_orphaned_media_files),
+        )
+        .route(
+            "/api/v1/media/statistics",
+            get(media_handlers::get_media_statistics),
+        )
+        .route(
+            "/api/v1/media/cleanup-orphaned",
+            post(media_handlers::cleanup_orphaned_media),
+        )
+        .route(
+            "/api/v1/media/:media_file_id",
+            get(media_handlers::download_media).delete(media_handlers::delete_media),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/cover-art",
+            put(media_handlers::set_collection_cover_art)
+                .delete(media_handlers::remove_collection_cover_art),
+        )
+        .route(
+            "/api/v1/projects/:project_id/audio-file",
+            put(media_handlers::set_project_audio_file)
+                .delete(media_handlers::remove_project_audio_file),
         )
         .layer(cors)
         .with_state(state)
