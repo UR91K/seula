@@ -17,6 +17,11 @@ impl Config {
             return Err(ConfigError::PortOutOfRange(0));
         }
 
+        // Validate HTTP port range (u16 is already limited to 0-65535, so just check for 0)
+        if self.http_port == 0 {
+            return Err(ConfigError::PortOutOfRange(0));
+        }
+
         // Validate log level
         let valid_log_levels = ["error", "warn", "info", "debug", "trace"];
         if !valid_log_levels.contains(&self.log_level.as_str()) {

@@ -1,6 +1,15 @@
 use tracing::info;
 use std::env;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::Mutex;
 use seula::config::CONFIG;
+use seula::database::ProjectDatabase;
+use seula::grpc::common::ScanStatus;
+use seula::http;
+use seula::media::{MediaConfig, MediaStorageManager};
+use seula::services::{Services, SystemService};
 use seula::{grpc, tray};
 use seula::grpc::projects::project_service_server;
 use seula::grpc::search::search_service_server;
@@ -48,23 +57,101 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+/// The state every adapter (gRPC, HTTP) runs on top of, built once so all of them share
+/// the same database connection and the same in-memory `SystemService` state (scan
+/// status, watcher handle) rather than each opening their own -- see ADR-0024.
+struct SharedState {
+    db: Arc<Mutex<ProjectDatabase>>,
+    media_storage: Arc<MediaStorageManager>,
+    services: Services,
+    system_service: SystemService,
+}
+
+fn build_shared_state() -> Result<SharedState, Box<dyn std::error::Error>> {
+    let config = CONFIG
+        .as_ref()
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+
+    let database_path = config
+        .database_path
+        .as_ref()
+        .expect("Database path should be set by config initialization");
+    let db_path = PathBuf::from(database_path);
+    let db = ProjectDatabase::new(db_path)
+        .map_err(|e| format!("Failed to initialize database: {}", e))?;
+    let db = Arc::new(Mutex::new(db));
+
+    let media_config = MediaConfig::from(config);
+    let media_storage = Arc::new(MediaStorageManager::new(
+        PathBuf::from(&config.media_storage_dir),
+        media_config,
+    )?);
+
+    let scan_status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
+    let scan_progress = Arc::new(Mutex::new(None));
+    let watcher = Arc::new(Mutex::new(None));
+    let watcher_events = Arc::new(Mutex::new(None));
+    let start_time = Instant::now();
+    let services = Services::new(Arc::clone(&db), Arc::clone(&media_storage));
+    let system_service = SystemService::new(
+        Arc::clone(&db),
+        scan_status,
+        scan_progress,
+        watcher,
+        watcher_events,
+        start_time,
+    );
+
+    Ok(SharedState {
+        db,
+        media_storage,
+        services,
+        system_service,
+    })
+}
+
 #[allow(unused)] //TODO: Remove this once it is used.
 async fn run_cli_mode() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting Seula gRPC Server (CLI mode)");
-    start_grpc_server().await
+    let state = build_shared_state()?;
+    start_grpc_server(state).await
 }
 
 async fn run_server_mode() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting Seula gRPC Server (server-only mode)");
-    start_grpc_server().await
+
+    let state = build_shared_state()?;
+    let http_services = state.services.clone();
+    let http_system_service = state.system_service.clone();
+    let http_handle = tokio::spawn(async move {
+        if let Err(e) = start_http_server(http_services, http_system_service).await {
+            eprintln!("HTTP server error: {}", e);
+        }
+    });
+
+    let grpc_result = start_grpc_server(state).await;
+    http_handle.abort();
+    grpc_result
 }
 
 async fn run_tray_mode() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting Seula gRPC Server (tray mode)");
 
+    let state = build_shared_state()?;
+
+    // Start the HTTP server in a background task first, since starting the gRPC
+    // server below consumes `state`.
+    let http_services = state.services.clone();
+    let http_system_service = state.system_service.clone();
+    let http_handle = tokio::spawn(async move {
+        if let Err(e) = start_http_server(http_services, http_system_service).await {
+            eprintln!("HTTP server error: {}", e);
+        }
+    });
+
     // Start the gRPC server in a background task
     let server_handle = tokio::spawn(async {
-        if let Err(e) = start_grpc_server().await {
+        if let Err(e) = start_grpc_server(state).await {
             eprintln!("gRPC server error: {}", e);
         }
     });
@@ -88,20 +175,25 @@ async fn run_tray_mode() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // If we get here, the user quit the tray, so abort the server
+    // If we get here, the user quit the tray, so abort the servers
     server_handle.abort();
+    http_handle.abort();
 
     Ok(())
 }
 
-async fn start_grpc_server() -> Result<(), Box<dyn std::error::Error>> {
+async fn start_grpc_server(state: SharedState) -> Result<(), Box<dyn std::error::Error>> {
     let config = CONFIG.as_ref().map_err(|e| {
         eprintln!("Failed to load configuration: {}", e);
         e
     })?;
 
-    // Create the gRPC server
-    let server = grpc::server::StudioProjectManagerServer::new().await?;
+    let server = grpc::server::StudioProjectManagerServer::from_shared(
+        state.db,
+        state.media_storage,
+        state.services,
+        state.system_service,
+    );
 
     // Set up the gRPC service
     let addr = format!("127.0.0.1:{}", config.grpc_port).parse()?;
@@ -121,6 +213,25 @@ async fn start_grpc_server() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(scanning_service_server::ScanningServiceServer::new(server.clone()))
         .add_service(watcher_service_server::WatcherServiceServer::new(server))
         .serve(addr)
+        .await?;
+
+    Ok(())
+}
+
+async fn start_http_server(services: Services, system_service: SystemService) -> Result<(), Box<dyn std::error::Error>> {
+    let config = CONFIG.as_ref().map_err(|e| {
+        eprintln!("Failed to load configuration: {}", e);
+        e
+    })?;
+
+    let state = http::state::AppState::new(services, system_service);
+    let router = http::server::build_router(state);
+
+    let addr = format!("127.0.0.1:{}", config.http_port()).parse::<std::net::SocketAddr>()?;
+    info!("HTTP server listening on {}", addr);
+
+    axum::Server::bind(&addr)
+        .serve(router.into_make_service())
         .await?;
 
     Ok(())

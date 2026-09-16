@@ -4,6 +4,10 @@ use dirs;
 /// Default gRPC port
 pub const DEFAULT_GRPC_PORT: u16 = 50051;
 
+/// Default HTTP port (ADR-0024). Distinct from `DEFAULT_GRPC_PORT` so the two
+/// servers can run side by side without a config change.
+pub const DEFAULT_HTTP_PORT: u16 = 50052;
+
 /// Default log level
 pub const DEFAULT_LOG_LEVEL: &str = "error";
 
@@ -41,6 +45,9 @@ paths = [
 # gRPC server configuration
 grpc_port = {}
 
+# HTTP server configuration (can be overridden by STUDIO_PROJECT_MANAGER_HTTP_PORT env var)
+http_port = {}
+
 # Logging configuration
 # Options: error, warn, info, debug, trace
 log_level = "{}"
@@ -60,6 +67,7 @@ vst_search_paths = []
 # vst_scan_timeout_secs = 30
 "#,
         DEFAULT_GRPC_PORT,
+        DEFAULT_HTTP_PORT,
         DEFAULT_LOG_LEVEL,
         media_storage_path.display()
     );
@@ -126,6 +134,10 @@ pub fn default_max_audio_file_size() -> Option<u32> {
 
 pub fn default_grpc_port() -> u16 {
     DEFAULT_GRPC_PORT
+}
+
+pub fn default_http_port() -> u16 {
+    DEFAULT_HTTP_PORT
 }
 
 pub fn default_database_path() -> Option<String> {

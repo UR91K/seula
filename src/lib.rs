@@ -42,6 +42,7 @@ pub mod config;
 pub mod database;
 pub mod error;
 pub mod grpc;
+pub mod http;
 pub mod project;
 pub mod media;
 pub mod models;

@@ -77,9 +77,22 @@ impl StudioProjectManagerServer {
             start_time,
         );
 
-        Ok(Self {
-            db: Arc::clone(&db),
-            media_storage: Arc::clone(&media_storage),
+        Ok(Self::from_shared(db, media_storage, services, system_service))
+    }
+
+    /// Builds the server from already-constructed shared state, so a caller that also
+    /// runs another adapter over the same data (the HTTP router, ADR-0024) can build
+    /// `Services`/`SystemService` once and hand the same instances to both -- one
+    /// database, one `Arc<Mutex<_>>`, no adapter opening its own connection.
+    pub fn from_shared(
+        db: Arc<Mutex<ProjectDatabase>>,
+        media_storage: Arc<MediaStorageManager>,
+        services: Services,
+        system_service: SystemService,
+    ) -> Self {
+        Self {
+            db,
+            media_storage,
             projects_handler: ProjectsHandler::new(services.projects.clone()),
             search_handler: SearchHandler::new(services.search.clone()),
             collections_handler: CollectionsHandler::new(services.collections.clone()),
@@ -90,7 +103,7 @@ impl StudioProjectManagerServer {
             plugins_handler: PluginsHandler::new(services.plugins.clone()),
             samples_handler: SamplesHandler::new(services.samples.clone()),
             config_handler: ConfigHandler::new(services.config.clone()),
-        })
+        }
     }
 
     pub fn new_for_test(db: ProjectDatabase, media_storage: MediaStorageManager) -> Self {

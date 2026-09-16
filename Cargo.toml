@@ -42,6 +42,11 @@ sha2 = "0.10"              # File hashing
 chrono = { version = "0.4.39", features = ["serde"] }
 tonic = "0.10"
 prost = "0.12"
+# HTTP router (ADR-0024). Pinned to 0.6 because axum v0.6.20 / hyper v0.14 / tower v0.4
+# are already transitively present in this tree via tonic 0.10; axum 0.7+ pulls hyper 1.0
+# alongside it, doubling the hyper/tower generations in the build.
+axum = "0.6"
+tower-http = { version = "0.4", features = ["cors"] }
 tokio-stream = "0.1"
 async-trait = "0.1"
 strum = "0.27.1"

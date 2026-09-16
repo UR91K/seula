@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 // Re-export constants from submodules for backward compatibility
 pub use defaults::{
-    DEFAULT_GRPC_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_COVER_ART_SIZE_MB, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
+    DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_COVER_ART_SIZE_MB, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
 };
 pub use paths::MAX_PATH_LENGTH;
 pub use loader::MAX_DIRECTORY_TRAVERSAL_DEPTH;
@@ -52,6 +52,9 @@ pub struct Config {
     /// gRPC server port (can be overridden by STUDIO_PROJECT_MANAGER_GRPC_PORT env var)
     #[serde(default = "defaults::default_grpc_port")]
     pub grpc_port: u16,
+    /// HTTP server port (can be overridden by STUDIO_PROJECT_MANAGER_HTTP_PORT env var)
+    #[serde(default = "defaults::default_http_port")]
+    pub http_port: u16,
     /// Logging level
     #[serde(default = "defaults::default_log_level")]
     pub log_level: String,
@@ -81,6 +84,14 @@ impl Config {
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(self.grpc_port)
+    }
+
+    /// Returns the HTTP port with environment variable override support
+    pub fn http_port(&self) -> u16 {
+        std::env::var("STUDIO_PROJECT_MANAGER_HTTP_PORT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(self.http_port)
     }
 
     /// Returns the log level with environment variable override support
