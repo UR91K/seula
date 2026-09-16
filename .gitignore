@@ -8,3 +8,4 @@ tests/MIGRATION_GUIDE.md
 spec.md
 appdata_roaming_junction/
 test_data/
+*.db
