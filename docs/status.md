@@ -3,7 +3,7 @@
 The single source of truth for what is done, in progress, deliberately out of scope, or
 known-broken. If status appears anywhere else in this repo, that copy is wrong.
 
-Last reviewed: 2026-09-15.
+Last reviewed: 2026-09-16.
 
 ## Subsystems
 
@@ -64,13 +64,18 @@ every open — and a bump discards the user's database (ADR-0011).
 
 ## Known issues
 
+Five tests are `#[ignore]`d as of 2026-09-16 — three scan the real configured project
+folders, two are hardcoded to paths on the maintainer's machine. `cargo test --workspace`
+no longer runs them; use `cargo test --workspace --tests -- --ignored` for the heavy
+pass. See CLAUDE.md.
+
 | Issue | Where | Severity |
 |---|---|---|
 | `test_process_projects_integration` fails on `._*.als` AppleDouble sidecars found in the configured project folders. They parse as `.als`, fail, and never reach the DB — while the test asserts every discovered `.als` is present. Environment-dependent. Fixing it means deciding whether the scanner should skip `._` files. | `tests/integration/scanning.rs` | Low, but it keeps the suite red |
-| `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. | `tests/integration/scanning.rs` | Low |
+| `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. Both are now `#[ignore]`d (2026-09-16, CLAUDE.md) so this only surfaces under `cargo test --tests -- --ignored`. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
-| `test_empty_plugin_name`, `test_whitespace_only_plugin_name`, and `test_psp_springbox_plugin_from_real_project` fail on `main` as of the ADR-0006/ADR-0012 work (commit `d762db5`, predates any DAW-generalisation changes). The first two assert a blank plugin name gets filled in "from the database" (`plugin.name == "Pro-Q 3"`) — the Ableton-database lookup that filled that in was removed by ADR-0006, and the test wasn't updated to match. The third filters by `installed = false`, which ADR-0012 made not the same as "never scanned" (`NULL`); an unscanned plugin no longer matches that filter. Discovered while verifying the DAW-generalisation refactor (ADR-0014/0015/0016); not touched by it. | `tests/scan/parser/plugins.rs` | Low, but it keeps the suite red |
+| `plugin_count` in the `plugin vendors` / `plugin formats` aggregates counts plugin-project pairs, not plugins — the usage subquery groups by `(plugin_id, project_id)`, the `LEFT JOIN` multiplies each plugin row by its project count, and `COUNT(*)` counts the multiplied rows. A plugin used in 5 projects counts as 5. Found 2026-09-16 while adding the unscanned count to these two aggregates (`61cfc23`, ADR-0025's follow-up); the new reconciliation test (`vendor_and_format_aggregates_account_for_unscanned_plugins`) doesn't catch it because installed/missing/unknown all inflate together and still sum to the (wrong) `plugin_count`. `seula plugin stats` counts correctly and disagrees with both. Fix is grouping the usage subquery by `plugin_id` alone and computing `unique_projects_using` inside it. | `src/database/plugins.rs` (`vendor_stats`/`format_stats` CTEs) | Medium — user-visible wrong numbers, not just a red test |
 
 ## Documentation triage
 
