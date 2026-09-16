@@ -74,11 +74,14 @@ every open — and a bump discards the user's database (ADR-0011).
 
 ## Documentation triage
 
+Resolved:
+
+- **`.kiro/`** — moved into `docs/archive/.kiro/` (2026-09-16). Superseded by
+  `crates/vst-meta` and `CLAUDE.md`/`architecture/`; kept for history rather than
+  deleted, same treatment as the rest of `docs/archive/`.
+
 Undecided, needs a call from the maintainer:
 
-- **`.kiro/`** — steering files plus a spec for the plugin subprocess that
-  `crates/vst-meta` superseded. `steering/structure.md` is already stale (no
-  `src/scan/plugins/`). Overlaps `CLAUDE.md` and `architecture/`. Keep, or retire?
 - **`FRONTEND_SPEC.md`, `REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md`,
   `TUI_PROJECT_PLAN.md`** — root-level planning docs. No corresponding code found for
   the TUI ones; `src/cli/interactive.rs` is a rustyline prompt, not a TUI. Aspirational,
