@@ -16,6 +16,7 @@ Last reviewed: 2026-09-16.
 | FTS5 search | **Done** | Operators: `plugin:`, `bpm:`, `key:`, `missing:` |
 | CLI | **Done** | 33+ commands, table/JSON/CSV via `src/cli/output.rs` |
 | gRPC API | **Done** | 12 services in `proto/services/` |
+| HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
 | Tray mode | **Done** | `src/tray.rs`; default when run with no subcommand |
 | File watcher | **Done** | `src/watcher/`, streams over gRPC |
 | Tags / collections / tasks / notes | **Done** | |
@@ -33,6 +34,15 @@ Last reviewed: 2026-09-16.
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
 ## Next
+
+ADR-0024's HTTP router landed in full (2026-09-16): skeleton, then every domain in the
+`Services` aggregator plus `system` (scan status, project add, watcher control, the two
+SSE streaming endpoints, statistics with CSV export). Each domain has its own hand-written
+DTOs in `src/http/dto/`, independent of the generated proto types, per the ADR.
+
+ADR-0028 records a tentative maintainer direction to retire the CLI and gRPC server
+entirely once this surface is proven out, leaving a pure Axum API for a web frontend
+and/or Tauri. Not decided or started — see that ADR before removing anything.
 
 The plugin migration is complete. Phase 1 (worker + supervisor) landed in `b261200`;
 phase 2 followed in three steps — schema and persistence, the first-run scan, and

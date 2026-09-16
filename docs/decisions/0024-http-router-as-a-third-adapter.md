@@ -1,6 +1,6 @@
 # 0024. An axum HTTP router as a third adapter over the service layer
 
-- **Status:** Accepted
+- **Status:** Accepted — implemented 2026-09-16
 - **Recognized:** ADR-0018, which introduced the service layer partly so this surface
   would not become a fourth copy of the business logic
 - **Decided:** 2026-09-16
