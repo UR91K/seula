@@ -23,6 +23,7 @@ impl TableDisplay for ScanResults {
     }
 }
 use crate::cli::CliError;
+use crate::database::batch::BatchInsertManager;
 use crate::database::ProjectDatabase;
 use crate::project::Project;
 use crate::process_projects_with_progress;
@@ -209,32 +210,45 @@ impl ScanCommand {
         Ok(results)
     }
 
+    /// Inserts all successfully-parsed projects in a single `BatchInsertManager`
+    /// transaction, matching the default (configured-paths) scan flow instead of
+    /// the sequential per-project `insert_project` loop this used to run. One
+    /// consequence: a DB-level failure now fails the whole batch rather than just
+    /// the one project that hit it -- the same trade-off the default flow already
+    /// accepts.
     async fn store_results(
         &self,
         db: &Arc<TokioMutex<ProjectDatabase>>,
         results: Vec<Result<(PathBuf, Project), (PathBuf, ParseError)>>,
     ) -> Result<(usize, usize), CliError> {
-        let mut db_guard = db.lock().await;
-        let mut success_count = 0;
+        let mut successful_projects = Vec::new();
         let mut error_count = 0;
 
         for result in results {
             match result {
                 Ok((path, live_set)) => {
-                    match db_guard.insert_project(&live_set) {
-                        Ok(_) => {
-                            success_count += 1;
-                            println!("✓ Stored: {}", path.display());
-                        }
-                        Err(e) => {
-                            error_count += 1;
-                            eprintln!("✗ Failed to store {}: {}", path.display(), e);
-                        }
-                    }
+                    println!("Parsed: {}", path.display());
+                    successful_projects.push(live_set);
                 }
                 Err((path, err)) => {
                     error_count += 1;
                     eprintln!("✗ Failed to parse {}: {}", path.display(), err);
+                }
+            }
+        }
+
+        let success_count = successful_projects.len();
+        if success_count > 0 {
+            let mut db_guard = db.lock().await;
+            let projects = Arc::new(successful_projects);
+            let mut batch_manager = BatchInsertManager::new(&mut db_guard.conn, projects);
+            match batch_manager.execute() {
+                Ok(stats) => {
+                    println!("✓ Stored {} project(s) in database", stats.projects_inserted);
+                }
+                Err(e) => {
+                    eprintln!("✗ Failed to store batch: {}", e);
+                    return Ok((0, success_count + error_count));
                 }
             }
         }

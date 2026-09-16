@@ -9,6 +9,7 @@ use tonic::{Code, Request, Response, Status};
 
 use super::utils::convert_live_set_to_proto;
 use crate::config::CONFIG;
+use crate::database::batch::BatchInsertManager;
 use crate::database::ProjectDatabase;
 use super::super::system::*;
 use super::super::scanning::*;
@@ -197,35 +198,53 @@ impl SystemHandler {
         match Project::new(file_path.clone()) {
             Ok(live_set) => {
                 debug!("Successfully parsed project: {}", live_set.name);
+                let project_id = live_set.id.to_string();
 
-                // Insert into database
+                // Insert via BatchInsertManager (a one-element batch), matching the
+                // default scan flow instead of the standalone insert_project this
+                // used to call directly.
                 let mut db = self.db.lock().await;
-                match db.insert_project(&live_set) {
-                    Ok(()) => {
-                        debug!(
-                            "Successfully inserted project into database: {}",
-                            live_set.name
-                        );
+                let mut batch_manager =
+                    BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(vec![live_set]));
+                match batch_manager.execute() {
+                    Ok(_) => {
+                        debug!("Successfully inserted project into database: {}", project_id);
 
-                        // Convert to proto project
-                        match convert_live_set_to_proto(live_set, &mut *db) {
-                            Ok(proto_project) => {
-                                info!("Successfully added single project: {}", req.file_path);
-                                Ok(Response::new(AddSingleProjectResponse {
-                                    success: true,
-                                    project: Some(proto_project),
-                                    error_message: None,
-                                }))
-                            }
+                        match db.get_project_by_id(&project_id) {
+                            Ok(Some(inserted)) => match convert_live_set_to_proto(inserted, &mut *db) {
+                                Ok(proto_project) => {
+                                    info!("Successfully added single project: {}", req.file_path);
+                                    Ok(Response::new(AddSingleProjectResponse {
+                                        success: true,
+                                        project: Some(proto_project),
+                                        error_message: None,
+                                    }))
+                                }
+                                Err(e) => {
+                                    error!("Failed to convert project to proto: {:?}", e);
+                                    Ok(Response::new(AddSingleProjectResponse {
+                                        success: false,
+                                        project: None,
+                                        error_message: Some(format!(
+                                            "Failed to convert project: {}",
+                                            e
+                                        )),
+                                    }))
+                                }
+                            },
+                            Ok(None) => Ok(Response::new(AddSingleProjectResponse {
+                                success: false,
+                                project: None,
+                                error_message: Some(
+                                    "Project inserted but not found".to_string(),
+                                ),
+                            })),
                             Err(e) => {
-                                error!("Failed to convert project to proto: {:?}", e);
+                                error!("Failed to re-fetch inserted project: {:?}", e);
                                 Ok(Response::new(AddSingleProjectResponse {
                                     success: false,
                                     project: None,
-                                    error_message: Some(format!(
-                                        "Failed to convert project: {}",
-                                        e
-                                    )),
+                                    error_message: Some(format!("Database error: {}", e)),
                                 }))
                             }
                         }
@@ -258,84 +277,99 @@ impl SystemHandler {
         debug!("AddMultipleProjects request: {:?}", request);
 
         let req = request.into_inner();
-        let mut projects = Vec::new();
         let mut failed_paths = Vec::new();
         let mut error_messages = Vec::new();
-        let mut successful_imports = 0;
-        let mut failed_imports = 0;
         let total_requested = req.file_paths.len() as i32;
 
-        // Process each file path
+        // Parse each file individually -- a bad file shouldn't block the others.
+        let mut parsed: Vec<(String, Project)> = Vec::new();
         for file_path_str in req.file_paths {
             let file_path = PathBuf::from(&file_path_str);
 
-            // Validate file path
             if !file_path.exists() {
                 failed_paths.push(file_path_str.clone());
                 error_messages.push("File does not exist".to_string());
-                failed_imports += 1;
                 continue;
             }
 
-            // Validate file extension
             if !file_path.extension().map_or(false, |ext| ext == "als") {
                 failed_paths.push(file_path_str.clone());
                 error_messages.push("File must have .als extension".to_string());
-                failed_imports += 1;
                 continue;
             }
 
-            // Parse the file
             match Project::new(file_path.clone()) {
                 Ok(live_set) => {
                     debug!("Successfully parsed project: {}", live_set.name);
-
-                    // Insert into database
-                    let mut db = self.db.lock().await;
-                    match db.insert_project(&live_set) {
-                        Ok(()) => {
-                            debug!(
-                                "Successfully inserted project into database: {}",
-                                live_set.name
-                            );
-
-                            // Convert to proto project
-                            match convert_live_set_to_proto(live_set, &mut *db) {
-                                Ok(proto_project) => {
-                                    projects.push(proto_project);
-                                    successful_imports += 1;
-                                    info!("Successfully added project: {}", file_path_str);
-                                }
-                                Err(e) => {
-                                    error!("Failed to convert project to proto: {:?}", e);
-                                    failed_paths.push(file_path_str.clone());
-                                    error_messages.push(format!("Failed to convert project: {}", e));
-                                    failed_imports += 1;
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to insert project into database: {:?}", e);
-                            failed_paths.push(file_path_str.clone());
-                            error_messages.push(format!("Database error: {}", e));
-                            failed_imports += 1;
-                        }
-                    }
+                    parsed.push((file_path_str, live_set));
                 }
                 Err(e) => {
                     error!("Failed to parse project file {}: {:?}", file_path_str, e);
                     failed_paths.push(file_path_str.clone());
                     error_messages.push(format!("Failed to parse project: {}", e));
-                    failed_imports += 1;
                 }
             }
         }
 
-        let success = failed_imports == 0; // Consider it successful if no projects failed to import
+        // Insert everything that parsed in one BatchInsertManager transaction,
+        // matching the default scan flow instead of the sequential per-project
+        // insert_project calls (each re-acquiring the DB lock) this used to run.
+        // A DB-level failure now fails the whole batch, not just the one project
+        // that hit it -- the same trade-off the default flow already accepts.
+        let mut proto_projects = Vec::new();
+        if !parsed.is_empty() {
+            let path_ids: Vec<(String, String)> = parsed
+                .iter()
+                .map(|(path, p)| (path.clone(), p.id.to_string()))
+                .collect();
+            let projects_to_insert: Vec<Project> = parsed.into_iter().map(|(_, p)| p).collect();
+
+            let mut db = self.db.lock().await;
+            let mut batch_manager =
+                BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(projects_to_insert));
+            match batch_manager.execute() {
+                Ok(_) => {
+                    for (path, project_id) in path_ids {
+                        match db.get_project_by_id(&project_id) {
+                            Ok(Some(inserted)) => match convert_live_set_to_proto(inserted, &mut *db) {
+                                Ok(proto_project) => {
+                                    proto_projects.push(proto_project);
+                                    info!("Successfully added project: {}", path);
+                                }
+                                Err(e) => {
+                                    error!("Failed to convert project to proto: {:?}", e);
+                                    failed_paths.push(path);
+                                    error_messages.push(format!("Failed to convert project: {}", e));
+                                }
+                            },
+                            Ok(None) => {
+                                failed_paths.push(path);
+                                error_messages.push("Project inserted but not found".to_string());
+                            }
+                            Err(e) => {
+                                failed_paths.push(path);
+                                error_messages.push(format!("Database error: {}", e));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to insert project batch: {:?}", e);
+                    for (path, _) in path_ids {
+                        failed_paths.push(path);
+                        error_messages.push(format!("Database error: {}", e));
+                    }
+                }
+            }
+        }
+
+        let successful_imports = proto_projects.len() as i32;
+        let failed_imports = total_requested - successful_imports;
+        let success = failed_imports == 0;
 
         Ok(Response::new(AddMultipleProjectsResponse {
             success,
-            projects,
+            projects: proto_projects,
             failed_paths,
             error_messages,
             total_requested,
