@@ -11,6 +11,7 @@ use axum::{Json, Router};
 use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+use super::handlers::collections as collection_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::tags as tag_handlers;
 use super::state::AppState;
@@ -110,6 +111,57 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/projects/:project_id/rescan",
             post(project_handlers::rescan_project),
+        )
+        .route(
+            "/api/v1/collections",
+            get(collection_handlers::list_collections).post(collection_handlers::create_collection),
+        )
+        .route(
+            "/api/v1/collections/search",
+            get(collection_handlers::search_collections),
+        )
+        .route(
+            "/api/v1/collections/batch-create",
+            post(collection_handlers::batch_create_collection_from),
+        )
+        .route(
+            "/api/v1/collections/:collection_id",
+            get(collection_handlers::get_collection)
+                .put(collection_handlers::update_collection)
+                .delete(collection_handlers::delete_collection),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/duplicate",
+            post(collection_handlers::duplicate_collection),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/projects",
+            get(collection_handlers::get_collection_projects),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/projects/:project_id",
+            post(collection_handlers::add_project_to_collection)
+                .delete(collection_handlers::remove_project_from_collection),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/reorder",
+            put(collection_handlers::reorder_collection),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/tasks",
+            get(collection_handlers::get_collection_tasks),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/statistics",
+            get(collection_handlers::get_collection_statistics),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/batch-add",
+            post(collection_handlers::batch_add_to_collection),
+        )
+        .route(
+            "/api/v1/collections/:collection_id/batch-remove",
+            post(collection_handlers::batch_remove_from_collection),
         )
         .layer(cors)
         .with_state(state)
