@@ -29,7 +29,9 @@ Last reviewed: 2026-09-16.
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
 | `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
-| Analytics dashboard frontend | **Not started** | `FRONTEND_SPEC.md`, status unverified |
+| Web frontend | **Mockups in progress** | Static HTML under `docs/mockups/`. Shape in `docs/architecture/frontend.md`. ADR-0029, ADR-0031. No React yet |
+| Tauri as OS bridge | **Trial pending** | Branch not yet started. Decides open-in-Ableton, show-in-Explorer, path import. ADR-0030 |
+| UI preferences endpoint | **Not started** | Get/set blob over `app_state`. ADR-0031 |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
@@ -109,12 +111,16 @@ Resolved:
   `crates/vst-meta` and `CLAUDE.md`/`architecture/`; kept for history rather than
   deleted, same treatment as the rest of `docs/archive/`.
 
+- **`FRONTEND_SPEC.md`** — verified by the maintainer on 2026-09-16 as still fairly
+  accurate (written 2025-08-14). Restated against the HTTP surface in
+  `docs/architecture/frontend.md`; the archive copy is frozen. ADR-0029.
+
 Undecided, needs a call from the maintainer:
 
-- **`FRONTEND_SPEC.md`, `REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md`,
-  `TUI_PROJECT_PLAN.md`** — root-level planning docs. No corresponding code found for
-  the TUI ones; `src/cli/interactive.rs` is a rustyline prompt, not a TUI. Aspirational,
-  abandoned, or active?
+- **`REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md`, `TUI_PROJECT_PLAN.md`** —
+  planning docs now in `docs/archive/`. No corresponding code found for the TUI ones;
+  `src/cli/interactive.rs` is a rustyline prompt, not a TUI. Aspirational, abandoned, or
+  active?
 - **`docs/archive/`** — two AI chat transcripts and an empty file, archived rather than
   deleted. `plugin_scanner_plan.md` proposes a C++ binary and is actively misleading.
   Git history preserves them; deleting is safe.

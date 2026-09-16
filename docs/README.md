@@ -67,7 +67,8 @@ It means one convention matters:
 
 `architecture/overview.md` is the map. `architecture/plugins.md` covers plugin
 identity and scanning, which is the most intricate part of the system and the one most
-likely to be misunderstood.
+likely to be misunderstood. `architecture/frontend.md` is the web frontend's shape,
+mapped onto the HTTP routes; the static mockups it describes live in `mockups/`.
 
 Architecture docs describe *shape*. When you catch yourself explaining *why* a shape was
 chosen, that belongs in an ADR — link to it instead.
@@ -85,6 +86,7 @@ It has deliberately been left alone — running two documentation systems in par
 what produced the mess this one replaces, so it needs a decision rather than an edit.
 See the triage entry in `status.md`.
 
-`FRONTEND_SPEC.md`, `REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md` and
-`TUI_PROJECT_PLAN.md` at the repo root are older planning documents whose status has not
-been verified. Also listed for triage in `status.md`.
+`REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md` and `TUI_PROJECT_PLAN.md` in
+`archive/` are older planning documents whose status has not been verified. Listed for
+triage in `status.md`. `archive/FRONTEND_SPEC.md` has been verified and restated in
+`architecture/frontend.md`; the archive copy is kept frozen as the source.

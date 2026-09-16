@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plugins — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item active"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <h1>Plugins</h1>
+      <div class="search-box">
+        <i data-lucide="search" class="icon"></i>
+        <input type="text" placeholder="Search by name or vendor">
+      </div>
+      <div class="titlebar-spacer"></div>
+    </header>
+
+    <div class="filter-bar">
+      <select class="select">
+        <option>All formats</option>
+        <option>VST3</option>
+        <option>VST2</option>
+        <option>AU</option>
+        <option>CLAP</option>
+      </select>
+      <select class="select">
+        <option>All vendors</option>
+        <option>Xfer Records</option>
+        <option>Native Instruments</option>
+        <option>FabFilter</option>
+        <option>Valhalla DSP</option>
+        <option>Spectrasonics</option>
+        <option>u-he</option>
+      </select>
+      <div class="tristate">
+        <button class="active">All</button>
+        <button>Installed</button>
+        <button>Missing</button>
+      </div>
+      <div class="titlebar-spacer"></div>
+      <span class="text-muted" style="font-size:12px;">Sort: <strong>Usage count &darr;</strong></span>
+    </div>
+
+    <div class="content">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="min-width:220px;"><div class="th-content">Name <i data-lucide="chevron-down" class="icon"></i></div></th>
+            <th style="width:170px;"><div class="th-content">Vendor</div></th>
+            <th style="width:80px;"><div class="th-content">Format</div></th>
+            <th style="width:110px;"><div class="th-content">Installed</div></th>
+            <th style="width:100px;"><div class="th-content">Usage</div></th>
+            <th style="width:100px;"><div class="th-content">Projects</div></th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td>
+              <div class="tooltip-wrap">
+                <span>Serum</span>
+                <div class="tooltip-bubble static-open">
+                  v1.36b13 &middot; SDK VST3 3.7.9 &middot; installed at C:\Program Files\Common Files\VST3\Serum.vst3
+                </div>
+              </div>
+            </td>
+            <td class="cell-muted">Xfer Records</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num"><span class="hover-count">88</span></td>
+            <td class="cell-num">61</td>
+          </tr>
+
+          <tr>
+            <td>Vital</td>
+            <td class="cell-muted">Matt Tytel</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">74</td>
+            <td class="cell-num">52</td>
+          </tr>
+
+          <tr>
+            <td>FabFilter Pro-Q 3</td>
+            <td class="cell-muted">FabFilter</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">143</td>
+            <td class="cell-num">97</td>
+          </tr>
+
+          <tr>
+            <td>Valhalla VintageVerb</td>
+            <td class="cell-muted">Valhalla DSP</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">102</td>
+            <td class="cell-num">80</td>
+          </tr>
+
+          <tr>
+            <td>Omnisphere</td>
+            <td class="cell-muted">Spectrasonics</td>
+            <td class="cell-mono">VST2</td>
+            <td><span class="status-pill missing"><span class="status-dot missing"></span>Missing</span></td>
+            <td class="cell-num">69</td>
+            <td class="cell-num">44</td>
+          </tr>
+
+          <tr>
+            <td>Kontakt 7</td>
+            <td class="cell-muted">Native Instruments</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill unknown"><span class="status-dot unknown"></span>Unknown</span></td>
+            <td class="cell-num">61</td>
+            <td class="cell-num">39</td>
+          </tr>
+
+          <tr>
+            <td>Diva</td>
+            <td class="cell-muted">u-he</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">37</td>
+            <td class="cell-num">29</td>
+          </tr>
+
+          <tr>
+            <td>RC-20 Retro Color</td>
+            <td class="cell-muted">XLN Audio</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">33</td>
+            <td class="cell-num">25</td>
+          </tr>
+
+          <tr>
+            <td>Massive X</td>
+            <td class="cell-muted">Native Instruments</td>
+            <td class="cell-mono">VST2</td>
+            <td><span class="status-pill missing"><span class="status-dot missing"></span>Missing</span></td>
+            <td class="cell-num">28</td>
+            <td class="cell-num">21</td>
+          </tr>
+
+          <tr>
+            <td>Pro-L 2</td>
+            <td class="cell-muted">FabFilter</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">96</td>
+            <td class="cell-num">70</td>
+          </tr>
+
+          <tr>
+            <td>Repro-5</td>
+            <td class="cell-muted">u-he</td>
+            <td class="cell-mono">CLAP</td>
+            <td><span class="status-pill unknown"><span class="status-dot unknown"></span>Unknown</span></td>
+            <td class="cell-num">14</td>
+            <td class="cell-num">11</td>
+          </tr>
+
+          <tr>
+            <td>Portal</td>
+            <td class="cell-muted">Output</td>
+            <td class="cell-mono">VST3</td>
+            <td><span class="status-pill installed"><span class="status-dot installed"></span>Installed</span></td>
+            <td class="cell-num">22</td>
+            <td class="cell-num">18</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-bar">
+      <span>1&ndash;12 of 96 plugins</span>
+      <label style="display:flex;align-items:center;gap:6px;">
+        Items per page
+        <select class="select">
+          <option>25</option>
+          <option selected>50</option>
+          <option>100</option>
+        </select>
+      </label>
+      <div class="pagination-controls">
+        <button class="page-btn"><i data-lucide="chevron-left" class="icon-sm"></i></button>
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn"><i data-lucide="chevron-right" class="icon-sm"></i></button>
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-segment"><i data-lucide="plug-zap" class="icon"></i>96 total</div>
+      <div class="statusbar-segment"><span class="status-dot installed"></span>71 installed</div>
+      <div class="statusbar-segment"><span class="status-dot missing"></span>17 missing</div>
+      <div class="statusbar-segment"><span class="status-dot unknown"></span>8 unknown</div>
+      <div class="statusbar-fill"></div>
+      <div class="statusbar-segment"><i data-lucide="building-2" class="icon"></i>23 vendors</div>
+    </footer>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

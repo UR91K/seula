@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seula mockups</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="index-page">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <i data-lucide="disc-3" class="icon-lg" style="color:var(--color-accent);"></i>
+    <h1 class="mt-0">Seula — frontend mockups</h1>
+  </div>
+  <p class="text-muted">Static HTML, no build step. See <code>README.md</code> in this directory for how to run these and the ambiguities that were resolved while making them.</p>
+
+  <ul class="index-list">
+    <li>
+      <a href="projects.html">
+        <div class="index-item-title"><i data-lucide="list-music" class="icon"></i>Projects</div>
+        <div class="index-item-desc">Main view, richest state: batch toolbar, details panel, inline rename, plugin hover list, context menu, archived filter, import.</div>
+      </a>
+    </li>
+    <li>
+      <a href="projects-tag-manager.html">
+        <div class="index-item-title"><i data-lucide="tags" class="icon"></i>Projects — Tag manager</div>
+        <div class="index-item-desc">Projects view with the tag manager modal open: create, rename, delete, usage counts.</div>
+      </a>
+    </li>
+    <li>
+      <a href="collections.html">
+        <div class="index-item-title"><i data-lucide="library-big" class="icon"></i>Collections</div>
+        <div class="index-item-desc">Grid of collection cards with a grid/list layout switcher.</div>
+      </a>
+    </li>
+    <li>
+      <a href="collection-detail.html">
+        <div class="index-item-title"><i data-lucide="disc" class="icon"></i>Collection detail</div>
+        <div class="index-item-desc">One collection opened: cover art, description, reorderable tracklist with a selection, consolidated task list.</div>
+      </a>
+    </li>
+    <li>
+      <a href="plugins.html">
+        <div class="index-item-title"><i data-lucide="plug-zap" class="icon"></i>Plugins</div>
+        <div class="index-item-desc">Paginated list, search, format/vendor filters, tri-state installed toggle, hover tooltip with version/SDK details.</div>
+      </a>
+    </li>
+    <li>
+      <a href="samples.html">
+        <div class="index-item-title"><i data-lucide="audio-lines" class="icon"></i>Samples</div>
+        <div class="index-item-desc">Same shape as plugins: presence status, truncated path tooltip, extension filter, context menu with show-in-Explorer.</div>
+      </a>
+    </li>
+    <li>
+      <a href="stats.html">
+        <div class="index-item-title"><i data-lucide="bar-chart-3" class="icon"></i>Stats</div>
+        <div class="index-item-desc">Dashboard: overview cards, musical analytics, plugin/sample analytics, activity, insights, collection/tag analytics, task completion.</div>
+      </a>
+    </li>
+  </ul>
+</div>
+<script>lucide.createIcons();</script>
+</body>
+</html>

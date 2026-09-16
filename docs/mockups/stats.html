@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stats — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item active"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <h1>Statistics</h1>
+      <div class="titlebar-spacer"></div>
+      <div class="titlebar-actions">
+        <button class="btn"><i data-lucide="download" class="icon"></i>Export CSV</button>
+      </div>
+    </header>
+
+    <div class="date-range-bar">
+      <i data-lucide="calendar-range" class="icon"></i>
+      <select class="select">
+        <option>All time</option>
+        <option>Last 12 months</option>
+        <option>Last 90 days</option>
+        <option>Custom range</option>
+      </select>
+      <select class="select">
+        <option>All collections</option>
+        <option>Ambient Sketches</option>
+        <option>Client: Nordvik</option>
+      </select>
+      <select class="select">
+        <option>All tags</option>
+        <option>house</option>
+        <option>techno</option>
+        <option>ambient</option>
+      </select>
+    </div>
+
+    <div class="content">
+      <div class="stats-page">
+
+        <section>
+          <div class="overview-cards">
+            <div class="stat-card"><span class="stat-card-label">Projects</span><span class="stat-card-value">214</span><span class="stat-card-sub">18 archived</span></div>
+            <div class="stat-card"><span class="stat-card-label">Collections</span><span class="stat-card-value">24</span><span class="stat-card-sub">avg 8.3 tracks</span></div>
+            <div class="stat-card"><span class="stat-card-label">Plugins</span><span class="stat-card-value">96</span><span class="stat-card-sub">71 installed</span></div>
+            <div class="stat-card"><span class="stat-card-label">Samples</span><span class="stat-card-value">512</span><span class="stat-card-sub">430 present</span></div>
+            <div class="stat-card"><span class="stat-card-label">Tags</span><span class="stat-card-value">18</span><span class="stat-card-sub">7 unused</span></div>
+            <div class="stat-card"><span class="stat-card-label">Tasks</span><span class="stat-card-value">342</span><span class="stat-card-sub">61% complete</span></div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="music-4" class="icon"></i>Musical analytics</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Tempo distribution</h3>
+              <div class="histogram">
+                <div class="histogram-col"><div class="histogram-bar" style="height:20%;"></div><span class="histogram-label">60-80</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:35%;"></div><span class="histogram-label">80-100</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:55%;"></div><span class="histogram-label">100-120</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:100%;"></div><span class="histogram-label">120-130</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:70%;"></div><span class="histogram-label">130-140</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:30%;"></div><span class="histogram-label">140-160</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:10%;"></div><span class="histogram-label">160+</span></div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Key distribution</h3>
+              <div class="donut-wrap">
+                <div class="donut" style="background:conic-gradient(var(--color-chip-1) 0 28%, var(--color-chip-2) 28% 48%, var(--color-chip-3) 48% 66%, var(--color-chip-4) 66% 82%, var(--color-chip-5) 82% 100%);"></div>
+                <div class="donut-legend">
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-1);"></span>A minor &middot; 28%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-2);"></span>F minor &middot; 20%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-3);"></span>C major &middot; 18%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-4);"></span>G minor &middot; 16%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-5);"></span>Other &middot; 18%</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Time signature distribution</h3>
+              <div class="donut-wrap">
+                <div class="donut" style="background:conic-gradient(var(--color-accent) 0 88%, var(--color-chip-4) 88% 96%, var(--color-chip-5) 96% 100%);"></div>
+                <div class="donut-legend">
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-accent);"></span>4/4 &middot; 88%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-4);"></span>3/4 &middot; 8%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-5);"></span>6/8 &middot; 4%</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Average project duration</h3>
+              <p style="font-size:32px; font-weight:700; margin:20px 0 4px;">4:22</p>
+              <p class="text-muted" style="font-size:12px;">Across 214 projects, excluding archived.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="plug-zap" class="icon"></i>Plugin and sample analytics</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Top 10 plugins by usage</h3>
+              <div class="bar-chart">
+                <div class="bar-row"><span class="bar-label">FabFilter Pro-Q 3</span><div class="bar-track"><div class="bar-fill" style="width:100%;"></div></div><span class="bar-value">143</span></div>
+                <div class="bar-row"><span class="bar-label">Valhalla VintageVerb</span><div class="bar-track"><div class="bar-fill" style="width:71%;"></div></div><span class="bar-value">102</span></div>
+                <div class="bar-row"><span class="bar-label">Pro-L 2</span><div class="bar-track"><div class="bar-fill" style="width:67%;"></div></div><span class="bar-value">96</span></div>
+                <div class="bar-row"><span class="bar-label">Serum</span><div class="bar-track"><div class="bar-fill" style="width:62%;"></div></div><span class="bar-value">88</span></div>
+                <div class="bar-row"><span class="bar-label">Vital</span><div class="bar-track"><div class="bar-fill" style="width:52%;"></div></div><span class="bar-value">74</span></div>
+                <div class="bar-row"><span class="bar-label">Omnisphere</span><div class="bar-track"><div class="bar-fill" style="width:48%;"></div></div><span class="bar-value">69</span></div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Top vendors</h3>
+              <div class="bar-chart">
+                <div class="bar-row"><span class="bar-label">FabFilter</span><div class="bar-track"><div class="bar-fill" style="width:100%;"></div></div><span class="bar-value">239</span></div>
+                <div class="bar-row"><span class="bar-label">Native Instr.</span><div class="bar-track"><div class="bar-fill" style="width:76%;"></div></div><span class="bar-value">182</span></div>
+                <div class="bar-row"><span class="bar-label">Valhalla DSP</span><div class="bar-track"><div class="bar-fill" style="width:43%;"></div></div><span class="bar-value">102</span></div>
+                <div class="bar-row"><span class="bar-label">Xfer Records</span><div class="bar-track"><div class="bar-fill" style="width:37%;"></div></div><span class="bar-value">88</span></div>
+                <div class="bar-row"><span class="bar-label">u-he</span><div class="bar-track"><div class="bar-fill" style="width:21%;"></div></div><span class="bar-value">51</span></div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Top 10 samples by usage</h3>
+              <div class="bar-chart">
+                <div class="bar-row"><span class="bar-label">kick_808_tight</span><div class="bar-track"><div class="bar-fill" style="width:100%;"></div></div><span class="bar-value">61</span></div>
+                <div class="bar-row"><span class="bar-label">subbass_drone_e</span><div class="bar-track"><div class="bar-fill" style="width:72%;"></div></div><span class="bar-value">44</span></div>
+                <div class="bar-row"><span class="bar-label">vinyl_crackle_04</span><div class="bar-track"><div class="bar-fill" style="width:56%;"></div></div><span class="bar-value">34</span></div>
+                <div class="bar-row"><span class="bar-label">tape_hiss_bed</span><div class="bar-track"><div class="bar-fill" style="width:25%;"></div></div><span class="bar-value">15</span></div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Averages per project</h3>
+              <p style="font-size:28px; font-weight:700; margin:16px 0 2px;">7.4 <span style="font-size:13px; font-weight:400; color:var(--color-text-tertiary);">plugins</span></p>
+              <p style="font-size:28px; font-weight:700; margin:8px 0 2px;">12.9 <span style="font-size:13px; font-weight:400; color:var(--color-text-tertiary);">samples</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="activity" class="icon"></i>Activity</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Projects created per year</h3>
+              <div class="histogram">
+                <div class="histogram-col"><div class="histogram-bar" style="height:22%;"></div><span class="histogram-label">2023</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:48%;"></div><span class="histogram-label">2024</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:100%;"></div><span class="histogram-label">2025</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:64%;"></div><span class="histogram-label">2026</span></div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Recent activity</h3>
+              <p class="text-muted" style="font-size:12px; margin-bottom:8px;">Last 26 weeks, one cell per week</p>
+              <div class="heatmap">
+                <div class="heatmap-cell l1"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell"></div><div class="heatmap-cell l3"></div>
+                <div class="heatmap-cell l4"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l1"></div><div class="heatmap-cell"></div>
+                <div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l1"></div>
+                <div class="heatmap-cell"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l1"></div>
+                <div class="heatmap-cell l4"></div><div class="heatmap-cell"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l3"></div>
+                <div class="heatmap-cell l1"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell"></div><div class="heatmap-cell l4"></div>
+                <div class="heatmap-cell l3"></div><div class="heatmap-cell l1"></div>
+              </div>
+              <p class="text-muted" style="font-size:12px; margin-top:10px;">Average 8.9 projects created per month.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="lightbulb" class="icon"></i>Insights</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Most complex projects (plugins + samples)</h3>
+              <ul class="insight-list">
+                <li><span><span class="insight-rank">1</span>Low Tide</span><span>57 items</span></li>
+                <li><span><span class="insight-rank">2</span>Paper Moons (Rework)</span><span>52 items</span></li>
+                <li><span><span class="insight-rank">3</span>Live Set Fragments — Nordvik Reprise</span><span>44 items</span></li>
+              </ul>
+            </div>
+            <div class="panel-block">
+              <h3>Duration extremes</h3>
+              <p style="font-size:13px; margin: 6px 0;"><strong>Longest:</strong> Live Set Fragments — Nordvik Reprise, 7:02</p>
+              <p style="font-size:13px; margin: 6px 0;"><strong>Under 40 seconds:</strong> 9 projects (4.2%)</p>
+            </div>
+            <div class="panel-block">
+              <h3>Ableton version distribution</h3>
+              <div class="donut-wrap">
+                <div class="donut" style="background:conic-gradient(var(--color-accent) 0 54%, var(--color-chip-3) 54% 82%, var(--color-chip-5) 82% 100%);"></div>
+                <div class="donut-legend">
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-accent);"></span>12.0.5 &middot; 54%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-3);"></span>11.3.13 &middot; 28%</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-chip-5);"></span>Older &middot; 18%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="library-big" class="icon"></i>Collection and tag analytics</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Collections</h3>
+              <p style="font-size:13px; margin: 6px 0;"><strong>Average projects per collection:</strong> 8.3</p>
+              <p style="font-size:13px; margin: 6px 0;"><strong>Largest:</strong> Scrapped Ideas, 33 projects</p>
+            </div>
+            <div class="panel-block">
+              <h3>Most used tags</h3>
+              <div class="bar-chart">
+                <div class="bar-row"><span class="bar-label">wip</span><div class="bar-track"><div class="bar-fill" style="width:100%;"></div></div><span class="bar-value">57</span></div>
+                <div class="bar-row"><span class="bar-label">house</span><div class="bar-track"><div class="bar-fill" style="width:74%;"></div></div><span class="bar-value">42</span></div>
+                <div class="bar-row"><span class="bar-label">techno</span><div class="bar-track"><div class="bar-fill" style="width:54%;"></div></div><span class="bar-value">31</span></div>
+                <div class="bar-row"><span class="bar-label">ambient</span><div class="bar-track"><div class="bar-fill" style="width:33%;"></div></div><span class="bar-value">19</span></div>
+                <div class="bar-row"><span class="bar-label">client</span><div class="bar-track"><div class="bar-fill" style="width:14%;"></div></div><span class="bar-value">8</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="stats-section-title"><i data-lucide="list-checks" class="icon"></i>Task completion</h2>
+          <div class="stats-grid">
+            <div class="panel-block">
+              <h3>Completed vs. pending</h3>
+              <div class="donut-wrap">
+                <div class="donut" style="background:conic-gradient(var(--color-success) 0 61%, var(--color-bg-input) 61% 100%);"></div>
+                <div class="donut-legend">
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-success);"></span>Completed &middot; 61% (209)</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--color-bg-input);"></span>Pending &middot; 39% (133)</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-block">
+              <h3>Completion rate over time</h3>
+              <div class="histogram">
+                <div class="histogram-col"><div class="histogram-bar" style="height:40%;"></div><span class="histogram-label">Q1</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:52%;"></div><span class="histogram-label">Q2</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:58%;"></div><span class="histogram-label">Q3</span></div>
+                <div class="histogram-col"><div class="histogram-bar" style="height:61%;"></div><span class="histogram-label">Q4</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-segment"><i data-lucide="calendar-range" class="icon"></i>All time</div>
+      <div class="statusbar-fill"></div>
+      <div class="statusbar-segment"><i data-lucide="refresh-cw" class="icon"></i>Updated just now</div>
+    </footer>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

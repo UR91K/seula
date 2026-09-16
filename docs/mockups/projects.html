@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Projects — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item active"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <h1>Projects</h1>
+      <div class="search-box">
+        <i data-lucide="search" class="icon"></i>
+        <input type="text" placeholder="Search projects (name, tag:, key:, tempo:...)">
+      </div>
+      <label class="toggle-switch" title="Show archived projects">
+        <span class="toggle-track"></span>
+        Show archived
+      </label>
+      <div class="titlebar-spacer"></div>
+      <div class="titlebar-actions">
+        <button class="btn">
+          <i data-lucide="folder-plus" class="icon"></i>
+          Add project
+          <span class="badge-native" title="Requires OS filesystem access; hidden in the browser build per ADR-0030"><i data-lucide="monitor" class="icon-sm"></i>native</span>
+        </button>
+        <button class="btn-icon active" title="Toggle details panel">
+          <i data-lucide="panel-right" class="icon"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="drop-hint">
+      <i data-lucide="upload" class="icon"></i>
+      <span>Drag an <strong>.als</strong> file here to import it from outside your watched folders.</span>
+      <span class="badge-native" style="margin-left:auto;" title="Browser drops yield bytes, not a path; import needs a native shell per ADR-0030"><i data-lucide="monitor" class="icon-sm"></i>native</span>
+    </div>
+
+    <div class="batch-toolbar" id="batchToolbar">
+      <span class="count">3 selected</span>
+      <button class="btn btn-sm"><i data-lucide="archive" class="icon-sm"></i>Archive</button>
+      <button class="btn btn-sm" disabled title="Enabled only when every selected project is already archived"><i data-lucide="trash-2" class="icon-sm"></i>Delete</button>
+      <span class="divider"></span>
+      <button class="btn btn-sm"><i data-lucide="tag" class="icon-sm"></i>Add tags</button>
+      <button class="btn btn-sm"><i data-lucide="tag" class="icon-sm"></i>Remove tags</button>
+      <span class="divider"></span>
+      <button class="btn btn-sm"><i data-lucide="folder-plus" class="icon-sm"></i>Add to collection</button>
+      <button class="btn btn-sm"><i data-lucide="folder-minus" class="icon-sm"></i>Remove from collection</button>
+      <button class="btn btn-sm"><i data-lucide="folder-plus" class="icon-sm"></i>Create collection from selection</button>
+    </div>
+
+    <div class="split-view">
+      <div class="split-main">
+        <div class="content">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="checkbox-cell"><input type="checkbox" title="Select all on page"></th>
+                <th style="width:44px;"></th>
+                <th style="min-width:260px;">
+                  <div class="th-content">Name <i data-lucide="chevron-down" class="icon"></i></div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:170px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Ableton version</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:130px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Created</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:130px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Modified</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:80px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Length</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:80px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Tempo</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:110px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Key</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:80px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Time sig.</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:100px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Plugins</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+                <th style="width:100px;">
+                  <div class="th-content"><span class="col-drag-handle"><i data-lucide="grip-vertical" class="icon"></i></span>Samples</div>
+                  <div class="col-resize-handle"></div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+
+              <tr class="selected">
+                <td class="checkbox-cell"><input type="checkbox" checked></td>
+                <td class="audition-cell"><div class="audition-thumb has-cover" style="background-image:linear-gradient(135deg,#4f7cac,#2f3a4a);"><i data-lucide="play" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary">
+                      <span class="name-title">Midnight Drive</span>
+                      <span class="name-filename">midnight_drive_v9.als</span>
+                    </div>
+                  </div>
+                  <div class="tag-list" style="margin-top:4px;">
+                    <span class="tag-chip" style="background:var(--color-chip-1);">house</span>
+                    <span class="tag-chip" style="background:var(--color-chip-3);">wip</span>
+                  </div>
+                </td>
+                <td class="cell-mono">11.3.13</td>
+                <td class="cell-mono">2026-02-11</td>
+                <td class="cell-mono">2026-08-30</td>
+                <td class="cell-num cell-mono">4:12</td>
+                <td class="cell-num cell-mono">124</td>
+                <td class="cell-mono">F minor</td>
+                <td class="cell-mono">4/4</td>
+                <td>
+                  <span class="hover-count">12 <i data-lucide="chevron-down" class="icon-sm"></i></span>
+                </td>
+                <td><span class="hover-count">27 <i data-lucide="chevron-down" class="icon-sm"></i></span></td>
+              </tr>
+
+              <tr class="selected">
+                <td class="checkbox-cell"><input type="checkbox" checked></td>
+                <td class="audition-cell"><div class="audition-thumb add-only" title="Add audition audio"><i data-lucide="plus" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary">
+                      <span class="name-title">Glass Ceiling</span>
+                    </div>
+                  </div>
+                  <div class="tag-list" style="margin-top:4px;">
+                    <span class="tag-chip" style="background:var(--color-chip-2);">techno</span>
+                  </div>
+                </td>
+                <td class="cell-mono">12.0.5</td>
+                <td class="cell-mono">2026-05-02</td>
+                <td class="cell-mono">2026-09-10</td>
+                <td class="cell-num cell-mono">5:48</td>
+                <td class="cell-num cell-mono">132</td>
+                <td class="cell-mono">A minor</td>
+                <td class="cell-mono">4/4</td>
+                <td><span class="hover-count">8</span></td>
+                <td><span class="hover-count">14</span></td>
+              </tr>
+
+              <tr class="selected">
+                <td class="checkbox-cell"><input type="checkbox" checked></td>
+                <td class="audition-cell"><div class="audition-thumb"><i data-lucide="play" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary">
+                      <span class="name-title">Paper Moons (Rework)</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="cell-mono">11.3.13</td>
+                <td class="cell-mono">2025-11-19</td>
+                <td class="cell-mono">2026-07-04</td>
+                <td class="cell-num cell-mono">3:57</td>
+                <td class="cell-num cell-mono">98</td>
+                <td class="cell-mono">D major</td>
+                <td class="cell-mono">3/4</td>
+                <td><span class="hover-count">19</span></td>
+                <td><span class="hover-count">33</span></td>
+              </tr>
+
+              <tr style="position:relative;">
+                <td class="checkbox-cell"><input type="checkbox"></td>
+                <td class="audition-cell"><div class="audition-thumb add-only"><i data-lucide="plus" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary">
+                      <span class="name-title is-renaming">Untitled Idea 14</span>
+                      <input class="rename-input" value="Untitled Idea 14" />
+                      <span class="rename-pencil"><i data-lucide="pencil" class="icon-sm"></i></span>
+                      <span class="name-filename">untitled_idea_14.als</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="cell-mono">12.0.5</td>
+                <td class="cell-mono">2026-09-01</td>
+                <td class="cell-mono">2026-09-14</td>
+                <td class="cell-num cell-mono">1:20</td>
+                <td class="cell-num cell-mono">140</td>
+                <td class="cell-mono">C major</td>
+                <td class="cell-mono">4/4</td>
+                <td><span class="hover-count">3</span></td>
+                <td><span class="hover-count">2</span></td>
+              </tr>
+
+              <tr style="position:relative; background:var(--color-bg-hover);">
+                <td class="checkbox-cell"><input type="checkbox"></td>
+                <td class="audition-cell"><div class="audition-thumb"><i data-lucide="play" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary">
+                      <span class="name-title">Low Tide</span>
+                    </div>
+                  </div>
+                  <div class="tag-list" style="margin-top:4px;">
+                    <span class="tag-chip" style="background:var(--color-chip-4);">ambient</span>
+                    <span class="tag-chip" style="background:var(--color-chip-5);">client</span>
+                  </div>
+                </td>
+                <td class="cell-mono">11.2.10</td>
+                <td class="cell-mono">2025-06-22</td>
+                <td class="cell-mono">2026-06-30</td>
+                <td class="cell-num cell-mono">6:04</td>
+                <td class="cell-num cell-mono">80</td>
+                <td class="cell-mono">E-flat minor</td>
+                <td class="cell-mono">4/4</td>
+                <td>
+                  <span class="hover-count">
+                    16 <i data-lucide="chevron-down" class="icon-sm"></i>
+                    <div class="hover-popover static-open">
+                      <div class="popover-item"><span class="status-dot installed"></span><span class="popover-item-name">Serum</span><span class="cell-muted">VST3</span></div>
+                      <div class="popover-item"><span class="status-dot installed"></span><span class="popover-item-name">Valhalla VintageVerb</span><span class="cell-muted">VST3</span></div>
+                      <div class="popover-item"><span class="status-dot missing"></span><span class="popover-item-name">Omnisphere</span><span class="cell-muted">VST2</span></div>
+                      <div class="popover-item"><span class="status-dot unknown"></span><span class="popover-item-name">Kontakt 7</span><span class="cell-muted">VST3</span></div>
+                      <div class="popover-item"><span class="status-dot installed"></span><span class="popover-item-name">FabFilter Pro-Q 3</span><span class="cell-muted">VST3</span></div>
+                      <div class="popover-item"><span class="status-dot installed"></span><span class="popover-item-name">Vital</span><span class="cell-muted">VST3</span></div>
+                    </div>
+                  </span>
+                </td>
+                <td><span class="hover-count">41</span></td>
+              </tr>
+
+              <tr>
+                <td class="checkbox-cell"><input type="checkbox"></td>
+                <td class="audition-cell"><div class="audition-thumb add-only"><i data-lucide="plus" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary"><span class="name-title">Echo Chamber</span></div>
+                  </div>
+                </td>
+                <td class="cell-mono">12.0.5</td>
+                <td class="cell-mono">2026-03-08</td>
+                <td class="cell-mono">2026-08-19</td>
+                <td class="cell-num cell-mono">4:33</td>
+                <td class="cell-num cell-mono">126</td>
+                <td class="cell-mono">G minor</td>
+                <td class="cell-mono">4/4</td>
+                <td><span class="hover-count">9</span></td>
+                <td><span class="hover-count">22</span></td>
+              </tr>
+
+              <tr class="archived-row">
+                <td class="checkbox-cell"><input type="checkbox"></td>
+                <td class="audition-cell"><div class="audition-thumb add-only"><i data-lucide="plus" class="icon-sm"></i></div></td>
+                <td>
+                  <div class="name-cell">
+                    <div class="name-primary"><span class="name-title">Scrapped Intro</span></div>
+                  </div>
+                </td>
+                <td class="cell-mono">11.1.0</td>
+                <td class="cell-mono">2024-12-02</td>
+                <td class="cell-mono">2025-01-15</td>
+                <td class="cell-num cell-mono">0:48</td>
+                <td class="cell-num cell-mono">110</td>
+                <td class="cell-mono">B minor</td>
+                <td class="cell-mono">4/4</td>
+                <td><span class="hover-count">2</span></td>
+                <td><span class="hover-count">1</span></td>
+              </tr>
+
+            </tbody>
+          </table>
+
+          <!-- statically-positioned context menu, rendered open over the "Low Tide" row -->
+          <div class="context-menu static-open" style="top:398px; left:520px;">
+            <div class="menu-item"><i data-lucide="tag" class="icon"></i><span class="menu-item-fill">Add tag</span><i data-lucide="chevron-right" class="menu-submenu-arrow"></i></div>
+            <div class="menu-separator"></div>
+            <div class="menu-item"><i data-lucide="play-circle" class="icon"></i>Open in Ableton <span class="badge-native" style="margin-left:auto;">native</span></div>
+            <div class="menu-item"><i data-lucide="folder-open" class="icon"></i>Show in Explorer <span class="badge-native" style="margin-left:auto;">native</span></div>
+            <div class="menu-item"><i data-lucide="pencil" class="icon"></i>Rename</div>
+            <div class="menu-item"><i data-lucide="mic" class="icon"></i>Add audio demo</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item"><i data-lucide="folder-plus" class="icon"></i><span class="menu-item-fill">Add to collection</span><i data-lucide="chevron-right" class="menu-submenu-arrow"></i></div>
+            <div class="menu-separator"></div>
+            <div class="menu-item"><i data-lucide="archive" class="icon"></i>Archive</div>
+          </div>
+
+        </div>
+
+        <div class="pagination-bar">
+          <span>1&ndash;8 of 214 projects</span>
+          <label style="display:flex;align-items:center;gap:6px;">
+            Items per page
+            <select class="select">
+              <option>25</option>
+              <option>50</option>
+              <option selected>100</option>
+            </select>
+          </label>
+          <div class="pagination-controls">
+            <button class="page-btn"><i data-lucide="chevron-left" class="icon-sm"></i></button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <button class="page-btn"><i data-lucide="chevron-right" class="icon-sm"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="split-panel">
+        <div class="panel-header">
+          <div class="panel-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <p class="panel-title">Low Tide</p>
+          <p class="panel-subtitle">low_tide_master.als &middot; 11.2.10</p>
+        </div>
+        <div class="panel-body">
+          <div class="panel-section">
+            <p class="panel-section-title">Details</p>
+            <dl class="meta-grid">
+              <dt>Created</dt><dd>2025-06-22</dd>
+              <dt>Modified</dt><dd>2026-06-30</dd>
+              <dt>Length</dt><dd>6:04</dd>
+              <dt>Tempo</dt><dd>80 BPM</dd>
+              <dt>Key</dt><dd>E-flat minor</dd>
+              <dt>Time sig.</dt><dd>4/4</dd>
+              <dt>Plugins</dt><dd>16 (1 missing, 1 unknown)</dd>
+              <dt>Samples</dt><dd>41</dd>
+            </dl>
+          </div>
+          <div class="panel-section">
+            <p class="panel-section-title">Notes</p>
+            <textarea class="notes-textarea">Client wants a longer breakdown around 3:30. Reference: Burial-ish pads, keep the vinyl crackle bus.</textarea>
+          </div>
+          <div class="panel-section">
+            <p class="panel-section-title">Collections</p>
+            <div class="chip-row">
+              <span class="tag-chip" style="background:var(--color-chip-1);">Ambient Sketches</span>
+              <span class="tag-chip" style="background:var(--color-chip-5);">Client: Nordvik</span>
+            </div>
+          </div>
+          <div class="panel-section">
+            <p class="panel-section-title">
+              Tasks
+              <span style="display:flex;gap:6px;align-items:center;font-weight:normal;text-transform:none;">
+                <input type="checkbox" title="Select all tasks">
+              </span>
+            </p>
+            <ul class="task-list">
+              <li class="task-item done"><input type="checkbox" checked><span class="task-label">Rough mixdown</span></li>
+              <li class="task-item done"><input type="checkbox" checked><span class="task-label">Send reference to client</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Extend breakdown section</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Replace missing Omnisphere patch</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Master and bounce WAV</span></li>
+            </ul>
+            <div class="task-toolbar">
+              <button class="btn btn-sm"><i data-lucide="check" class="icon-sm"></i>Complete</button>
+              <button class="btn btn-sm"><i data-lucide="rotate-ccw" class="icon-sm"></i>Reopen</button>
+              <button class="btn btn-sm btn-danger"><i data-lucide="trash-2" class="icon-sm"></i>Delete</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-progress">
+        <i data-lucide="loader-circle" class="icon"></i>
+        <div class="statusbar-progress-track"><div class="statusbar-progress-fill"></div></div>
+        <span class="statusbar-progress-text">Scanning: parsing "Echo Chamber" (134 of 214 files)</span>
+      </div>
+      <div class="statusbar-segment"><i data-lucide="folder" class="icon"></i>214 projects</div>
+      <div class="statusbar-segment"><i data-lucide="check-square" class="icon"></i>3 selected</div>
+    </footer>
+  </div>
+</div>
+
+<script>
+  lucide.createIcons();
+  document.getElementById('batchToolbar').style.display = 'flex';
+</script>
+</body>
+</html>

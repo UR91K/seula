@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Projects — Tag manager — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item active"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <h1>Projects</h1>
+      <div class="search-box">
+        <i data-lucide="search" class="icon"></i>
+        <input type="text" placeholder="Search projects (name, tag:, key:, tempo:...)">
+      </div>
+      <label class="toggle-switch">
+        <span class="toggle-track"></span>
+        Show archived
+      </label>
+      <div class="titlebar-spacer"></div>
+      <div class="titlebar-actions">
+        <button class="btn"><i data-lucide="folder-plus" class="icon"></i>Add project<span class="badge-native"><i data-lucide="monitor" class="icon-sm"></i>native</span></button>
+        <button class="btn-icon" title="Toggle details panel"><i data-lucide="panel-right" class="icon"></i></button>
+      </div>
+    </header>
+
+    <div class="content" style="display:flex;align-items:center;justify-content:center;filter:blur(1px); opacity:0.5;">
+      <p class="text-muted">Projects table (see projects.html) — dimmed behind the modal.</p>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-segment"><i data-lucide="folder" class="icon"></i>214 projects</div>
+      <div class="statusbar-fill"></div>
+      <div class="statusbar-segment"><i data-lucide="tags" class="icon"></i>18 tags</div>
+    </footer>
+  </div>
+</div>
+
+<div class="modal-scrim">
+  <div class="modal" style="width:560px;">
+    <div class="modal-header">
+      <h2>Manage tags</h2>
+      <button class="btn-icon"><i data-lucide="x" class="icon"></i></button>
+    </div>
+    <div class="modal-body">
+
+      <div class="field">
+        <label>Create a new tag</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" placeholder="e.g. needs-mixdown" style="flex:1; height:30px; padding:0 8px; background:var(--color-bg-input); border:1px solid var(--color-border); border-radius:4px; color:var(--color-text-primary);">
+          <button class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i>Create</button>
+        </div>
+      </div>
+
+      <div class="menu-separator" style="margin:16px 0;"></div>
+
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th>Tag</th>
+            <th style="width:90px;">Usage</th>
+            <th style="width:170px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-1);">house</span></td>
+            <td class="cell-num">42</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="text" value="techno" style="height:26px; padding:0 6px; background:var(--color-bg-input); border:1px solid var(--color-border-focus); border-radius:4px; color:var(--color-text-primary); width:120px;">
+              </div>
+            </td>
+            <td class="cell-num">31</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Save"><i data-lucide="check" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Cancel"><i data-lucide="x" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-3);">wip</span></td>
+            <td class="cell-num">57</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-4);">ambient</span></td>
+            <td class="cell-num">19</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-5);">client</span></td>
+            <td class="cell-num">8</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-2);">needs-mixdown</span></td>
+            <td class="cell-num">3</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag-chip" style="background:var(--color-chip-1);">demo-only</span></td>
+            <td class="cell-num">0</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-icon" title="Rename"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button class="btn-icon" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="text-muted" style="font-size:12px; margin-top:14px;">
+        Renaming a tag updates every project that uses it. Deleting a tag asks for confirmation and removes it from all projects; it never deletes the projects themselves.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

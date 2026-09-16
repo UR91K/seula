@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Collections — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item active"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <h1>Collections</h1>
+      <div class="search-box">
+        <i data-lucide="search" class="icon"></i>
+        <input type="text" placeholder="Search collections">
+      </div>
+      <div class="titlebar-spacer"></div>
+      <div class="titlebar-actions">
+        <button class="btn btn-primary"><i data-lucide="folder-plus" class="icon"></i>New collection</button>
+      </div>
+    </header>
+
+    <div class="toolbar-row">
+      <span class="text-muted">24 collections</span>
+      <div class="layout-switch">
+        <button class="active" title="Grid view"><i data-lucide="layout-grid" class="icon-sm"></i></button>
+        <button title="List view"><i data-lucide="list" class="icon-sm"></i></button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="card-grid">
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Ambient Sketches</div>
+            <div class="card-meta"><span>14 tracks</span><span>52:10</span></div>
+            <div class="card-meta"><span>Created 2025-03-11</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Client: Nordvik</div>
+            <div class="card-meta"><span>6 tracks</span><span>28:44</span></div>
+            <div class="card-meta"><span>Created 2026-01-04</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Techno EP 2026</div>
+            <div class="card-meta"><span>5 tracks</span><span>24:03</span></div>
+            <div class="card-meta"><span>Created 2026-04-19</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Live Set Fragments</div>
+            <div class="card-meta"><span>21 tracks</span><span>1:18:52</span></div>
+            <div class="card-meta"><span>Created 2024-11-30</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Sound Design Bank</div>
+            <div class="card-meta"><span>9 tracks</span><span>15:37</span></div>
+            <div class="card-meta"><span>Created 2025-09-08</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Scrapped Ideas</div>
+            <div class="card-meta"><span>33 tracks</span><span>1:42:09</span></div>
+            <div class="card-meta"><span>Created 2024-06-17</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Downtempo Vol. 2</div>
+            <div class="card-meta"><span>8 tracks</span><span>36:20</span></div>
+            <div class="card-meta"><span>Created 2026-06-02</span></div>
+          </div>
+        </a>
+
+        <a class="card" href="collection-detail.html">
+          <div class="card-cover"><i data-lucide="image" class="icon-lg"></i></div>
+          <div class="card-body">
+            <div class="card-title">Radio Edits</div>
+            <div class="card-meta"><span>4 tracks</span><span>14:58</span></div>
+            <div class="card-meta"><span>Created 2026-07-21</span></div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-segment"><i data-lucide="library-big" class="icon"></i>24 collections</div>
+      <div class="statusbar-segment"><i data-lucide="disc-3" class="icon"></i>100 projects total</div>
+      <div class="statusbar-fill"></div>
+    </footer>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

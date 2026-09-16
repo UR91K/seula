@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ambient Sketches — Seula</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="sidebar-brand"><i data-lucide="disc-3" class="icon-lg"></i>Seula</div>
+    <ul class="nav-list">
+      <li><a href="projects.html" class="nav-item"><i data-lucide="list-music" class="icon"></i>Projects</a></li>
+      <li><a href="collections.html" class="nav-item active"><i data-lucide="library-big" class="icon"></i>Collections</a></li>
+      <li><a href="plugins.html" class="nav-item"><i data-lucide="plug-zap" class="icon"></i>Plugins</a></li>
+      <li><a href="samples.html" class="nav-item"><i data-lucide="audio-lines" class="icon"></i>Samples</a></li>
+      <li><a href="stats.html" class="nav-item"><i data-lucide="bar-chart-3" class="icon"></i>Stats</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item"><i data-lucide="settings" class="icon"></i>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <a href="collections.html" class="btn-icon" title="Back to collections"><i data-lucide="arrow-left" class="icon"></i></a>
+      <h1>Ambient Sketches</h1>
+      <div class="titlebar-spacer"></div>
+      <div class="titlebar-actions">
+        <button class="btn"><i data-lucide="pencil" class="icon"></i>Edit</button>
+        <button class="btn btn-danger"><i data-lucide="trash-2" class="icon"></i>Delete collection</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <div class="detail-hero">
+        <div class="detail-cover"><i data-lucide="image" class="icon-lg"></i></div>
+        <div class="detail-info">
+          <h2 class="detail-title">Ambient Sketches</h2>
+          <div class="detail-meta-row">
+            <span>14 tracks</span>
+            <span>52:10 total</span>
+            <span>Created 2025-03-11</span>
+          </div>
+          <p class="detail-description">Slow, textural pieces for the label's winter compilation. Mostly pad-driven with field-recording layers; keep tempos under 90 unless noted.</p>
+        </div>
+      </div>
+
+      <div class="split-view" style="height:auto; min-height:520px;">
+        <div class="split-main">
+
+          <div class="toolbar-row">
+            <strong>Tracklist</strong>
+            <span class="text-muted">2 selected</span>
+            <div class="titlebar-spacer"></div>
+            <button class="btn btn-sm btn-danger"><i data-lucide="folder-minus" class="icon-sm"></i>Remove selected</button>
+          </div>
+
+          <div class="tracklist">
+            <div class="track-row">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">1</span>
+              <input type="checkbox">
+              <span class="track-name">Low Tide</span>
+              <span class="cell-mono track-duration">6:04</span>
+            </div>
+            <div class="track-row selected">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">2</span>
+              <input type="checkbox" checked>
+              <span class="track-name">Field Notes I</span>
+              <span class="cell-mono track-duration">3:41</span>
+            </div>
+            <div class="track-row selected">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">3</span>
+              <input type="checkbox" checked>
+              <span class="track-name">Field Notes II</span>
+              <span class="cell-mono track-duration">4:02</span>
+            </div>
+            <div class="track-row">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">4</span>
+              <input type="checkbox">
+              <span class="track-name">Greywater</span>
+              <span class="cell-mono track-duration">5:15</span>
+            </div>
+            <div class="track-row">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">5</span>
+              <input type="checkbox">
+              <span class="track-name">Half-Light</span>
+              <span class="cell-mono track-duration">4:47</span>
+            </div>
+            <div class="track-row">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">6</span>
+              <input type="checkbox">
+              <span class="track-name">Nordvik Reprise</span>
+              <span class="cell-mono track-duration">7:02</span>
+            </div>
+            <div class="track-row">
+              <span class="track-grip"><i data-lucide="grip-vertical" class="icon-sm"></i></span>
+              <span class="track-index">7</span>
+              <input type="checkbox">
+              <span class="track-name">Static Bloom</span>
+              <span class="cell-mono track-duration">3:29</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="split-panel">
+          <div class="panel-section" style="border-top:none;">
+            <p class="panel-section-title">
+              Tasks (all tracks)
+              <input type="checkbox" title="Select all tasks">
+            </p>
+            <ul class="task-list">
+              <li class="task-item done"><input type="checkbox" checked><span class="task-label">Low Tide — rough mixdown</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Low Tide — extend breakdown</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Field Notes I — replace field recording</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Greywater — automate filter sweep</span></li>
+              <li class="task-item done"><input type="checkbox" checked><span class="task-label">Static Bloom — bounce stems</span></li>
+              <li class="task-item"><input type="checkbox"><span class="task-label">Sequence final tracklist for mastering</span></li>
+            </ul>
+            <div class="task-toolbar">
+              <button class="btn btn-sm"><i data-lucide="check" class="icon-sm"></i>Complete</button>
+              <button class="btn btn-sm"><i data-lucide="rotate-ccw" class="icon-sm"></i>Reopen</button>
+              <button class="btn btn-sm btn-danger"><i data-lucide="trash-2" class="icon-sm"></i>Delete</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar-segment"><i data-lucide="list-music" class="icon"></i>14 tracks</div>
+      <div class="statusbar-segment"><i data-lucide="check-square" class="icon"></i>2 selected</div>
+      <div class="statusbar-fill"></div>
+      <div class="statusbar-segment"><i data-lucide="clock" class="icon"></i>52:10 total</div>
+    </footer>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>
