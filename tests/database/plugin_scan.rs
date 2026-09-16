@@ -546,3 +546,91 @@ fn app_state_round_trips_and_overwrites() {
     db.set_app_state("some_key", "second").unwrap();
     assert_eq!(db.get_app_state("some_key").unwrap().as_deref(), Some("second"));
 }
+
+// ---------------------------------------------------------------- aggregates
+
+/// Insert a plugin row directly, so the test can set all three install states —
+/// including `NULL`, which no write path produces on demand.
+fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, installed: Option<bool>) {
+    db.conn
+        .execute(
+            "INSERT INTO plugins (id, plugin_kind, uid, name, format, vendor, installed)
+             VALUES (?, 'VST3', ?, ?, ?, ?, ?)",
+            rusqlite::params![
+                uuid::Uuid::new_v4().to_string(),
+                format!("{:032x}", name.len() as u128 + vendor.len() as u128 * 997 + format.len() as u128 * 31),
+                name,
+                format,
+                vendor,
+                installed,
+            ],
+        )
+        .unwrap();
+}
+
+/// The vendor and format aggregates must account for every row, not just the ones a
+/// scan has ruled on. Reporting only installed and missing leaves the never-scanned
+/// rows (ADR-0012) out of a total they are counted in, so the columns do not sum.
+#[test]
+fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
+    setup("error");
+    let (_dir, db) = temp_db();
+
+    // One vendor and one format carrying all three states at once.
+    insert_plugin(&db, "Found", "Acme", "VST3 AudioFx", Some(true));
+    insert_plugin(&db, "Absent", "Acme", "VST3 AudioFx", Some(false));
+    insert_plugin(&db, "NeverLookedFor", "Acme", "VST3 AudioFx", None);
+    insert_plugin(&db, "OtherVendorUnscanned", "Bolt", "VST2 Instrument", None);
+
+    let (vendors, _) = db.get_plugin_vendors(None, None, None, None).unwrap();
+    assert_eq!(vendors.len(), 2);
+
+    for vendor in &vendors {
+        assert_eq!(
+            vendor.installed_plugins + vendor.missing_plugins + vendor.unknown_plugins,
+            vendor.plugin_count,
+            "vendor {} does not reconcile",
+            vendor.vendor
+        );
+    }
+
+    let acme = vendors.iter().find(|v| v.vendor == "Acme").unwrap();
+    assert_eq!(acme.plugin_count, 3);
+    assert_eq!(acme.installed_plugins, 1);
+    assert_eq!(acme.missing_plugins, 1);
+    assert_eq!(acme.unknown_plugins, 1);
+
+    let bolt = vendors.iter().find(|v| v.vendor == "Bolt").unwrap();
+    assert_eq!(bolt.unknown_plugins, 1);
+
+    let (formats, _) = db.get_plugin_formats(None, None, None, None).unwrap();
+    assert_eq!(formats.len(), 2);
+
+    for format in &formats {
+        assert_eq!(
+            format.installed_plugins + format.missing_plugins + format.unknown_plugins,
+            format.plugin_count,
+            "format {} does not reconcile",
+            format.format
+        );
+    }
+
+    let audiofx = formats.iter().find(|f| f.format == "VST3 AudioFx").unwrap();
+    assert_eq!(audiofx.plugin_count, 3);
+    assert_eq!(audiofx.installed_plugins, 1);
+    assert_eq!(audiofx.missing_plugins, 1);
+    assert_eq!(audiofx.unknown_plugins, 1);
+
+    // And the aggregates agree with the top-level stats, which was the point: a user
+    // who sees a nonzero unknown total can now find where those plugins are.
+    let stats = db.get_plugin_stats().unwrap();
+    assert_eq!(stats.unknown_plugins, 2);
+    assert_eq!(
+        vendors.iter().map(|v| v.unknown_plugins).sum::<i32>(),
+        stats.unknown_plugins
+    );
+    assert_eq!(
+        formats.iter().map(|f| f.unknown_plugins).sum::<i32>(),
+        stats.unknown_plugins
+    );
+}

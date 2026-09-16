@@ -512,11 +512,14 @@ impl ProjectDatabase {
                     COUNT(*) as plugin_count,
                     SUM(CASE WHEN p.installed = 1 THEN 1 ELSE 0 END) as installed_plugins,
                     SUM(CASE WHEN p.installed = 0 THEN 1 ELSE 0 END) as missing_plugins,
+                    -- Never scanned for (ADR-0012). Counted explicitly rather than left
+                    -- out, so installed + missing + unknown == plugin_count.
+                    SUM(CASE WHEN p.installed IS NULL THEN 1 ELSE 0 END) as unknown_plugins,
                     COALESCE(SUM(usage_stats.usage_count), 0) as total_usage_count,
                     COALESCE(COUNT(DISTINCT usage_stats.project_id), 0) as unique_projects_using
                 FROM plugins p
                 LEFT JOIN (
-                    SELECT 
+                    SELECT
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         pp.project_id
@@ -526,11 +529,12 @@ impl ProjectDatabase {
                 WHERE p.vendor IS NOT NULL
                 GROUP BY p.vendor
             )
-            SELECT 
+            SELECT
                 vendor,
                 plugin_count,
                 installed_plugins,
                 missing_plugins,
+                unknown_plugins,
                 total_usage_count,
                 unique_projects_using
             FROM vendor_stats
@@ -564,8 +568,9 @@ impl ProjectDatabase {
                     plugin_count: row.get(1)?,
                     installed_plugins: row.get(2)?,
                     missing_plugins: row.get(3)?,
-                    total_usage_count: row.get(4)?,
-                    unique_projects_using: row.get(5)?,
+                    unknown_plugins: row.get(4)?,
+                    total_usage_count: row.get(5)?,
+                    unique_projects_using: row.get(6)?,
                     plugins_by_format,
                 })
             },
@@ -612,11 +617,14 @@ impl ProjectDatabase {
                     COUNT(*) as plugin_count,
                     SUM(CASE WHEN p.installed = 1 THEN 1 ELSE 0 END) as installed_plugins,
                     SUM(CASE WHEN p.installed = 0 THEN 1 ELSE 0 END) as missing_plugins,
+                    -- Never scanned for (ADR-0012). Counted explicitly rather than left
+                    -- out, so installed + missing + unknown == plugin_count.
+                    SUM(CASE WHEN p.installed IS NULL THEN 1 ELSE 0 END) as unknown_plugins,
                     COALESCE(SUM(usage_stats.usage_count), 0) as total_usage_count,
                     COALESCE(COUNT(DISTINCT usage_stats.project_id), 0) as unique_projects_using
                 FROM plugins p
                 LEFT JOIN (
-                    SELECT 
+                    SELECT
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         pp.project_id
@@ -625,11 +633,12 @@ impl ProjectDatabase {
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 GROUP BY p.format
             )
-            SELECT 
+            SELECT
                 format,
                 plugin_count,
                 installed_plugins,
                 missing_plugins,
+                unknown_plugins,
                 total_usage_count,
                 unique_projects_using
             FROM format_stats
@@ -663,8 +672,9 @@ impl ProjectDatabase {
                     plugin_count: row.get(1)?,
                     installed_plugins: row.get(2)?,
                     missing_plugins: row.get(3)?,
-                    total_usage_count: row.get(4)?,
-                    unique_projects_using: row.get(5)?,
+                    unknown_plugins: row.get(4)?,
+                    total_usage_count: row.get(5)?,
+                    unique_projects_using: row.get(6)?,
                     plugins_by_vendor,
                 })
             },
@@ -753,6 +763,9 @@ pub struct VendorInfo {
     pub plugin_count: i32,
     pub installed_plugins: i32,
     pub missing_plugins: i32,
+    /// This vendor's plugins no scan has looked for yet.
+    /// `installed + missing + unknown == plugin_count`.
+    pub unknown_plugins: i32,
     pub total_usage_count: i32,
     pub unique_projects_using: i32,
     pub plugins_by_format: std::collections::HashMap<String, i32>,
@@ -764,6 +777,9 @@ pub struct FormatInfo {
     pub plugin_count: i32,
     pub installed_plugins: i32,
     pub missing_plugins: i32,
+    /// This format's plugins no scan has looked for yet.
+    /// `installed + missing + unknown == plugin_count`.
+    pub unknown_plugins: i32,
     pub total_usage_count: i32,
     pub unique_projects_using: i32,
     pub plugins_by_vendor: std::collections::HashMap<String, i32>,

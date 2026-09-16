@@ -146,6 +146,9 @@ message VendorInfo {
   int32 total_usage_count = 5;
   int32 unique_projects_using = 6;
   map<string, int32> plugins_by_format = 7;  // format -> count
+  // Plugins no scan has looked for yet, distinct from looked-for-and-absent.
+  // installed + missing + unknown == plugin_count.
+  int32 unknown_plugins = 8;
 }
 
 // Get Plugin Formats
@@ -169,6 +172,9 @@ message FormatInfo {
   int32 total_usage_count = 5;
   int32 unique_projects_using = 6;
   map<string, int32> plugins_by_vendor = 7;  // vendor -> count
+  // Plugins no scan has looked for yet, distinct from looked-for-and-absent.
+  // installed + missing + unknown == plugin_count.
+  int32 unknown_plugins = 8;
 }
 
 // Get Individual Plugin

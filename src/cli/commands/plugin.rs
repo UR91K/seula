@@ -712,6 +712,7 @@ impl TableDisplay for PluginVendorsDisplay {
             "Total".to_string(),
             "Installed".to_string(),
             "Missing".to_string(),
+            "Unknown".to_string(),
             "Usage".to_string(),
             "Projects".to_string(),
         ]);
@@ -722,6 +723,7 @@ impl TableDisplay for PluginVendorsDisplay {
                 &vendor.plugin_count.to_string(),
                 &vendor.installed_plugins.to_string(),
                 &vendor.missing_plugins.to_string(),
+                &vendor.unknown_plugins.to_string(),
                 &vendor.total_usage_count.to_string(),
                 &vendor.unique_projects_using.to_string()
             );
@@ -731,13 +733,14 @@ impl TableDisplay for PluginVendorsDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["vendor", "total_plugins", "installed", "missing", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["vendor", "total_plugins", "installed", "missing", "unknown", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
         for vendor in &self.vendors {
             writer.write_record([
                 vendor.vendor.as_str(),
                 &vendor.plugin_count.to_string(),
                 &vendor.installed_plugins.to_string(),
                 &vendor.missing_plugins.to_string(),
+                &vendor.unknown_plugins.to_string(),
                 &vendor.total_usage_count.to_string(),
                 &vendor.unique_projects_using.to_string(),
             ]).map_err(|e| -> CliError { e.into() })?;
@@ -759,6 +762,7 @@ impl TableDisplay for PluginFormatsDisplay {
             "Total".to_string(),
             "Installed".to_string(),
             "Missing".to_string(),
+            "Unknown".to_string(),
             "Usage".to_string(),
             "Projects".to_string(),
         ]);
@@ -769,6 +773,7 @@ impl TableDisplay for PluginFormatsDisplay {
                 &format.plugin_count.to_string(),
                 &format.installed_plugins.to_string(),
                 &format.missing_plugins.to_string(),
+                &format.unknown_plugins.to_string(),
                 &format.total_usage_count.to_string(),
                 &format.unique_projects_using.to_string()
             );
@@ -778,13 +783,14 @@ impl TableDisplay for PluginFormatsDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["format", "total_plugins", "installed", "missing", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
+        writer.write_record(["format", "total_plugins", "installed", "missing", "unknown", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
         for format in &self.formats {
             writer.write_record([
                 format.format.as_str(),
                 &format.plugin_count.to_string(),
                 &format.installed_plugins.to_string(),
                 &format.missing_plugins.to_string(),
+                &format.unknown_plugins.to_string(),
                 &format.total_usage_count.to_string(),
                 &format.unique_projects_using.to_string(),
             ]).map_err(|e| -> CliError { e.into() })?;

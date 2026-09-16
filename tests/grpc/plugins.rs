@@ -89,13 +89,15 @@ async fn test_get_plugin_vendors() {
         assert!(vendor.plugin_count >= 0);
         assert!(vendor.installed_plugins >= 0);
         assert!(vendor.missing_plugins >= 0);
+        assert!(vendor.unknown_plugins >= 0);
         assert!(vendor.total_usage_count >= 0);
         assert!(vendor.unique_projects_using >= 0);
-        
-        // Plugin counts should add up
+
+        // Plugin counts should add up. `unknown` is the never-scanned rows
+        // (ADR-0012); leaving it out silently loses them.
         assert_eq!(
             vendor.plugin_count,
-            vendor.installed_plugins + vendor.missing_plugins
+            vendor.installed_plugins + vendor.missing_plugins + vendor.unknown_plugins
         );
     }
 }
@@ -126,13 +128,15 @@ async fn test_get_plugin_formats() {
         assert!(format.plugin_count >= 0);
         assert!(format.installed_plugins >= 0);
         assert!(format.missing_plugins >= 0);
+        assert!(format.unknown_plugins >= 0);
         assert!(format.total_usage_count >= 0);
         assert!(format.unique_projects_using >= 0);
-        
-        // Plugin counts should add up
+
+        // Plugin counts should add up. `unknown` is the never-scanned rows
+        // (ADR-0012); leaving it out silently loses them.
         assert_eq!(
             format.plugin_count,
-            format.installed_plugins + format.missing_plugins
+            format.installed_plugins + format.missing_plugins + format.unknown_plugins
         );
     }
 }
