@@ -10,6 +10,9 @@ use seula::{
 };
 
 #[test]
+#[ignore = "scans and parses every .als under the real configured project paths, then \
+            rebuilds the database from them; run with --ignored. Also the documented \
+            AppleDouble-sidecar failure, see CLAUDE.md"]
 fn test_process_projects_integration() {
     setup("error");
 
@@ -93,6 +96,7 @@ fn test_process_projects_integration() {
 }
 
 #[test]
+#[ignore = "scans and parses every .als under the real configured project paths; run with --ignored"]
 fn test_process_projects_with_progress() {
     setup("warn");
 

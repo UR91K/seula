@@ -249,6 +249,7 @@ fn test_parallel_parser() {
 }
 
 #[test]
+#[ignore = "scans every .als under the real configured project paths; run with --ignored"]
 fn test_integrated_scanning_and_parsing() {
     setup("error");
     // Create a scanner

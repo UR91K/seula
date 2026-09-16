@@ -37,6 +37,24 @@ cargo test --workspace --no-fail-fast
                                 # --no-fail-fast because without it the run stops at the
                                 # first failing binary; three broken tests in scan_tests
                                 # hid behind an earlier failure for a month that way.
+cargo test --workspace --no-fail-fast --tests -- --ignored
+                                # The heavy pass. Five tests are `#[ignore]`d: three scan
+                                # and parse every .als under your real configured project
+                                # paths, and two (test_load_real_project,
+                                # test_parse_performance) are hardcoded to specific
+                                # project files on the maintainer's machine and cannot
+                                # run anywhere else. All expensive, all environment-
+                                # dependent. Run this before relying on scan/parse
+                                # changes, not on every edit.
+                                # --tests here is load-bearing, not optional: several
+                                # doc examples in src/lib.rs and src/scan/parser.rs are
+                                # marked ```rust,ignore` because they're illustrative
+                                # fragments needing a real config.toml, not because
+                                # they're expensive. `-- --ignored` forces those to run
+                                # too and about half fail standalone -- noise, not
+                                # signal. `--tests` drops doctests from the run
+                                # entirely while still building the examples/ binaries
+                                # plugin_scanner_tests.rs needs, unlike `--test X`.
 cargo run -- --help             # CLI
 cargo run                       # tray mode (default)
 ```

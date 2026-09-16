@@ -12,6 +12,7 @@ use seula::utils::decompress_gzip_file;
 // TODO: Could include tests that start a real gRPC server and test full client workflows
 
 #[test]
+#[ignore = "hardcoded to a real project path on the maintainer's machine; run with --ignored"]
 fn test_load_real_project() {
     setup("debug");
 
@@ -53,6 +54,7 @@ fn test_load_real_project() {
 }
 
 #[test]
+#[ignore = "benchmark over hardcoded real project paths on the maintainer's machine; run with --ignored"]
 fn test_parse_performance() {
     setup("error");
 
