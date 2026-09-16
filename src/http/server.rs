@@ -12,6 +12,7 @@ use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use super::handlers::collections as collection_handlers;
+use super::handlers::plugins as plugin_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::search as search_handlers;
 use super::handlers::tags as tag_handlers;
@@ -193,6 +194,39 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/tasks/:task_id",
             put(task_handlers::update_task).delete(task_handlers::delete_task),
+        )
+        .route("/api/v1/plugins", get(plugin_handlers::get_all_plugins))
+        .route(
+            "/api/v1/plugins/by-status",
+            get(plugin_handlers::get_plugins_by_installed_status),
+        )
+        .route(
+            "/api/v1/plugins/search",
+            get(plugin_handlers::search_plugins),
+        )
+        .route(
+            "/api/v1/plugins/stats",
+            get(plugin_handlers::get_plugin_stats),
+        )
+        .route(
+            "/api/v1/plugins/vendors",
+            get(plugin_handlers::get_plugin_vendors),
+        )
+        .route(
+            "/api/v1/plugins/formats",
+            get(plugin_handlers::get_plugin_formats),
+        )
+        .route(
+            "/api/v1/plugins/refresh-installation-status",
+            post(plugin_handlers::refresh_plugin_installation_status),
+        )
+        .route(
+            "/api/v1/plugins/:plugin_id",
+            get(plugin_handlers::get_plugin),
+        )
+        .route(
+            "/api/v1/plugins/:plugin_id/projects",
+            get(plugin_handlers::get_projects_by_plugin),
         )
         .layer(cors)
         .with_state(state)
