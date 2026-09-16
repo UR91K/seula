@@ -49,6 +49,12 @@ pub struct SearchQuery {
     pub offset: Option<i32>,
 }
 
+#[derive(Deserialize)]
+pub struct ProjectsByTagQuery {
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
 #[derive(Serialize)]
 pub struct TagSearchResponse {
     pub tags: Vec<TagDto>,

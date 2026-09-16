@@ -69,6 +69,10 @@ pub fn build_router(state: AppState) -> Router {
                 .delete(tag_handlers::delete_tag),
         )
         .route(
+            "/api/v1/tags/:tag_id/projects",
+            get(tag_handlers::get_projects_by_tag),
+        )
+        .route(
             "/api/v1/projects/:project_id/tags/:tag_id",
             post(tag_handlers::tag_project).delete(tag_handlers::untag_project),
         )

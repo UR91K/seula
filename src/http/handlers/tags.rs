@@ -1,19 +1,15 @@
 //! Tags domain HTTP handlers (ADR-0024) -- the pattern-proof domain. Thin in the
 //! sense ADR-0018 specified: parse the request, call one `Services` method,
 //! convert the result. No business logic, no database access.
-//!
-//! `GetProjectsByTag` (the gRPC handlers' name) is deliberately not ported yet:
-//! it returns full `Project` values, and there is no HTTP DTO for projects until
-//! that domain's own pass. Porting it here would mean inventing a throwaway
-//! shape ahead of that work.
 
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 
+use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::dto::tags::{
-    BatchOperationResponse, BatchTagRequest, CreateTagRequest, SearchQuery, TagDto,
-    TagListResponse, TagSearchResponse, TagsWithUsageQuery, UpdateTagRequest,
+    BatchOperationResponse, BatchTagRequest, CreateTagRequest, ProjectsByTagQuery, SearchQuery,
+    TagDto, TagListResponse, TagSearchResponse, TagsWithUsageQuery, UpdateTagRequest,
 };
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
@@ -113,6 +109,36 @@ pub async fn get_all_tags_with_usage(
         tags,
         total_count,
     }))
+}
+
+/// Mirrors `src/grpc/handlers/tags.rs::get_projects_by_tag`: the service
+/// returns every tagged project, and pagination is applied here rather than in
+/// SQL, matching the existing (gRPC) behavior rather than changing it as part
+/// of this port.
+pub async fn get_projects_by_tag(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    Query(query): Query<ProjectsByTagQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let projects = state.services.tags.get_projects_by_tag(&tag_id).await?;
+    let total_count = projects.len() as i32;
+
+    let db_arc = state.services.tags.db_handle();
+    let mut db = db_arc.lock().await;
+    let projects = projects
+        .into_iter()
+        .map(|p| project_to_dto(p, &mut db))
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(db);
+
+    let offset = query.offset.unwrap_or(0) as usize;
+    let projects = if let Some(limit) = query.limit {
+        projects.into_iter().skip(offset).take(limit as usize).collect()
+    } else {
+        projects.into_iter().skip(offset).collect()
+    };
+
+    Ok(Json(ProjectListResponse { projects, total_count }))
 }
 
 pub async fn tag_project(
