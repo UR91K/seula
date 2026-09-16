@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Loading plugin binaries and normalizing what they report.
 //!
 //! Everything in this module runs third-party native code in the current process. It
