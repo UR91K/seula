@@ -1,14 +1,11 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, CollectionCommands};
-use crate::database::ProjectDatabase;
-use crate::project::Project;
 use crate::models::CollectionStatistics;
+use crate::services::CollectionsService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use serde::Serialize;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex;
 
 pub struct CollectionCommand;
 
@@ -28,23 +25,23 @@ impl CliCommand for CollectionCommands {
 
         match self {
             CollectionCommands::List => {
-                let collections_list = self.get_collections_list(&ctx.db).await?;
+                let collections_list = self.get_collections_list(&ctx.services.collections).await?;
                 formatter.print(&collections_list)?;
             }
             CollectionCommands::Show { id } => {
-                let collection_details = self.get_collection_details(&ctx.db, id).await?;
+                let collection_details = self.get_collection_details(&ctx.services.collections, id).await?;
                 formatter.print(&collection_details)?;
             }
             CollectionCommands::Create { name, description } => {
-                let create_result = self.create_collection(&ctx.db, name, description.as_deref()).await?;
+                let create_result = self.create_collection(&ctx.services.collections, name, description.as_deref()).await?;
                 formatter.print(&create_result)?;
             }
             CollectionCommands::Add { collection_id, project_id } => {
-                let add_result = self.add_project_to_collection(&ctx.db, collection_id, project_id).await?;
+                let add_result = self.add_project_to_collection(&ctx.services.collections, collection_id, project_id).await?;
                 formatter.print(&add_result)?;
             }
             CollectionCommands::Remove { collection_id, project_id } => {
-                let remove_result = self.remove_project_from_collection(&ctx.db, collection_id, project_id).await?;
+                let remove_result = self.remove_project_from_collection(&ctx.services.collections, collection_id, project_id).await?;
                 formatter.print(&remove_result)?;
             }
         }
@@ -54,19 +51,15 @@ impl CliCommand for CollectionCommands {
 }
 
 impl CollectionCommands {
-    async fn get_collections_list(
-        &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
-    ) -> Result<CollectionsList, CliError> {
-        let mut db_guard = db.lock().await;
-        let (collections, total_count) = db_guard.list_collections(None, None, None, None)?;
+    async fn get_collections_list(&self, collections: &CollectionsService) -> Result<CollectionsList, CliError> {
+        let (list, total_count) = collections.list_collections(None, None, None, None).await?;
 
-        let displayed = collections
+        let displayed = list
             .into_iter()
-            .map(|(id, name, description)| CollectionRow {
-                id: id[..8].to_string(), // Show only first 8 chars of UUID
-                name,
-                description: description.unwrap_or_else(|| "No description".to_string()),
+            .map(|c| CollectionRow {
+                id: c.id[..8].to_string(), // Show only first 8 chars of UUID
+                name: c.name,
+                description: c.description.unwrap_or_else(|| "No description".to_string()),
             })
             .collect();
 
@@ -78,27 +71,19 @@ impl CollectionCommands {
 
     async fn get_collection_details(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        collections: &CollectionsService,
         collection_id: &str,
     ) -> Result<CollectionDetails, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Get collection basic info
-        let collection_data = db_guard.get_collection_by_id(collection_id)?;
-        let collection_data = collection_data.ok_or_else(|| {
+        let detail = collections.get_collection(collection_id).await?.ok_or_else(|| {
             Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("Collection {} not found", collection_id)
             )) as CliError
         })?;
 
-        let (id, name, description, notes, created_at, modified_at, _project_ids, _cover_art_id) = collection_data;
-        
-        // Get collection statistics
-        let stats = db_guard.get_collection_detailed_statistics(collection_id)?;
-        
-        // Get projects in collection
-        let projects = db_guard.get_collection_projects(collection_id)?;
+        let stats = collections.get_collection_statistics(collection_id).await?;
+
+        let projects = collections.get_collection_projects(collection_id).await?;
         let project_rows = projects
             .into_iter()
             .map(|project| ProjectInCollectionRow {
@@ -112,12 +97,12 @@ impl CollectionCommands {
             .collect();
 
         Ok(CollectionDetails {
-            id: id[..8].to_string(),
-            name,
-            description: description.unwrap_or_else(|| "No description".to_string()),
-            notes: notes.unwrap_or_else(|| "No notes".to_string()),
-            created_at,
-            modified_at,
+            id: detail.id[..8].to_string(),
+            name: detail.name,
+            description: detail.description.unwrap_or_else(|| "No description".to_string()),
+            notes: detail.notes.unwrap_or_else(|| "No notes".to_string()),
+            created_at: detail.created_at,
+            modified_at: detail.modified_at,
             stats,
             projects: project_rows,
         })
@@ -125,15 +110,14 @@ impl CollectionCommands {
 
     async fn create_collection(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        collections: &CollectionsService,
         name: &str,
         description: Option<&str>,
     ) -> Result<CollectionCreateResult, CliError> {
-        let mut db_guard = db.lock().await;
-        let collection_id = db_guard.create_collection(name, description, None)?;
+        let detail = collections.create_collection(name, description, None).await?;
 
         Ok(CollectionCreateResult {
-            id: collection_id[..8].to_string(),
+            id: detail.id[..8].to_string(),
             name: name.to_string(),
             description: description.map(|s| s.to_string()).unwrap_or_else(|| "No description".to_string()),
         })
@@ -141,22 +125,11 @@ impl CollectionCommands {
 
     async fn add_project_to_collection(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        collections: &CollectionsService,
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify collection exists
-        let collection_data = db_guard.get_collection_by_id(collection_id)?;
-        if collection_data.is_none() {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Collection {} not found", collection_id)
-            )) as CliError);
-        }
-
-        db_guard.add_project_to_collection(collection_id, project_id)?;
+        collections.add_project_to_collection(collection_id, project_id).await?;
 
         Ok(CollectionProjectResult {
             collection_id: collection_id[..8].to_string(),
@@ -168,22 +141,11 @@ impl CollectionCommands {
 
     async fn remove_project_from_collection(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        collections: &CollectionsService,
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify collection exists
-        let collection_data = db_guard.get_collection_by_id(collection_id)?;
-        if collection_data.is_none() {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Collection {} not found", collection_id)
-            )) as CliError);
-        }
-
-        db_guard.remove_project_from_collection(collection_id, project_id)?;
+        collections.remove_project_from_collection(collection_id, project_id).await?;
 
         Ok(CollectionProjectResult {
             collection_id: collection_id[..8].to_string(),

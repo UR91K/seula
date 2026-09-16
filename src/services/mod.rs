@@ -3,6 +3,7 @@
 //! domain; gRPC handlers and CLI commands both call into these instead of the
 //! database directly. See docs/decisions for the audit that motivated this.
 
+pub mod collections;
 pub mod project;
 pub mod tags;
 
@@ -11,6 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::database::ProjectDatabase;
 
+pub use collections::{CollectionDetail, CollectionsService};
 pub use project::{DeletionScope, ProjectsService};
 pub use tags::TagsService;
 
@@ -18,6 +20,7 @@ pub use tags::TagsService;
 pub struct Services {
     pub tags: TagsService,
     pub projects: ProjectsService,
+    pub collections: CollectionsService,
 }
 
 impl Services {
@@ -25,6 +28,7 @@ impl Services {
         Self {
             tags: TagsService::new(Arc::clone(&db)),
             projects: ProjectsService::new(Arc::clone(&db)),
+            collections: CollectionsService::new(Arc::clone(&db)),
         }
     }
 }

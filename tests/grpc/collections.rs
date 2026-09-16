@@ -418,7 +418,9 @@ async fn test_add_project_to_nonexistent_collection() {
 
     let result = server.add_project_to_collection(add_request).await;
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err().code(), Code::Internal);
+    // CollectionsService now validates the collection exists before mutating
+    // (previously this fell through to a raw FK-constraint failure -> Internal).
+    assert_eq!(result.unwrap_err().code(), Code::NotFound);
 }
 
 #[tokio::test]
@@ -435,7 +437,9 @@ async fn test_remove_project_from_nonexistent_collection() {
 
     let result = server.remove_project_from_collection(remove_request).await;
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err().code(), Code::Internal);
+    // Same fix as add_project_to_collection: validated up front now, so this is
+    // a clean NotFound instead of whatever the underlying query happened to raise.
+    assert_eq!(result.unwrap_err().code(), Code::NotFound);
 }
 
 #[tokio::test]
