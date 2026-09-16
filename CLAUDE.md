@@ -31,8 +31,12 @@ proto/services/  gRPC definitions
 
 ```bash
 cargo build --workspace
-cargo test --workspace          # NOT `cargo test --test X` — that skips examples,
-                                # and tests/plugin_scanner_tests.rs needs one
+cargo test --workspace --no-fail-fast
+                                # NOT `cargo test --test X` — that skips examples,
+                                # and tests/plugin_scanner_tests.rs needs one.
+                                # --no-fail-fast because without it the run stops at the
+                                # first failing binary; three broken tests in scan_tests
+                                # hid behind an earlier failure for a month that way.
 cargo run -- --help             # CLI
 cargo run                       # tray mode (default)
 ```
