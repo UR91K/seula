@@ -15,6 +15,7 @@ use super::handlers::collections as collection_handlers;
 use super::handlers::projects as project_handlers;
 use super::handlers::search as search_handlers;
 use super::handlers::tags as tag_handlers;
+use super::handlers::tasks as task_handlers;
 use super::state::AppState;
 
 /// Builds the axum router for the HTTP adapter.
@@ -169,6 +170,30 @@ pub fn build_router(state: AppState) -> Router {
             post(collection_handlers::batch_remove_from_collection),
         )
         .route("/api/v1/search", get(search_handlers::search))
+        .route(
+            "/api/v1/projects/:project_id/tasks",
+            get(task_handlers::get_project_tasks).post(task_handlers::create_task),
+        )
+        .route(
+            "/api/v1/projects/:project_id/tasks/search",
+            get(task_handlers::search_tasks),
+        )
+        .route(
+            "/api/v1/tasks/statistics",
+            get(task_handlers::get_task_statistics),
+        )
+        .route(
+            "/api/v1/tasks/batch-update-status",
+            post(task_handlers::batch_update_task_status),
+        )
+        .route(
+            "/api/v1/tasks/batch-delete",
+            post(task_handlers::batch_delete_tasks),
+        )
+        .route(
+            "/api/v1/tasks/:task_id",
+            put(task_handlers::update_task).delete(task_handlers::delete_task),
+        )
         .layer(cors)
         .with_state(state)
 }
