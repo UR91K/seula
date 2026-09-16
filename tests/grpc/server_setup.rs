@@ -173,9 +173,9 @@ mod tests {
             status: ScanStatus::ScanParsing as i32,
         };
 
-        // Set the progress using the system handler
-        *server.system_handler.scan_progress.lock().await = Some(progress_response.clone());
-        *server.system_handler.scan_status.lock().await = ScanStatus::ScanParsing;
+        // Set the progress using the system service
+        *server.system_handler.service.scan_progress_handle().lock().await = Some(progress_response.clone());
+        *server.system_handler.service.scan_status_handle().lock().await = ScanStatus::ScanParsing;
 
         // Now check that the progress is returned
         let request = Request::new(GetScanStatusRequest {});

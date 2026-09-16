@@ -8,7 +8,7 @@ use tonic::{Request, Response, Status};
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
 use crate::media::{MediaConfig, MediaStorageManager};
-use crate::services::Services;
+use crate::services::{Services, SystemService};
 
 use super::handlers::*;
 use super::common::*;
@@ -68,6 +68,14 @@ impl StudioProjectManagerServer {
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
         let services = Services::new(Arc::clone(&db), Arc::clone(&media_storage));
+        let system_service = SystemService::new(
+            Arc::clone(&db),
+            scan_status,
+            scan_progress,
+            watcher,
+            watcher_events,
+            start_time,
+        );
 
         Ok(Self {
             db: Arc::clone(&db),
@@ -78,14 +86,7 @@ impl StudioProjectManagerServer {
             tags_handler: TagsHandler::new(services.tags.clone()),
             tasks_handler: TasksHandler::new(services.tasks.clone()),
             media_handler: MediaHandler::new(services.media.clone()),
-            system_handler: SystemHandler::new(
-                Arc::clone(&db),
-                scan_status,
-                scan_progress,
-                watcher,
-                watcher_events,
-                start_time,
-            ),
+            system_handler: SystemHandler::new(system_service),
             plugins_handler: PluginsHandler::new(services.plugins.clone()),
             samples_handler: SamplesHandler::new(services.samples.clone()),
             config_handler: ConfigHandler::new(services.config.clone()),
@@ -101,6 +102,14 @@ impl StudioProjectManagerServer {
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
         let services = Services::new(Arc::clone(&db), Arc::clone(&media_storage));
+        let system_service = SystemService::new(
+            Arc::clone(&db),
+            scan_status,
+            scan_progress,
+            watcher,
+            watcher_events,
+            start_time,
+        );
 
         Self {
             db: Arc::clone(&db),
@@ -111,14 +120,7 @@ impl StudioProjectManagerServer {
             tags_handler: TagsHandler::new(services.tags.clone()),
             tasks_handler: TasksHandler::new(services.tasks.clone()),
             media_handler: MediaHandler::new(services.media.clone()),
-            system_handler: SystemHandler::new(
-                Arc::clone(&db),
-                scan_status,
-                scan_progress,
-                watcher,
-                watcher_events,
-                start_time,
-            ),
+            system_handler: SystemHandler::new(system_service),
             plugins_handler: PluginsHandler::new(services.plugins.clone()),
             samples_handler: SamplesHandler::new(services.samples.clone()),
             config_handler: ConfigHandler::new(services.config.clone()),

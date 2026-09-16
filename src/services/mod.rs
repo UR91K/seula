@@ -9,6 +9,7 @@ pub mod plugins;
 pub mod project;
 pub mod samples;
 pub mod search;
+pub mod system;
 pub mod tags;
 pub mod tasks;
 
@@ -25,6 +26,7 @@ pub use plugins::PluginsService;
 pub use project::{DeletionScope, ProjectsService};
 pub use samples::SamplesService;
 pub use search::SearchService;
+pub use system::SystemService;
 pub use tags::TagsService;
 pub use tasks::TasksService;
 
