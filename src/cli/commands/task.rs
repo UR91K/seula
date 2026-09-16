@@ -1,13 +1,10 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, TaskCommands};
-use crate::database::tasks::TaskAnalytics;
-use crate::database::ProjectDatabase;
+use crate::services::TasksService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 use serde::Serialize;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex;
 
 pub struct TaskCommand;
 
@@ -27,19 +24,19 @@ impl CliCommand for TaskCommands {
 
         match self {
             TaskCommands::List { project_id, completed } => {
-                let tasks_list = self.get_tasks_list(&ctx.db, project_id.as_deref(), *completed).await?;
+                let tasks_list = self.get_tasks_list(&ctx.services.tasks, project_id.as_deref(), *completed).await?;
                 formatter.print(&tasks_list)?;
             }
             TaskCommands::Create { project_id, description, priority } => {
-                let create_result = self.create_task(&ctx.db, project_id, description, *priority).await?;
+                let create_result = self.create_task(&ctx.services.tasks, project_id, description, *priority).await?;
                 formatter.print(&create_result)?;
             }
             TaskCommands::Complete { id } => {
-                let complete_result = self.complete_task(&ctx.db, id).await?;
+                let complete_result = self.complete_task(&ctx.services.tasks, id).await?;
                 formatter.print(&complete_result)?;
             }
             TaskCommands::Delete { id } => {
-                let delete_result = self.delete_task(&ctx.db, id).await?;
+                let delete_result = self.delete_task(&ctx.services.tasks, id).await?;
                 formatter.print(&delete_result)?;
             }
         }
@@ -51,15 +48,12 @@ impl CliCommand for TaskCommands {
 impl TaskCommands {
     async fn get_tasks_list(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tasks: &TasksService,
         project_id: Option<&str>,
         show_completed: bool,
     ) -> Result<TasksList, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        let tasks = if let Some(pid) = project_id {
-            // Get tasks for specific project
-            let all_tasks = db_guard.get_project_tasks(pid)?;
+        let displayed_tasks = if let Some(pid) = project_id {
+            let all_tasks = tasks.get_project_tasks(pid).await?;
             if show_completed {
                 all_tasks
             } else {
@@ -74,7 +68,7 @@ impl TaskCommands {
             )) as CliError);
         };
 
-        let displayed = tasks
+        let displayed = displayed_tasks
             .into_iter()
             .map(|(id, description, completed, created_at)| TaskRow {
                 id: id[..8].to_string(), // Show only first 8 chars of UUID
@@ -96,13 +90,12 @@ impl TaskCommands {
 
     async fn create_task(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tasks: &TasksService,
         project_id: &str,
         description: &str,
         _priority: u8, // Priority is not stored in current database schema
     ) -> Result<TaskCreateResult, CliError> {
-        let mut db_guard = db.lock().await;
-        let task_id = db_guard.add_task(project_id, description)?;
+        let (task_id, _, _, _, _) = tasks.create_task(project_id, description).await?;
 
         Ok(TaskCreateResult {
             id: task_id[..8].to_string(),
@@ -114,13 +107,10 @@ impl TaskCommands {
 
     async fn complete_task(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tasks: &TasksService,
         task_id: &str,
     ) -> Result<TaskActionResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify task exists and get its details
-        let task_data = db_guard.get_task(task_id)?;
+        let task_data = tasks.get_task(task_id).await?;
         match task_data {
             Some((_, project_id, description, already_completed, _)) => {
                 if already_completed {
@@ -133,7 +123,7 @@ impl TaskCommands {
                         message: "Task is already completed".to_string(),
                     })
                 } else {
-                    db_guard.complete_task(task_id, true)?;
+                    tasks.update_task(task_id, None, Some(true)).await?;
                     Ok(TaskActionResult {
                         id: task_id[..8].to_string(),
                         project_id: project_id[..8].to_string(),
@@ -155,16 +145,13 @@ impl TaskCommands {
 
     async fn delete_task(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        tasks: &TasksService,
         task_id: &str,
     ) -> Result<TaskActionResult, CliError> {
-        let mut db_guard = db.lock().await;
-        
-        // Verify task exists and get its details
-        let task_data = db_guard.get_task(task_id)?;
+        let task_data = tasks.get_task(task_id).await?;
         match task_data {
             Some((_, project_id, description, _, _)) => {
-                db_guard.remove_task(task_id)?;
+                tasks.delete_task(task_id).await?;
                 Ok(TaskActionResult {
                     id: task_id[..8].to_string(),
                     project_id: project_id[..8].to_string(),

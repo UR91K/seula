@@ -1,33 +1,22 @@
 use log::{debug, error};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tonic::{Code, Request, Response, Status};
 
-use crate::config::{Config, CONFIG};
-use crate::database::ProjectDatabase;
 use super::super::config::*;
+use crate::config::Config;
+use crate::services::ConfigService;
 
 #[derive(Clone)]
 pub struct ConfigHandler {
-    pub db: Arc<Mutex<ProjectDatabase>>,
+    pub service: ConfigService,
 }
 
 impl ConfigHandler {
-    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
-        Self { db }
+    pub fn new(service: ConfigService) -> Self {
+        Self { service }
     }
 
-    pub async fn get_config(
-        &self,
-        _request: Request<GetConfigRequest>,
-    ) -> Result<Response<GetConfigResponse>, Status> {
-        debug!("GetConfig request");
-
-        let config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?;
-
-        let config_data = ConfigData {
+    fn to_proto(config: &Config) -> ConfigData {
+        ConfigData {
             paths: config.paths.clone(),
             database_path: config.database_path.clone(),
             grpc_port: config.grpc_port as u32,
@@ -37,12 +26,23 @@ impl ConfigHandler {
             max_audio_file_size_mb: config.max_audio_file_size_mb,
             needs_setup: config.needs_setup(),
             status_message: config.get_status_message(),
-        };
+        }
+    }
 
-        let response = GetConfigResponse {
-            config: Some(config_data),
-        };
-        Ok(Response::new(response))
+    pub async fn get_config(
+        &self,
+        _request: Request<GetConfigRequest>,
+    ) -> Result<Response<GetConfigResponse>, Status> {
+        debug!("GetConfig request");
+
+        let config = self
+            .service
+            .get()
+            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?;
+
+        Ok(Response::new(GetConfigResponse {
+            config: Some(Self::to_proto(config)),
+        }))
     }
 
     pub async fn get_config_status(
@@ -51,17 +51,17 @@ impl ConfigHandler {
     ) -> Result<Response<GetConfigStatusResponse>, Status> {
         debug!("GetConfigStatus request");
 
-        let config = CONFIG
-            .as_ref()
+        let config = self
+            .service
+            .get()
             .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?;
 
-        let response = GetConfigStatusResponse {
+        Ok(Response::new(GetConfigStatusResponse {
             needs_setup: config.needs_setup(),
             is_ready_for_operation: config.is_ready_for_operation(),
             status_message: config.get_status_message(),
             configured_paths_count: config.paths.len() as i32,
-        };
-        Ok(Response::new(response))
+        }))
     }
 
     pub async fn update_paths(
@@ -69,34 +69,24 @@ impl ConfigHandler {
         request: Request<UpdatePathsRequest>,
     ) -> Result<Response<UpdatePathsResponse>, Status> {
         debug!("UpdatePaths request: {:?}", request);
-
         let req = request.into_inner();
-        
-        // Since CONFIG is a static lazy, we need to reload it to get a mutable version
-        // For now, we'll work with a temporary config and save it
-        let mut config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?
-            .clone();
 
-        match config.update_paths(req.paths) {
-            Ok(warnings) => {
+        match self.service.update_paths(req.paths) {
+            Ok((_, warnings)) => {
                 debug!("Successfully updated paths");
-                let response = UpdatePathsResponse {
+                Ok(Response::new(UpdatePathsResponse {
                     success: true,
                     error_message: None,
                     validation_warnings: warnings,
-                };
-                Ok(Response::new(response))
+                }))
             }
             Err(e) => {
                 error!("Failed to update paths: {:?}", e);
-                let response = UpdatePathsResponse {
+                Ok(Response::new(UpdatePathsResponse {
                     success: false,
                     error_message: Some(e.to_string()),
                     validation_warnings: vec![],
-                };
-                Ok(Response::new(response))
+                }))
             }
         }
     }
@@ -106,32 +96,24 @@ impl ConfigHandler {
         request: Request<AddPathRequest>,
     ) -> Result<Response<AddPathResponse>, Status> {
         debug!("AddPath request: {:?}", request);
-
         let req = request.into_inner();
-        
-        let mut config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?
-            .clone();
 
-        match config.add_path(req.path) {
-            Ok(warnings) => {
+        match self.service.add_path(req.path) {
+            Ok((_, warnings)) => {
                 debug!("Successfully added path");
-                let response = AddPathResponse {
+                Ok(Response::new(AddPathResponse {
                     success: true,
                     error_message: None,
                     validation_warnings: warnings,
-                };
-                Ok(Response::new(response))
+                }))
             }
             Err(e) => {
                 error!("Failed to add path: {:?}", e);
-                let response = AddPathResponse {
+                Ok(Response::new(AddPathResponse {
                     success: false,
                     error_message: Some(e.to_string()),
                     validation_warnings: vec![],
-                };
-                Ok(Response::new(response))
+                }))
             }
         }
     }
@@ -141,32 +123,27 @@ impl ConfigHandler {
         request: Request<RemovePathRequest>,
     ) -> Result<Response<RemovePathResponse>, Status> {
         debug!("RemovePath request: {:?}", request);
-
         let req = request.into_inner();
-        
-        let mut config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?
-            .clone();
 
-        match config.remove_path(&req.path) {
-            Ok(()) => {
+        match self.service.remove_path(&req.path) {
+            Ok(config) => {
                 debug!("Successfully removed path");
-                let response = RemovePathResponse {
+                Ok(Response::new(RemovePathResponse {
                     success: true,
                     error_message: None,
                     remaining_paths_count: config.paths.len() as i32,
-                };
-                Ok(Response::new(response))
+                }))
             }
             Err(e) => {
                 error!("Failed to remove path: {:?}", e);
-                let response = RemovePathResponse {
+                // Match prior behavior: report the (unchanged) current path count
+                // even on failure, rather than leaving the field unset.
+                let remaining = self.service.get().map(|c| c.paths.len() as i32).unwrap_or(0);
+                Ok(Response::new(RemovePathResponse {
                     success: false,
                     error_message: Some(e.to_string()),
-                    remaining_paths_count: config.paths.len() as i32,
-                };
-                Ok(Response::new(response))
+                    remaining_paths_count: remaining,
+                }))
             }
         }
     }
@@ -176,15 +153,9 @@ impl ConfigHandler {
         request: Request<UpdateSettingsRequest>,
     ) -> Result<Response<UpdateSettingsResponse>, Status> {
         debug!("UpdateSettings request: {:?}", request);
-
         let req = request.into_inner();
-        
-        let mut config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?
-            .clone();
 
-        match config.update_settings(
+        match self.service.update_settings(
             req.database_path,
             req.grpc_port.map(|p| p as u16),
             req.log_level,
@@ -192,23 +163,21 @@ impl ConfigHandler {
             req.max_cover_art_size_mb.map(Some),
             req.max_audio_file_size_mb.map(Some),
         ) {
-            Ok(warnings) => {
+            Ok((_, warnings)) => {
                 debug!("Successfully updated settings");
-                let response = UpdateSettingsResponse {
+                Ok(Response::new(UpdateSettingsResponse {
                     success: true,
                     error_message: None,
                     validation_warnings: warnings,
-                };
-                Ok(Response::new(response))
+                }))
             }
             Err(e) => {
                 error!("Failed to update settings: {:?}", e);
-                let response = UpdateSettingsResponse {
+                Ok(Response::new(UpdateSettingsResponse {
                     success: false,
                     error_message: Some(e.to_string()),
                     validation_warnings: vec![],
-                };
-                Ok(Response::new(response))
+                }))
             }
         }
     }
@@ -219,39 +188,24 @@ impl ConfigHandler {
     ) -> Result<Response<ReloadConfigResponse>, Status> {
         debug!("ReloadConfig request");
 
-        match Config::reload() {
+        match self.service.reload() {
             Ok((new_config, warnings)) => {
                 debug!("Successfully reloaded config");
-                
-                let config_data = ConfigData {
-                    paths: new_config.paths.clone(),
-                    database_path: new_config.database_path.clone(),
-                    grpc_port: new_config.grpc_port as u32,
-                    log_level: new_config.log_level.clone(),
-                    media_storage_dir: new_config.media_storage_dir.clone(),
-                    max_cover_art_size_mb: new_config.max_cover_art_size_mb,
-                    max_audio_file_size_mb: new_config.max_audio_file_size_mb,
-                    needs_setup: new_config.needs_setup(),
-                    status_message: new_config.get_status_message(),
-                };
-
-                let response = ReloadConfigResponse {
+                Ok(Response::new(ReloadConfigResponse {
                     success: true,
                     error_message: None,
                     validation_warnings: warnings,
-                    config: Some(config_data),
-                };
-                Ok(Response::new(response))
+                    config: Some(Self::to_proto(&new_config)),
+                }))
             }
             Err(e) => {
                 error!("Failed to reload config: {:?}", e);
-                let response = ReloadConfigResponse {
+                Ok(Response::new(ReloadConfigResponse {
                     success: false,
                     error_message: Some(e.to_string()),
                     validation_warnings: vec![],
                     config: None,
-                };
-                Ok(Response::new(response))
+                }))
             }
         }
     }
@@ -262,30 +216,30 @@ impl ConfigHandler {
     ) -> Result<Response<ValidateConfigResponse>, Status> {
         debug!("ValidateConfig request");
 
-        let config = CONFIG
-            .as_ref()
-            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?;
+        let needs_setup = self
+            .service
+            .get()
+            .map_err(|e| Status::new(Code::Internal, format!("Failed to load config: {}", e)))?
+            .needs_setup();
 
-        match config.validate() {
+        match self.service.validate() {
             Ok(warnings) => {
                 debug!("Config validation successful with {} warnings", warnings.len());
-                let response = ValidateConfigResponse {
+                Ok(Response::new(ValidateConfigResponse {
                     is_valid: true,
                     warnings,
                     errors: vec![],
-                    needs_setup: config.needs_setup(),
-                };
-                Ok(Response::new(response))
+                    needs_setup,
+                }))
             }
             Err(e) => {
                 debug!("Config validation failed: {:?}", e);
-                let response = ValidateConfigResponse {
+                Ok(Response::new(ValidateConfigResponse {
                     is_valid: false,
                     warnings: vec![],
                     errors: vec![e.to_string()],
-                    needs_setup: config.needs_setup(),
-                };
-                Ok(Response::new(response))
+                    needs_setup,
+                }))
             }
         }
     }

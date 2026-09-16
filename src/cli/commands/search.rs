@@ -1,7 +1,7 @@
 use crate::cli::commands::CliContext;
 use crate::cli::CliError;
 use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
-use crate::database::search::{SearchQuery as DbSearchQuery, SearchResult as DbSearchResult};
+use crate::database::search::SearchResult as DbSearchResult;
 use serde::Serialize;
 
 pub struct SearchCommand {
@@ -15,27 +15,21 @@ impl crate::cli::commands::CliCommand for SearchCommand {
     async fn execute(&self, ctx: &CliContext) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
 
-        let mut db = ctx.db.lock().await;
-        let parsed = DbSearchQuery::parse(&self.query);
-        let results: Vec<DbSearchResult> = db.search_fts(&parsed)?;
+        let (page, total_count) = ctx
+            .services
+            .search
+            .search(&self.query, Some(self.limit as i32), Some(self.offset as i32))
+            .await?;
 
-        if results.is_empty() {
+        if total_count == 0 {
             formatter.print_message("No results found", crate::cli::output::MessageType::Info);
             return Ok(());
         }
 
-        // Pagination
-        let start = self.offset.min(results.len());
-        let end = (start + self.limit).min(results.len());
-        let page = &results[start..end];
-
-        let rows: Vec<SearchRow> = page
-            .iter()
-            .map(|r| SearchRow::from_result(r))
-            .collect();
+        let rows: Vec<SearchRow> = page.iter().map(SearchRow::from_result).collect();
 
         let display = SearchResultsDisplay {
-            total: results.len(),
+            total: total_count as usize,
             displayed: rows,
         };
 

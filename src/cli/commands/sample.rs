@@ -1,14 +1,12 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, SampleCommands};
-use crate::database::ProjectDatabase;
 use crate::models::Sample;
+use crate::services::SamplesService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 
 use serde::Serialize;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex;
 
 pub struct SampleCommand;
 
@@ -28,19 +26,19 @@ impl CliCommand for SampleCommands {
 
         match self {
             SampleCommands::List { limit, offset } => {
-                let samples_list = self.get_samples_list(&ctx.db, *limit, *offset).await?;
+                let samples_list = self.get_samples_list(&ctx.services.samples, *limit, *offset).await?;
                 formatter.print(&samples_list)?;
             }
             SampleCommands::Search { query, limit } => {
-                let search_results = self.search_samples(&ctx.db, query, *limit).await?;
+                let search_results = self.search_samples(&ctx.services.samples, query, *limit).await?;
                 formatter.print(&search_results)?;
             }
             SampleCommands::Stats => {
-                let stats = self.get_sample_stats(&ctx.db).await?;
+                let stats = self.get_sample_stats(&ctx.services.samples).await?;
                 formatter.print(&stats)?;
             }
             SampleCommands::CheckPresence => {
-                let refresh_result = self.check_sample_presence(&ctx.db).await?;
+                let refresh_result = self.check_sample_presence(&ctx.services.samples).await?;
                 formatter.print(&refresh_result)?;
             }
         }
@@ -52,12 +50,11 @@ impl CliCommand for SampleCommands {
 impl SampleCommands {
     async fn get_samples_list(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        samples: &SamplesService,
         limit: usize,
         offset: usize,
     ) -> Result<SamplesList, CliError> {
-        let db_guard = db.lock().await;
-        let (samples, total_count) = db_guard.get_all_samples(
+        let (samples, total_count) = samples.get_all_samples(
             Some(limit as i32),
             Some(offset as i32),
             None,
@@ -67,7 +64,7 @@ impl SampleCommands {
             None,
             None,
             None,
-        )?;
+        ).await?;
 
         let displayed = samples
             .into_iter()
@@ -89,18 +86,17 @@ impl SampleCommands {
 
     async fn search_samples(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        samples: &SamplesService,
         query: &str,
         limit: usize,
     ) -> Result<SamplesSearchResults, CliError> {
-        let db_guard = db.lock().await;
-        let (samples, total_count) = db_guard.search_samples(
+        let (samples, total_count) = samples.search_samples(
             query,
             Some(limit as i32),
             Some(0),
             None,
             None,
-        )?;
+        ).await?;
 
         let displayed = samples
             .into_iter()
@@ -119,10 +115,9 @@ impl SampleCommands {
         })
     }
 
-    async fn get_sample_stats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<SampleStatsDisplay, CliError> {
-        let db_guard = db.lock().await;
-        let stats = db_guard.get_sample_stats()?;
-        let analytics = db_guard.get_sample_analytics()?;
+    async fn get_sample_stats(&self, samples: &SamplesService) -> Result<SampleStatsDisplay, CliError> {
+        let stats = samples.get_sample_stats().await?;
+        let analytics = samples.get_sample_analytics().await?;
 
         Ok(SampleStatsDisplay {
             stats,
@@ -130,9 +125,8 @@ impl SampleCommands {
         })
     }
 
-    async fn check_sample_presence(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<SamplePresenceCheckResult, CliError> {
-        let mut db_guard = db.lock().await;
-        let refresh_result = db_guard.refresh_sample_presence_status()?;
+    async fn check_sample_presence(&self, samples: &SamplesService) -> Result<SamplePresenceCheckResult, CliError> {
+        let refresh_result = samples.refresh_sample_presence_status().await?;
 
         Ok(SamplePresenceCheckResult {
             total_checked: refresh_result.total_samples_checked as usize,

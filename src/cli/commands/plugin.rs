@@ -1,9 +1,9 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
 use crate::cli::{CliError, OutputFormat, PluginCommands};
-use crate::database::ProjectDatabase;
 use crate::database::plugins::{PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
-use crate::models::{Plugin, GrpcPlugin};
+use crate::models::Plugin;
+use crate::services::PluginsService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 
@@ -14,9 +14,7 @@ use vst_meta::protocol::Outcome;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex as TokioMutex;
 
 pub struct PluginCommand;
 
@@ -36,31 +34,31 @@ impl CliCommand for PluginCommands {
 
         match self {
             PluginCommands::List { vendor, format, installed, limit, offset, sort_by, sort_desc } => {
-                let plugins_list = self.get_plugins_list(&ctx.db, vendor, format, installed, *limit, *offset, sort_by, *sort_desc).await?;
+                let plugins_list = self.get_plugins_list(&ctx.services.plugins, vendor, format, installed, *limit, *offset, sort_by, *sort_desc).await?;
                 formatter.print(&plugins_list)?;
             }
             PluginCommands::Search { query, vendor, format, installed, limit } => {
-                let search_results = self.search_plugins(&ctx.db, query, vendor, format, installed, *limit).await?;
+                let search_results = self.search_plugins(&ctx.services.plugins, query, vendor, format, installed, *limit).await?;
                 formatter.print(&search_results)?;
             }
             PluginCommands::Show { id } => {
-                let plugin_details = self.get_plugin_details(&ctx.db, id).await?;
+                let plugin_details = self.get_plugin_details(&ctx.services.plugins, id).await?;
                 formatter.print(&plugin_details)?;
             }
             PluginCommands::Stats => {
-                let stats = self.get_plugin_stats(&ctx.db).await?;
+                let stats = self.get_plugin_stats(&ctx.services.plugins).await?;
                 formatter.print(&stats)?;
             }
             PluginCommands::Refresh => {
-                let refresh_result = self.refresh_plugin_installation_status(&ctx.db).await?;
+                let refresh_result = self.refresh_plugin_installation_status(&ctx.services.plugins).await?;
                 formatter.print(&refresh_result)?;
             }
             PluginCommands::Vendors => {
-                let vendors = self.get_plugin_vendors(&ctx.db).await?;
+                let vendors = self.get_plugin_vendors(&ctx.services.plugins).await?;
                 formatter.print(&vendors)?;
             }
             PluginCommands::Formats => {
-                let formats = self.get_plugin_formats(&ctx.db).await?;
+                let formats = self.get_plugin_formats(&ctx.services.plugins).await?;
                 formatter.print(&formats)?;
             }
             PluginCommands::ScanSystem { paths, timeout, failures_only, limit } => {
@@ -90,7 +88,7 @@ impl CliCommand for PluginCommands {
 impl PluginCommands {
     async fn get_plugins_list(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        plugins: &PluginsService,
         vendor: &Option<String>,
         format: &Option<String>,
         installed: &Option<bool>,
@@ -99,8 +97,7 @@ impl PluginCommands {
         sort_by: &Option<String>,
         sort_desc: bool,
     ) -> Result<PluginsList, CliError> {
-        let db_guard = db.lock().await;
-        let (plugins, total_count) = db_guard.get_all_plugins(
+        let (plugins, total_count) = plugins.get_all_plugins(
             Some(limit as i32),
             Some(offset as i32),
             sort_by.clone(),
@@ -109,7 +106,7 @@ impl PluginCommands {
             format.as_ref().map(|s| s.clone()),
             *installed,
             None, // min_usage_count
-        )?;
+        ).await?;
 
         let displayed = plugins
             .into_iter()
@@ -134,22 +131,21 @@ impl PluginCommands {
 
     async fn search_plugins(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        plugins: &PluginsService,
         query: &str,
         vendor: &Option<String>,
         format: &Option<String>,
         installed: &Option<bool>,
         limit: usize,
     ) -> Result<PluginsSearchResults, CliError> {
-        let db_guard = db.lock().await;
-        let (plugins, total_count) = db_guard.search_plugins(
+        let (plugins, total_count) = plugins.search_plugins(
             query,
             Some(limit as i32),
             Some(0),
             *installed,
             vendor.as_ref().map(|s| s.clone()),
             format.as_ref().map(|s| s.clone()),
-        )?;
+        ).await?;
 
         let displayed = plugins
             .into_iter()
@@ -173,11 +169,10 @@ impl PluginCommands {
 
     async fn get_plugin_details(
         &self,
-        db: &Arc<TokioMutex<ProjectDatabase>>,
+        plugins: &PluginsService,
         plugin_id: &str,
     ) -> Result<PluginDetails, CliError> {
-        let db_guard = db.lock().await;
-        let plugin = db_guard.get_plugin_by_id(plugin_id)?;
+        let plugin = plugins.get_plugin(plugin_id).await?;
 
         match plugin {
             Some(grpc_plugin) => Ok(PluginDetails {
@@ -189,28 +184,25 @@ impl PluginCommands {
         }
     }
 
-    async fn get_plugin_stats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginStatsDisplay, CliError> {
-        let db_guard = db.lock().await;
-        let stats = db_guard.get_plugin_stats()?;
+    async fn get_plugin_stats(&self, plugins: &PluginsService) -> Result<PluginStatsDisplay, CliError> {
+        let stats = plugins.get_plugin_stats().await?;
 
         Ok(PluginStatsDisplay { stats })
     }
 
-    async fn refresh_plugin_installation_status(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginRefreshDisplay, CliError> {
-        let mut db_guard = db.lock().await;
-        let result = db_guard.refresh_plugin_installation_status()?;
+    async fn refresh_plugin_installation_status(&self, plugins: &PluginsService) -> Result<PluginRefreshDisplay, CliError> {
+        let result = plugins.refresh_plugin_installation_status().await?;
 
         Ok(PluginRefreshDisplay { result })
     }
 
-    async fn get_plugin_vendors(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginVendorsDisplay, CliError> {
-        let db_guard = db.lock().await;
-        let (vendors, total_count) = db_guard.get_plugin_vendors(
+    async fn get_plugin_vendors(&self, plugins: &PluginsService) -> Result<PluginVendorsDisplay, CliError> {
+        let (vendors, total_count) = plugins.get_plugin_vendors(
             Some(50), // limit
             Some(0),  // offset
             Some("vendor".to_string()), // sort_by
             Some(false), // sort_desc
-        )?;
+        ).await?;
 
         Ok(PluginVendorsDisplay {
             vendors,
@@ -218,14 +210,13 @@ impl PluginCommands {
         })
     }
 
-    async fn get_plugin_formats(&self, db: &Arc<TokioMutex<ProjectDatabase>>) -> Result<PluginFormatsDisplay, CliError> {
-        let db_guard = db.lock().await;
-        let (formats, total_count) = db_guard.get_plugin_formats(
+    async fn get_plugin_formats(&self, plugins: &PluginsService) -> Result<PluginFormatsDisplay, CliError> {
+        let (formats, total_count) = plugins.get_plugin_formats(
             Some(50), // limit
             Some(0),  // offset
             Some("format".to_string()), // sort_by
             Some(false), // sort_desc
-        )?;
+        ).await?;
 
         Ok(PluginFormatsDisplay {
             formats,

@@ -14,6 +14,7 @@ use crate::grpc::handlers::*;
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
 use crate::cli::CliError;
+use crate::media::{MediaConfig, MediaStorageManager};
 use crate::services::Services;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -34,7 +35,14 @@ impl CliContext {
             config.database_path.clone().expect("Database path must be set by config initialization"),
         );
         let db = Arc::new(Mutex::new(ProjectDatabase::new(db_path)?));
-        let services = Services::new(Arc::clone(&db));
+
+        let media_config = MediaConfig::from(config);
+        let media_storage = Arc::new(MediaStorageManager::new(
+            std::path::PathBuf::from(&config.media_storage_dir),
+            media_config,
+        )?);
+
+        let services = Services::new(Arc::clone(&db), media_storage);
 
         Ok(Self {
             db,

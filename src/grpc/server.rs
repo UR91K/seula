@@ -28,6 +28,7 @@ use super::config::*;
 #[derive(Clone)]
 pub struct StudioProjectManagerServer {
     db: Arc<Mutex<ProjectDatabase>>,
+    media_storage: Arc<MediaStorageManager>,
     pub projects_handler: ProjectsHandler,
     pub search_handler: SearchHandler,
     pub collections_handler: CollectionsHandler,
@@ -66,16 +67,17 @@ impl StudioProjectManagerServer {
         let watcher = Arc::new(Mutex::new(None));
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
-        let services = Services::new(Arc::clone(&db));
+        let services = Services::new(Arc::clone(&db), Arc::clone(&media_storage));
 
         Ok(Self {
             db: Arc::clone(&db),
+            media_storage: Arc::clone(&media_storage),
             projects_handler: ProjectsHandler::new(services.projects.clone()),
-            search_handler: SearchHandler::new(Arc::clone(&db)),
+            search_handler: SearchHandler::new(services.search.clone()),
             collections_handler: CollectionsHandler::new(services.collections.clone()),
             tags_handler: TagsHandler::new(services.tags.clone()),
-            tasks_handler: TasksHandler::new(Arc::clone(&db)),
-            media_handler: MediaHandler::new(Arc::clone(&db), Arc::clone(&media_storage)),
+            tasks_handler: TasksHandler::new(services.tasks.clone()),
+            media_handler: MediaHandler::new(services.media.clone()),
             system_handler: SystemHandler::new(
                 Arc::clone(&db),
                 scan_status,
@@ -84,9 +86,9 @@ impl StudioProjectManagerServer {
                 watcher_events,
                 start_time,
             ),
-            plugins_handler: PluginsHandler::new(Arc::clone(&db)),
-            samples_handler: SamplesHandler::new(Arc::clone(&db)),
-            config_handler: ConfigHandler::new(Arc::clone(&db)),
+            plugins_handler: PluginsHandler::new(services.plugins.clone()),
+            samples_handler: SamplesHandler::new(services.samples.clone()),
+            config_handler: ConfigHandler::new(services.config.clone()),
         })
     }
 
@@ -98,16 +100,17 @@ impl StudioProjectManagerServer {
         let watcher = Arc::new(Mutex::new(None));
         let watcher_events = Arc::new(Mutex::new(None));
         let start_time = Instant::now();
-        let services = Services::new(Arc::clone(&db));
+        let services = Services::new(Arc::clone(&db), Arc::clone(&media_storage));
 
         Self {
             db: Arc::clone(&db),
+            media_storage: Arc::clone(&media_storage),
             projects_handler: ProjectsHandler::new(services.projects.clone()),
-            search_handler: SearchHandler::new(Arc::clone(&db)),
+            search_handler: SearchHandler::new(services.search.clone()),
             collections_handler: CollectionsHandler::new(services.collections.clone()),
             tags_handler: TagsHandler::new(services.tags.clone()),
-            tasks_handler: TasksHandler::new(Arc::clone(&db)),
-            media_handler: MediaHandler::new(Arc::clone(&db), Arc::clone(&media_storage)),
+            tasks_handler: TasksHandler::new(services.tasks.clone()),
+            media_handler: MediaHandler::new(services.media.clone()),
             system_handler: SystemHandler::new(
                 Arc::clone(&db),
                 scan_status,
@@ -116,9 +119,9 @@ impl StudioProjectManagerServer {
                 watcher_events,
                 start_time,
             ),
-            plugins_handler: PluginsHandler::new(Arc::clone(&db)),
-            samples_handler: SamplesHandler::new(Arc::clone(&db)),
-            config_handler: ConfigHandler::new(Arc::clone(&db)),
+            plugins_handler: PluginsHandler::new(services.plugins.clone()),
+            samples_handler: SamplesHandler::new(services.samples.clone()),
+            config_handler: ConfigHandler::new(services.config.clone()),
         }
     }
 
@@ -127,7 +130,7 @@ impl StudioProjectManagerServer {
     }
 
     pub fn media_storage(&self) -> &Arc<MediaStorageManager> {
-        &self.media_handler.media_storage
+        &self.media_storage
     }
 }
 
