@@ -19,6 +19,21 @@ service PluginService {
   rpc GetPlugin(GetPluginRequest) returns (GetPluginResponse);
 }
 
+// Which of the three `plugins.installed` categories a query should return.
+//
+// `installed` is tri-state: a scan found it, a scan looked and did not, or no scan has
+// looked yet. Filters carry a repeated field so unions are expressible -- "everything I
+// cannot load" is ABSENT plus UNSCANNED. An empty list means no filtering. See ADR-0025.
+enum InstallState {
+  INSTALL_STATE_UNSPECIFIED = 0;
+  // A scan confirmed the plugin is installed.
+  INSTALL_STATE_INSTALLED = 1;
+  // A scan looked for the plugin and did not find it.
+  INSTALL_STATE_ABSENT = 2;
+  // No scan has looked. Deliberately distinct from ABSENT.
+  INSTALL_STATE_UNSCANNED = 3;
+}
+
 message GetAllPluginsRequest {
   optional int32 limit = 1;
   optional int32 offset = 2;
@@ -26,7 +41,7 @@ message GetAllPluginsRequest {
   optional bool sort_desc = 4;
   optional string vendor_filter = 5;
   optional string format_filter = 6;
-  optional bool installed_only = 7;
+  repeated InstallState install_states = 7;
   optional int32 min_usage_count = 8;
 }
 
@@ -37,7 +52,7 @@ message GetAllPluginsResponse {
 
 // Filter by Status
 message GetPluginByInstalledStatusRequest {
-  bool installed = 1;
+  repeated InstallState install_states = 1;
   optional int32 limit = 2;
   optional int32 offset = 3;
   optional string sort_by = 4;
@@ -54,7 +69,7 @@ message SearchPluginsRequest {
   string query = 1;
   optional int32 limit = 2;
   optional int32 offset = 3;
-  optional bool installed_only = 4;
+  repeated InstallState install_states = 4;
   optional string vendor_filter = 5;
   optional string format_filter = 6;
 }

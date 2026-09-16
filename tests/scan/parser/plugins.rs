@@ -167,8 +167,10 @@ fn test_empty_plugin_name() {
         plugin.id.to_string().len() > 0,
         "Plugin should have a valid UUID"
     );
-    // The plugin name should be "Pro-Q 3" from the database, not empty
-    assert_eq!(plugin.name, "Pro-Q 3");
+    // The parser records the reference exactly as the project file writes it. There is
+    // no name backfill any more -- ADR-0006 deleted the Ableton database that used to
+    // supply one -- so an empty <Name> stays empty until a plugin scan enriches it.
+    assert_eq!(plugin.name, "");
     assert_eq!(
         plugin.dev_identifier,
         "device:vst3:audiofx:72c4db71-7a4d-459a-b97e-51745d84b39d"
@@ -211,8 +213,9 @@ fn test_whitespace_only_plugin_name() {
         plugin.id.to_string().len() > 0,
         "Plugin should have a valid UUID"
     );
-    // The plugin name should be "Pro-Q 3" from the database, not the whitespace-only name
-    assert_eq!(plugin.name, "Pro-Q 3");
+    // As above: no backfill since ADR-0006, so the whitespace-only name is preserved
+    // verbatim rather than being replaced from a database that no longer exists.
+    assert_eq!(plugin.name, "   ");
     assert_eq!(
         plugin.dev_identifier,
         "device:vst3:audiofx:72c4db71-7a4d-459a-b97e-51745d84b39d"
@@ -510,8 +513,17 @@ fn test_psp_springbox_plugin_from_real_project() {
     );
     
     // 5. Check for the specific plugin that should be PSP SpringBox
-    let (plugins, _) = db.get_plugins_by_installed_status(false, Some(1000), Some(0), Some("name".to_string()), Some(false))
-        .expect("Failed to get plugins");
+    // Batch insert records a *reference* and deliberately leaves `installed` NULL, since
+    // a project file cannot know what is installed here (ADR-0012). So the plugin we just
+    // inserted is Unscanned, not Absent -- asking for Absent returned nothing at all.
+    let (plugins, _) = db.get_plugins_by_installed_status(
+        &[seula::database::plugins::InstallState::Unscanned],
+        Some(1000),
+        Some(0),
+        Some("name".to_string()),
+        Some(false),
+    )
+    .expect("Failed to get plugins");
     
     // Look for the plugin with the specific device ID that should be PSP SpringBox
     let psp_springbox_device_id = "device:vst3:audiofx:13b117f4-1b21-3a38-7923-ff895d3b3131";

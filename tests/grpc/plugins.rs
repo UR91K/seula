@@ -176,7 +176,7 @@ async fn test_get_all_plugins_with_filters() {
         sort_desc: Some(false),
         vendor_filter: Some("TestVendor".to_string()),
         format_filter: Some("VST3AudioFx".to_string()),
-        installed_only: Some(true),
+        install_states: vec![InstallState::Installed as i32],
         min_usage_count: Some(1),
     });
     let response = server.get_all_plugins(request).await;
@@ -196,7 +196,7 @@ async fn test_get_all_plugins_with_filters() {
         sort_desc: Some(false),
         vendor_filter: Some("AnotherVendor".to_string()),
         format_filter: None,
-        installed_only: None,
+        install_states: vec![],
         min_usage_count: None,
     });
     let response = server.get_all_plugins(request).await;
@@ -213,7 +213,7 @@ async fn test_get_all_plugins_with_filters() {
         sort_desc: Some(false),
         vendor_filter: None,
         format_filter: Some("VST2AudioFx".to_string()),
-        installed_only: None,
+        install_states: vec![],
         min_usage_count: None,
     });
     let response = server.get_all_plugins(request).await;
@@ -222,7 +222,7 @@ async fn test_get_all_plugins_with_filters() {
     let response = response.unwrap().into_inner();
     assert!(response.total_count >= 0);
     
-    // Test with just installed_only filter
+    // Test with just the install-state filter (a union: everything not confirmed present)
     let request = Request::new(GetAllPluginsRequest {
         limit: Some(5),
         offset: Some(0),
@@ -230,7 +230,7 @@ async fn test_get_all_plugins_with_filters() {
         sort_desc: Some(false),
         vendor_filter: None,
         format_filter: None,
-        installed_only: Some(false),
+        install_states: vec![InstallState::Absent as i32, InstallState::Unscanned as i32],
         min_usage_count: None,
     });
     let response = server.get_all_plugins(request).await;
@@ -247,7 +247,7 @@ async fn test_get_all_plugins_with_filters() {
         sort_desc: Some(true),
         vendor_filter: None,
         format_filter: None,
-        installed_only: None,
+        install_states: vec![],
         min_usage_count: Some(5),
     });
     let response = server.get_all_plugins(request).await;

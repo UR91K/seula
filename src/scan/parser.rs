@@ -744,7 +744,8 @@ impl Parser {
     ///
     /// This method performs the final processing step that transforms the raw data
     /// collected during XML parsing into structured model objects. It handles
-    /// validation, plugin installation detection, and key signature analysis.
+    /// validation, sample and plugin construction, and key signature analysis. It
+    /// touches no database and does no I/O.
     ///
     /// # Processing Steps
     ///
@@ -752,7 +753,7 @@ impl Parser {
     /// 2. **Property Validation**: Validates tempo and time signature values
     /// 3. **Duration Calculation**: Computes project length from end times
     /// 4. **Sample Processing**: Converts file paths to Sample objects
-    /// 5. **Plugin Resolution**: Queries Ableton database for plugin installation status
+    /// 5. **Plugin References**: Builds bare, unenriched plugin references
     /// 6. **Key Analysis**: Determines most frequent key signature (Live 11+)
     ///
     /// # Arguments
@@ -769,15 +770,16 @@ impl Parser {
     /// Returns [`LiveSetError`] if:
     /// - Tempo is outside valid range (10-999 BPM)
     /// - Time signature is invalid (numerator 1-99, denominator power of 2)
-    /// - Configuration cannot be loaded for plugin database access
-    /// - Ableton plugin database cannot be opened or queried
     ///
-    /// # Plugin Installation Detection
+    /// # Plugin References
     ///
-    /// For each plugin found in the project:
-    /// - Queries Ableton's plugin database using the device identifier
-    /// - If found: Populates full metadata and marks as installed
-    /// - If not found: Creates basic plugin record marked as not installed
+    /// Each plugin is recorded exactly as the `.als` describes it: a name, a
+    /// `dev_identifier`, and the format derived from that identifier. Nothing is looked
+    /// up. Vendor and version are resolved against our own `plugins` table once per
+    /// batch in the database layer (ADR-0009), and `installed` is left unset because
+    /// only a plugin scan may write it (ADR-0012). The earlier implementation queried
+    /// Ableton's own plugin database here; ADR-0006 removed it, and with it the only
+    /// reason this function ever needed configuration or I/O.
     ///
     /// # Key Signature Analysis
     ///

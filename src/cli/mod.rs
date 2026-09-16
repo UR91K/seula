@@ -392,6 +392,32 @@ pub enum ConfigCommands {
     Edit,
 }
 
+/// Install-status filter for `plugin list` and `plugin search`.
+///
+/// Repeatable, and the values union: `--installed missing --installed unscanned` is
+/// "everything I cannot load". Passing none filters nothing. See ADR-0025.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum InstallFilter {
+    /// A plugin scan confirmed it is installed.
+    Installed,
+    /// A plugin scan looked for it and did not find it.
+    Missing,
+    /// No plugin scan has looked yet. Fixed by `seula plugin refresh`.
+    #[value(name = "unscanned", alias = "unknown")]
+    Unscanned,
+}
+
+impl From<InstallFilter> for crate::database::plugins::InstallState {
+    fn from(filter: InstallFilter) -> Self {
+        use crate::database::plugins::InstallState;
+        match filter {
+            InstallFilter::Installed => InstallState::Installed,
+            InstallFilter::Missing => InstallState::Absent,
+            InstallFilter::Unscanned => InstallState::Unscanned,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum PluginCommands {
     /// List all plugins
@@ -404,9 +430,9 @@ pub enum PluginCommands {
         #[arg(long)]
         format: Option<String>,
 
-        /// Show only installed plugins
-        #[arg(long)]
-        installed: Option<bool>,
+        /// Filter by install status; repeat to union (installed, missing, unscanned)
+        #[arg(long, value_enum)]
+        installed: Vec<InstallFilter>,
 
         /// Limit number of results
         #[arg(long, default_value = "50")]
@@ -438,9 +464,9 @@ pub enum PluginCommands {
         #[arg(long)]
         format: Option<String>,
 
-        /// Show only installed plugins
-        #[arg(long)]
-        installed: Option<bool>,
+        /// Filter by install status; repeat to union (installed, missing, unscanned)
+        #[arg(long, value_enum)]
+        installed: Vec<InstallFilter>,
 
         /// Limit number of results
         #[arg(long, default_value = "50")]

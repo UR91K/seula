@@ -1,7 +1,7 @@
 use crate::cli::commands::{CliCommand, CliContext};
 use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
-use crate::cli::{CliError, OutputFormat, PluginCommands};
-use crate::database::plugins::{PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
+use crate::cli::{CliError, InstallFilter, OutputFormat, PluginCommands};
+use crate::database::plugins::{InstallState, PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
 use crate::models::Plugin;
 use crate::services::PluginsService;
 use crate::{colored_cell, simple_table_row};
@@ -17,6 +17,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 pub struct PluginCommand;
+
+/// Map the repeatable `--installed` flag onto the database layer's tri-state set.
+fn install_states(filters: &[InstallFilter]) -> Vec<InstallState> {
+    filters.iter().copied().map(InstallState::from).collect()
+}
 
 #[async_trait::async_trait]
 impl CliCommand for PluginCommand {
@@ -91,7 +96,7 @@ impl PluginCommands {
         plugins: &PluginsService,
         vendor: &Option<String>,
         format: &Option<String>,
-        installed: &Option<bool>,
+        installed: &[InstallFilter],
         limit: usize,
         offset: usize,
         sort_by: &Option<String>,
@@ -104,7 +109,7 @@ impl PluginCommands {
             Some(sort_desc),
             vendor.as_ref().map(|s| s.clone()),
             format.as_ref().map(|s| s.clone()),
-            *installed,
+            &install_states(installed),
             None, // min_usage_count
         ).await?;
 
@@ -135,14 +140,14 @@ impl PluginCommands {
         query: &str,
         vendor: &Option<String>,
         format: &Option<String>,
-        installed: &Option<bool>,
+        installed: &[InstallFilter],
         limit: usize,
     ) -> Result<PluginsSearchResults, CliError> {
         let (plugins, total_count) = plugins.search_plugins(
             query,
             Some(limit as i32),
             Some(0),
-            *installed,
+            &install_states(installed),
             vendor.as_ref().map(|s| s.clone()),
             format.as_ref().map(|s| s.clone()),
         ).await?;

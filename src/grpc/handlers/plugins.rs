@@ -4,7 +4,23 @@ use tonic::{Code, Request, Response, Status};
 use super::super::common::*;
 use super::super::plugins::*;
 use super::utils::convert_live_set_to_proto;
+use crate::database::plugins::InstallState as DbInstallState;
 use crate::services::PluginsService;
+
+/// Translate the wire enum into the database layer's tri-state set (ADR-0025).
+///
+/// Unrecognised values and `UNSPECIFIED` are dropped rather than rejected: an empty set
+/// means "no filtering", which is what a request that named no state is asking for.
+fn install_states(raw: &[i32]) -> Vec<DbInstallState> {
+    raw.iter()
+        .filter_map(|value| match InstallState::try_from(*value) {
+            Ok(InstallState::Installed) => Some(DbInstallState::Installed),
+            Ok(InstallState::Absent) => Some(DbInstallState::Absent),
+            Ok(InstallState::Unscanned) => Some(DbInstallState::Unscanned),
+            Ok(InstallState::Unspecified) | Err(_) => None,
+        })
+        .collect()
+}
 
 #[derive(Clone)]
 pub struct PluginsHandler {
@@ -32,7 +48,7 @@ impl PluginsHandler {
                 req.sort_desc,
                 req.vendor_filter,
                 req.format_filter,
-                req.installed_only,
+                &install_states(&req.install_states),
                 req.min_usage_count,
             )
             .await?;
@@ -67,7 +83,13 @@ impl PluginsHandler {
 
         let (plugins, total_count) = self
             .service
-            .get_plugins_by_installed_status(req.installed, req.limit, req.offset, req.sort_by, req.sort_desc)
+            .get_plugins_by_installed_status(
+                &install_states(&req.install_states),
+                req.limit,
+                req.offset,
+                req.sort_by,
+                req.sort_desc,
+            )
             .await?;
 
         let proto_plugins = plugins
@@ -104,7 +126,7 @@ impl PluginsHandler {
                 &req.query,
                 req.limit,
                 req.offset,
-                req.installed_only,
+                &install_states(&req.install_states),
                 req.vendor_filter,
                 req.format_filter,
             )

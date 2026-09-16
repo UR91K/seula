@@ -2,11 +2,27 @@ use crate::cli::commands::CliContext;
 use crate::cli::OutputFormat;
 use crate::cli::commands::CliCommand;
 use crate::cli::CliError;
+use crate::cli::InstallFilter;
+use clap::ValueEnum;
 use colored::Colorize;
 use rustyline::error::ReadlineError;
 use rustyline::{Editor, Config};
 use rustyline::config::EditMode;
 use std::collections::HashMap;
+
+const INSTALL_FILTER_USAGE: &str =
+    "Usage: --installed[=installed|missing|unscanned] (repeatable; states union)";
+
+/// Parse one `--installed` argument in interactive mode.
+///
+/// Bare `--installed` keeps its previous meaning of installed-only. With a value it
+/// names any one of the three states, and repeating the flag unions them (ADR-0025).
+fn parse_install_filter(arg: &str) -> Option<InstallFilter> {
+    match arg.split_once('=') {
+        None => Some(InstallFilter::Installed),
+        Some((_, value)) => InstallFilter::from_str(value, true).ok(),
+    }
+}
 
 /// Interactive CLI mode
 pub struct InteractiveCli {
@@ -180,7 +196,7 @@ impl InteractiveCli {
         println!("  {}", "tag list".italic());
         println!("  {}", "tag create <name> [--color=hex]".italic());
         println!("  {}", "task list [--project=id] [--completed]".italic());
-        println!("  {}", "plugin list [--vendor=name] [--installed]".italic());
+        println!("  {}", "plugin list [--vendor=name] [--installed[=installed|missing|unscanned]]".italic());
         println!("  {}", "plugin search <query> [--format=VST3]".italic());
         println!("  {}", "config show".italic());
         println!("  {}", "system info".italic());
@@ -559,7 +575,7 @@ impl InteractiveCli {
                     "list" => {
                         let mut vendor = None;
                         let mut format = None;
-                        let mut installed = None;
+                        let mut installed = Vec::new();
                         let mut limit = 50;
                         let mut offset = 0;
                         let mut sort_by = None;
@@ -570,8 +586,14 @@ impl InteractiveCli {
                                 vendor = Some(arg.split('=').nth(1).unwrap_or("").to_string());
                             } else if arg.starts_with("--format=") {
                                 format = Some(arg.split('=').nth(1).unwrap_or("").to_string());
-                            } else if arg == "--installed" {
-                                installed = Some(true);
+                            } else if arg == "--installed" || arg.starts_with("--installed=") {
+                                match parse_install_filter(arg) {
+                                    Some(filter) => installed.push(filter),
+                                    None => {
+                                        println!("{}", INSTALL_FILTER_USAGE.red());
+                                        return Ok(());
+                                    }
+                                }
                             } else if arg.starts_with("--limit=") {
                                 if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
                                     limit = v;
@@ -591,13 +613,13 @@ impl InteractiveCli {
                     }
                     "search" => {
                         if args.len() < 3 {
-                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed] [--limit=N]".red());
+                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed[=state]] [--limit=N]".red());
                             return Ok(());
                         }
                         
                         let mut vendor = None;
                         let mut format = None;
-                        let mut installed = None;
+                        let mut installed = Vec::new();
                         let mut limit = 50;
                         let mut query_parts = Vec::new();
                         
@@ -606,8 +628,14 @@ impl InteractiveCli {
                                 vendor = Some(arg.split('=').nth(1).unwrap_or("").to_string());
                             } else if arg.starts_with("--format=") {
                                 format = Some(arg.split('=').nth(1).unwrap_or("").to_string());
-                            } else if arg == "--installed" {
-                                installed = Some(true);
+                            } else if arg == "--installed" || arg.starts_with("--installed=") {
+                                match parse_install_filter(arg) {
+                                    Some(filter) => installed.push(filter),
+                                    None => {
+                                        println!("{}", INSTALL_FILTER_USAGE.red());
+                                        return Ok(());
+                                    }
+                                }
                             } else if arg.starts_with("--limit=") {
                                 if let Ok(v) = arg.split('=').nth(1).unwrap_or("").parse::<usize>() {
                                     limit = v;
@@ -618,7 +646,7 @@ impl InteractiveCli {
                         }
                         
                         if query_parts.is_empty() {
-                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed] [--limit=N]".red());
+                            println!("{}", "Usage: plugin search <query> [--vendor=name] [--format=type] [--installed[=state]] [--limit=N]".red());
                             return Ok(());
                         }
                         

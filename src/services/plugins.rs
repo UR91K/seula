@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::database::plugins::{FormatInfo, PluginRefreshResult, PluginStats, VendorInfo};
+use crate::database::plugins::{
+    FormatInfo, InstallState, PluginRefreshResult, PluginStats, VendorInfo,
+};
 use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use crate::models::GrpcPlugin;
@@ -30,7 +32,7 @@ impl PluginsService {
         sort_desc: Option<bool>,
         vendor_filter: Option<String>,
         format_filter: Option<String>,
-        installed_only: Option<bool>,
+        install_states: &[InstallState],
         min_usage_count: Option<i32>,
     ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
         let db = self.db.lock().await;
@@ -41,21 +43,21 @@ impl PluginsService {
             sort_desc,
             vendor_filter,
             format_filter,
-            installed_only,
+            install_states,
             min_usage_count,
         )
     }
 
     pub async fn get_plugins_by_installed_status(
         &self,
-        installed: bool,
+        install_states: &[InstallState],
         limit: Option<i32>,
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
     ) -> Result<(Vec<crate::models::Plugin>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.get_plugins_by_installed_status(installed, limit, offset, sort_by, sort_desc)
+        db.get_plugins_by_installed_status(install_states, limit, offset, sort_by, sort_desc)
     }
 
     pub async fn search_plugins(
@@ -63,12 +65,12 @@ impl PluginsService {
         query: &str,
         limit: Option<i32>,
         offset: Option<i32>,
-        installed_only: Option<bool>,
+        install_states: &[InstallState],
         vendor_filter: Option<String>,
         format_filter: Option<String>,
     ) -> Result<(Vec<crate::models::Plugin>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.search_plugins(query, limit, offset, installed_only, vendor_filter, format_filter)
+        db.search_plugins(query, limit, offset, install_states, vendor_filter, format_filter)
     }
 
     pub async fn get_plugin_stats(&self) -> Result<PluginStats, DatabaseError> {

@@ -4,6 +4,69 @@ use rusqlite::params;
 
 use super::ProjectDatabase;
 
+/// Which of the three `plugins.installed` categories a query should return.
+///
+/// `installed` is tri-state (ADR-0012): `1` means a scan found the plugin, `0` means a
+/// scan looked and did not, and `NULL` means no scan has looked yet. Filters take a
+/// *set* of these rather than a single value because the useful questions are unions:
+/// "everything I cannot load" is `Absent + Unscanned`, "everything a scan has ruled on"
+/// is `Installed + Absent`. An empty set means no filtering at all. See ADR-0025.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InstallState {
+    /// A scan confirmed the plugin is installed on this machine.
+    Installed,
+    /// A scan looked for the plugin and did not find it.
+    Absent,
+    /// No scan has looked. Deliberately not the same as `Absent`.
+    Unscanned,
+}
+
+impl InstallState {
+    /// The SQL predicate for one state.
+    ///
+    /// Spelled out per variant rather than as `installed = ?`, because in SQL
+    /// `NULL = 0` is not true — which is exactly how the never-scanned rows used to be
+    /// dropped silently.
+    fn predicate(self, column: &str) -> String {
+        match self {
+            InstallState::Installed => format!("{} = 1", column),
+            InstallState::Absent => format!("{} = 0", column),
+            InstallState::Unscanned => format!("{} IS NULL", column),
+        }
+    }
+}
+
+/// Build the `WHERE` fragment for a set of install states, or `None` when the set does
+/// not constrain anything (empty, or naming all three categories).
+///
+/// Binds no parameters, so callers do not have to keep a parameter list in step.
+fn install_state_condition(states: &[InstallState], column: &str) -> Option<String> {
+    if states.is_empty() {
+        return None;
+    }
+
+    let mut wanted: Vec<InstallState> = Vec::with_capacity(3);
+    for state in states {
+        if !wanted.contains(state) {
+            wanted.push(*state);
+        }
+    }
+
+    // All three categories together are every row, so filtering would be a no-op.
+    if wanted.len() == 3 {
+        return None;
+    }
+
+    Some(format!(
+        "({})",
+        wanted
+            .iter()
+            .map(|state| state.predicate(column))
+            .collect::<Vec<_>>()
+            .join(" OR ")
+    ))
+}
+
 impl ProjectDatabase {
     /// Get all plugins with pagination, sorting, and filtering, including usage data
     pub fn get_all_plugins(
@@ -14,7 +77,7 @@ impl ProjectDatabase {
         sort_desc: Option<bool>,
         vendor_filter: Option<String>,
         format_filter: Option<String>,
-        installed_only: Option<bool>,
+        install_states: &[InstallState],
         min_usage_count: Option<i32>,
     ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
         let sort_column = match sort_by.as_deref() {
@@ -33,22 +96,22 @@ impl ProjectDatabase {
         };
 
         // Build WHERE conditions for filtering
-        let mut conditions = Vec::new();
+        let mut conditions: Vec<String> = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
         if let Some(ref vendor) = vendor_filter {
-            conditions.push("p.vendor = ?");
+            conditions.push("p.vendor = ?".to_string());
             params.push(Box::new(vendor.clone()));
         }
 
         if let Some(ref format) = format_filter {
-            conditions.push("p.format = ?");
+            conditions.push("p.format = ?".to_string());
             params.push(Box::new(format.clone()));
         }
 
-        if let Some(installed) = installed_only {
-            conditions.push("p.installed = ?");
-            params.push(Box::new(installed));
+        // Binds no parameter, so it does not appear in the count/main parameter lists.
+        if let Some(condition) = install_state_condition(install_states, "p.installed") {
+            conditions.push(condition);
         }
 
         let where_clause = if conditions.is_empty() {
@@ -94,9 +157,6 @@ impl ProjectDatabase {
         }
         if let Some(format) = &format_filter {
             count_params.push(format as &dyn rusqlite::ToSql);
-        }
-        if let Some(installed) = &installed_only {
-            count_params.push(installed as &dyn rusqlite::ToSql);
         }
         if let Some(min_usage) = &min_usage_count {
             count_params.push(min_usage as &dyn rusqlite::ToSql);
@@ -228,10 +288,13 @@ impl ProjectDatabase {
         })
     }
 
-    /// Get plugins filtered by installation status
+    /// Get plugins filtered by installation status.
+    ///
+    /// `install_states` is a set: passing several returns their union, and passing none
+    /// returns everything. See ADR-0025.
     pub fn get_plugins_by_installed_status(
         &self,
-        installed: bool,
+        install_states: &[InstallState],
         limit: Option<i32>,
         offset: Option<i32>,
         sort_by: Option<String>,
@@ -251,22 +314,27 @@ impl ProjectDatabase {
             "ASC"
         };
 
+        let where_clause = match install_state_condition(install_states, "installed") {
+            Some(condition) => format!("WHERE {}", condition),
+            None => String::new(),
+        };
+
         // Get total count
         let total_count: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM plugins WHERE installed = ?",
-            params![installed],
+            &format!("SELECT COUNT(*) FROM plugins {}", where_clause),
+            [],
             |row| row.get(0),
         )?;
 
         // Build query with pagination
         let query = format!(
-            "SELECT * FROM plugins WHERE installed = ? ORDER BY {} {} LIMIT ? OFFSET ?",
-            sort_column, sort_order
+            "SELECT * FROM plugins {} ORDER BY {} {} LIMIT ? OFFSET ?",
+            where_clause, sort_column, sort_order
         );
 
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
-            params![installed, limit.unwrap_or(1000), offset.unwrap_or(0)],
+            params![limit.unwrap_or(1000), offset.unwrap_or(0)],
             |row| {
                 Ok(crate::database::helpers::row_to_plugin(row)?)
             },
@@ -282,29 +350,30 @@ impl ProjectDatabase {
         query: &str,
         limit: Option<i32>,
         offset: Option<i32>,
-        installed_only: Option<bool>,
+        install_states: &[InstallState],
         vendor_filter: Option<String>,
         format_filter: Option<String>,
     ) -> Result<(Vec<Plugin>, i32), DatabaseError> {
-        let mut conditions = vec!["(name LIKE ? OR vendor LIKE ? OR format LIKE ?)"];
+        let mut conditions: Vec<String> =
+            vec!["(name LIKE ? OR vendor LIKE ? OR format LIKE ?)".to_string()];
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![
             Box::new(format!("%{}%", query)),
             Box::new(format!("%{}%", query)),
             Box::new(format!("%{}%", query)),
         ];
 
-        if let Some(installed) = installed_only {
-            conditions.push("installed = ?");
-            params.push(Box::new(installed));
+        // Binds no parameter, so the parameter list stays in step on its own.
+        if let Some(condition) = install_state_condition(install_states, "installed") {
+            conditions.push(condition);
         }
 
         if let Some(vendor) = vendor_filter {
-            conditions.push("vendor = ?");
+            conditions.push("vendor = ?".to_string());
             params.push(Box::new(vendor));
         }
 
         if let Some(format) = format_filter {
-            conditions.push("format = ?");
+            conditions.push("format = ?".to_string());
             params.push(Box::new(format));
         }
 
