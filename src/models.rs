@@ -1068,6 +1068,68 @@ pub struct Sample {
 }
 
 #[allow(dead_code)]
+/// An audio file format a sample can be, by the extensions it goes under. Filtering
+/// and counting are by format, not extension, so `.aif`, `.aiff` and `.aifc` are all
+/// AIFF. Anything not listed counts as the format `other`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SampleFormat {
+    /// The value the API takes and returns: `wav`, `aiff`, ...
+    pub id: &'static str,
+    /// Short display name.
+    pub name: &'static str,
+    /// Lowercase, without the dot.
+    pub extensions: &'static [&'static str],
+}
+
+/// The formats Ableton Live can load.
+pub const SAMPLE_FORMATS: &[SampleFormat] = &[
+    SampleFormat { id: "wav", name: "WAV", extensions: &["wav", "wave"] },
+    SampleFormat { id: "aiff", name: "AIFF", extensions: &["aif", "aiff", "aifc"] },
+    SampleFormat { id: "flac", name: "FLAC", extensions: &["flac"] },
+    SampleFormat { id: "mp3", name: "MP3", extensions: &["mp3"] },
+    SampleFormat { id: "ogg", name: "Ogg Vorbis", extensions: &["ogg"] },
+    SampleFormat { id: "aac", name: "AAC", extensions: &["m4a", "aac"] },
+];
+
+/// The id of samples in no listed format.
+pub const OTHER_SAMPLE_FORMAT: &str = "other";
+
+impl SampleFormat {
+    /// A format by its id, or by any of its extensions, so `aif` finds AIFF.
+    pub fn find(id_or_extension: &str) -> Option<&'static SampleFormat> {
+        let key = id_or_extension.trim_start_matches('.').to_ascii_lowercase();
+        SAMPLE_FORMATS
+            .iter()
+            .find(|f| f.id == key || f.extensions.contains(&key.as_str()))
+    }
+
+    /// SQL that is true when `column` (a path) ends in one of this format's extensions.
+    /// SQLite's LIKE ignores ASCII case. Binds nothing: the patterns are constants.
+    pub fn sql_matches(&self, column: &str) -> String {
+        let any: Vec<String> = self.extensions.iter().map(|e| format!("{} LIKE '%.{}'", column, e)).collect();
+        format!("({})", any.join(" OR "))
+    }
+
+    /// SQL for the format id of the path in `column`, or `other`.
+    pub fn sql_case(column: &str) -> String {
+        let whens: String = SAMPLE_FORMATS
+            .iter()
+            .map(|f| format!(" WHEN {} THEN '{}'", f.sql_matches(column), f.id))
+            .collect();
+        format!("(CASE{} ELSE '{}' END)", whens, OTHER_SAMPLE_FORMAT)
+    }
+
+    /// The `WHERE` condition for a format filter value: a format id, one of its
+    /// extensions, or `other`. `None` for a value that is none of those.
+    pub fn sql_filter(value: &str, column: &str) -> Option<String> {
+        if value.eq_ignore_ascii_case(OTHER_SAMPLE_FORMAT) {
+            let known: Vec<String> = SAMPLE_FORMATS.iter().map(|f| f.sql_matches(column)).collect();
+            return Some(format!("NOT ({})", known.join(" OR ")));
+        }
+        Self::find(value).map(|f| f.sql_matches(column))
+    }
+}
+
 impl Sample {
     pub fn new(name: String, path: PathBuf) -> Self {
         let is_present = path.exists();

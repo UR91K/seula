@@ -8,8 +8,9 @@ use axum::Json;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::dto::samples::{
     sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto,
-    SampleListResponse, SearchSamplesQuery,
+    SampleFormatDto, SampleFormatListResponse, SampleListResponse, SearchSamplesQuery,
 };
+use crate::models::{OTHER_SAMPLE_FORMAT, SAMPLE_FORMATS};
 use crate::models::Sample;
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
@@ -41,7 +42,7 @@ pub async fn get_all_samples(
             query.sort_desc,
             query.present_only,
             query.missing_only,
-            query.extension_filter,
+            query.format_filter,
             query.min_project_count,
             query.max_project_count,
         )
@@ -97,7 +98,7 @@ pub async fn search_samples(
     let (samples, total_count) = state
         .services
         .samples
-        .search_samples(&query.query, query.limit, query.offset, query.present_only, query.extension_filter)
+        .search_samples(&query.query, query.limit, query.offset, query.present_only, query.format_filter)
         .await?;
 
     Ok(Json(SampleListResponse {
@@ -151,7 +152,34 @@ pub async fn get_sample_analytics(State(state): State<AppState>) -> Result<impl 
     Ok(Json(analytics))
 }
 
-pub async fn get_sample_extensions(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
-    let extensions = state.services.samples.get_sample_extensions().await?;
-    Ok(Json(extensions))
+/// The format dropdown: every format Live loads, with its counts, then `other`.
+pub async fn get_sample_formats(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let mut counts = state.services.samples.get_sample_extensions().await?;
+    let mut formats: Vec<SampleFormatDto> = SAMPLE_FORMATS
+        .iter()
+        .map(|f| {
+            let c = counts.remove(f.id);
+            SampleFormatDto {
+                format: f.id.to_string(),
+                name: f.name.to_string(),
+                extensions: f.extensions.iter().map(|e| e.to_string()).collect(),
+                count: c.as_ref().map_or(0, |c| c.count),
+                present_count: c.as_ref().map_or(0, |c| c.present_count),
+                missing_count: c.as_ref().map_or(0, |c| c.missing_count),
+                total_size_bytes: c.as_ref().map_or(0, |c| c.total_size_bytes),
+            }
+        })
+        .collect();
+    if let Some(c) = counts.remove(OTHER_SAMPLE_FORMAT) {
+        formats.push(SampleFormatDto {
+            format: OTHER_SAMPLE_FORMAT.to_string(),
+            name: "Other".to_string(),
+            extensions: Vec::new(),
+            count: c.count,
+            present_count: c.present_count,
+            missing_count: c.missing_count,
+            total_size_bytes: c.total_size_bytes,
+        });
+    }
+    Ok(Json(SampleFormatListResponse { formats }))
 }

@@ -40,7 +40,7 @@ impl SamplesService {
         sort_desc: Option<bool>,
         present_only: Option<bool>,
         missing_only: Option<bool>,
-        extension_filter: Option<String>,
+        format_filter: Option<String>,
         min_usage_count: Option<i32>,
         max_usage_count: Option<i32>,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
@@ -52,7 +52,7 @@ impl SamplesService {
             sort_desc,
             present_only,
             missing_only,
-            extension_filter,
+            format_filter,
             min_usage_count,
             max_usage_count,
         )
@@ -81,10 +81,10 @@ impl SamplesService {
         limit: Option<i32>,
         offset: Option<i32>,
         present_only: Option<bool>,
-        extension_filter: Option<String>,
+        format_filter: Option<String>,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.search_samples(query, limit, offset, present_only, extension_filter)
+        db.search_samples(query, limit, offset, present_only, format_filter)
     }
 
     pub async fn get_sample_stats(&self) -> Result<SampleStats, DatabaseError> {

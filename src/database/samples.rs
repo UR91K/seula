@@ -1,5 +1,5 @@
 use crate::error::DatabaseError;
-use crate::models::Sample;
+use crate::models::{Sample, SampleFormat};
 use rusqlite::params;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -16,7 +16,7 @@ impl ProjectDatabase {
         sort_desc: Option<bool>,
         present_only: Option<bool>,
         missing_only: Option<bool>,
-        extension_filter: Option<String>,
+        format_filter: Option<String>,
         min_usage_count: Option<i32>,
         max_usage_count: Option<i32>,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
@@ -35,22 +35,22 @@ impl ProjectDatabase {
         };
 
         // Build WHERE conditions for filtering
-        let mut conditions = Vec::new();
+        let mut conditions: Vec<String> = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
         // Presence filters (mutually exclusive)
         if let Some(present) = present_only {
-            conditions.push("s.is_present = ?");
+            conditions.push("s.is_present = ?".into());
             params.push(Box::new(present));
         } else if let Some(missing) = missing_only {
-            conditions.push("s.is_present = ?");
+            conditions.push("s.is_present = ?".into());
             params.push(Box::new(!missing));
         }
 
-        // Extension filter
-        if let Some(extension) = extension_filter {
-            conditions.push("s.path LIKE ?");
-            params.push(Box::new(format!("%.{}", extension)));
+        // Format filter: a format id, one of its extensions, or "other". A value that is
+        // none of those matches nothing rather than being ignored.
+        if let Some(format) = format_filter {
+            conditions.push(SampleFormat::sql_filter(&format, "s.path").unwrap_or_else(|| "0".into()));
         }
 
         // Determine if we need to join with project_samples for usage count
@@ -59,12 +59,12 @@ impl ProjectDatabase {
         // Usage count filters - only apply when we're using the join approach
         if needs_usage_join && (min_usage_count.is_some() || max_usage_count.is_some()) {
             if let Some(min_count) = min_usage_count {
-                conditions.push("COALESCE(usage_count, 0) >= ?");
+                conditions.push("COALESCE(usage_count, 0) >= ?".into());
                 params.push(Box::new(min_count));
             }
             
             if let Some(max_count) = max_usage_count {
-                conditions.push("COALESCE(usage_count, 0) <= ?");
+                conditions.push("COALESCE(usage_count, 0) <= ?".into());
                 params.push(Box::new(max_count));
             }
         }
@@ -211,22 +211,21 @@ impl ProjectDatabase {
         limit: Option<i32>,
         offset: Option<i32>,
         present_only: Option<bool>,
-        extension_filter: Option<String>,
+        format_filter: Option<String>,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
-        let mut conditions = vec!["(name LIKE ? OR path LIKE ?)"];
+        let mut conditions: Vec<String> = vec!["(name LIKE ? OR path LIKE ?)".into()];
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![
             Box::new(format!("%{}%", query)),
             Box::new(format!("%{}%", query)),
         ];
 
         if let Some(present) = present_only {
-            conditions.push("is_present = ?");
+            conditions.push("is_present = ?".into());
             params.push(Box::new(present));
         }
 
-        if let Some(extension) = extension_filter {
-            conditions.push("path LIKE ?");
-            params.push(Box::new(format!("%.{}", extension)));
+        if let Some(format) = format_filter {
+            conditions.push(SampleFormat::sql_filter(&format, "path").unwrap_or_else(|| "0".into()));
         }
 
         let where_clause = conditions.join(" AND ");
@@ -284,23 +283,16 @@ impl ProjectDatabase {
 
         // Get samples by extension
         let mut samples_by_extension = std::collections::HashMap::new();
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             r#"
             SELECT 
-                CASE 
-                    WHEN path LIKE '%.wav' THEN 'wav'
-                    WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 'aiff'
-                    WHEN path LIKE '%.mp3' THEN 'mp3'
-                    WHEN path LIKE '%.flac' THEN 'flac'
-                    WHEN path LIKE '%.ogg' THEN 'ogg'
-                    WHEN path LIKE '%.m4a' THEN 'm4a'
-                    ELSE 'other'
-                END as extension,
+                {format_case} as extension,
                 COUNT(*) as count
             FROM samples 
             GROUP BY extension
             "#,
-        )?;
+            format_case = SampleFormat::sql_case("path")
+        ))?;
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
         })?;
@@ -515,18 +507,10 @@ impl ProjectDatabase {
 
     /// Get extension analytics with detailed statistics
     fn get_extension_analytics(&self) -> Result<std::collections::HashMap<String, ExtensionAnalytics>, DatabaseError> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             r#"
             SELECT 
-                CASE 
-                    WHEN path LIKE '%.wav' THEN 'wav'
-                    WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 'aiff'
-                    WHEN path LIKE '%.mp3' THEN 'mp3'
-                    WHEN path LIKE '%.flac' THEN 'flac'
-                    WHEN path LIKE '%.ogg' THEN 'ogg'
-                    WHEN path LIKE '%.m4a' THEN 'm4a'
-                    ELSE 'other'
-                END as extension,
+                {format_case} as extension,
                 COUNT(*) as count,
                 SUM(CASE WHEN is_present THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN NOT is_present THEN 1 ELSE 0 END) as missing_count,
@@ -553,7 +537,8 @@ impl ProjectDatabase {
             )
             GROUP BY extension
             "#,
-        )?;
+            format_case = SampleFormat::sql_case("path")
+        ))?;
 
         let rows = stmt.query_map([], |row| {
             Ok((

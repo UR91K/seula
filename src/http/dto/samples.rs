@@ -52,7 +52,8 @@ pub struct GetAllSamplesQuery {
     pub sort_desc: Option<bool>,
     pub present_only: Option<bool>,
     pub missing_only: Option<bool>,
-    pub extension_filter: Option<String>,
+    /// A format id (`aiff`), one of its extensions (`aif`), or `other`.
+    pub format_filter: Option<String>,
     pub min_project_count: Option<i32>,
     pub max_project_count: Option<i32>,
 }
@@ -72,7 +73,26 @@ pub struct SearchSamplesQuery {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
     pub present_only: Option<bool>,
-    pub extension_filter: Option<String>,
+    pub format_filter: Option<String>,
+}
+
+/// One sample format and its counts (`GET /api/v1/samples/formats`). Every known
+/// format is listed, in a fixed order, even when no sample has it; `other` is listed
+/// only when some sample has it.
+#[derive(Serialize)]
+pub struct SampleFormatDto {
+    pub format: String,
+    pub name: String,
+    pub extensions: Vec<String>,
+    pub count: i32,
+    pub present_count: i32,
+    pub missing_count: i32,
+    pub total_size_bytes: i64,
+}
+
+#[derive(Serialize)]
+pub struct SampleFormatListResponse {
+    pub formats: Vec<SampleFormatDto>,
 }
 
 #[derive(Deserialize)]

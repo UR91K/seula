@@ -255,8 +255,8 @@ pub fn build_router(state: AppState) -> Router {
             get(sample_handlers::get_sample_analytics),
         )
         .route(
-            "/api/v1/samples/extensions",
-            get(sample_handlers::get_sample_extensions),
+            "/api/v1/samples/formats",
+            get(sample_handlers::get_sample_formats),
         )
         .route(
             "/api/v1/samples/refresh-presence-status",
