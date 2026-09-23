@@ -13,9 +13,10 @@ the sketch's account of both, per ADR-0032.
 
 Static HTML mockups come first, in `mockup/` at the repo root (ADR-0029 named
 `docs/mockups/`; the first round there was rejected and is on the `old-mockups` branch).
-The shell is built alone first and reviewed before any view: `mockup/shell.html`.
-Colours live only in `mockup/colors.css`, which the maintainer edits by hand. Mockup
-data is a snapshot of the real HTTP API over a seeded database, made by
+The shell is built alone first and reviewed before any view: `mockup/shell.html`. Then
+one review board per view, one view at a time, drawn from shared component renderers
+(ADR-0036). Colours live only in `mockup/colors.css`, which the maintainer edits by
+hand. Mockup data is a snapshot of the real HTTP API over a seeded database, made by
 `mockup/data/generate.py` from the same `src/database/schema.sql` the program compiles
 in. No React exists yet. See `docs/status.md` for where things stand.
 
@@ -81,7 +82,7 @@ three columns. This is the VS Code arrangement and it is present in every view.
 | **Sidebar** | One entry per view, icon and label. Collapses to icons only, never to zero width, so navigation is always one click away. Collapse state persists (ADR-0031). |
 | **Main area** | Opens with a thin view toolbar — view title, that view's filters, the inspector toggle — then the view itself. Per-view chrome lives here, not in the top bar. |
 | **Inspector** | Right-hand panel, one component across all four content views, showing whatever is selected. Same width, same toggle, same position throughout. Stats has none. |
-| **Status bar** | View-specific counts. Selection count when rows are selected. During a scan, a progress bar and the current message from the SSE stream at `/api/v1/system/scan-status`. |
+| **Status bar** | View-specific counts. Selection count when rows are selected. During a scan, a progress bar and the current message from the SSE stream at `/api/v1/system/scan-status`. At the right end, the ♯/♭ key spelling switch (ADR-0035), where Explorer-lineage apps keep view toggles. |
 
 Search is global and lives in the top bar. On the projects view a non-empty search
 switches the table from `/api/v1/projects` to the ranked results of `/api/v1/search`;
