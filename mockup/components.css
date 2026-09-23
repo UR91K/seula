@@ -63,6 +63,8 @@ textarea.notes::placeholder { color: var(--text-3); }
   border-radius: var(--radius);
 }
 .chip .ms { width: calc(var(--u) * 7); height: calc(var(--u) * 7); font-size: calc(var(--u) * 7); color: var(--text-2); }
+/* the clear button's wrapper: a flex box, or the icon sits on its baseline and rides high */
+.chip > span { display: flex; }
 
 .pager { display: inline-flex; align-items: center; gap: var(--u); color: var(--text-2); white-space: nowrap; }
 
