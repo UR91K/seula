@@ -254,7 +254,9 @@ ul.tasks li.sel { background: var(--select); margin: 0 calc(var(--u) * -4); padd
 table.grid tbody tr.sel .pstate { color: var(--text); }
 
 /* the state icons at text size in the status bar */
-.statusbar .status-dot .ms { vertical-align: middle; }
+/* An inline-flex box sits on its icon's baseline, which rides high; fill the line box and
+   centre the icon in it instead, as the text beside it is. */
+.statusbar .status-dot { vertical-align: top; height: var(--row); }
 .statusbar .is-installed .ms, .statusbar .is-absent .ms, .statusbar .ms.sb { font-size: calc(var(--u) * 7); width: calc(var(--u) * 7); height: calc(var(--u) * 7); vertical-align: middle; }
 
 /* a plugin's or sample's inspector: a glyph in place of cover art, a state line */

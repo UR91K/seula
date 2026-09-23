@@ -294,9 +294,10 @@ ul.plain li .faint { color: var(--text-3); }
 .statusbar > span:last-child { border-right: 0; }
 .statusbar .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .statusbar .progress {
-  display: inline-block; vertical-align: middle;
+  /* middle centres on the x-height, not the line box; pin to the top and inset instead */
+  display: inline-block; vertical-align: top;
   width: calc(var(--u) * 60); height: calc(var(--u) * 5);
-  margin-right: calc(var(--u) * 3);
+  margin: calc(var(--u) * 2) calc(var(--u) * 3) 0 0;
   border: 1px solid var(--border); background: var(--field);
 }
 .statusbar .progress i { display: block; height: 100%; background: var(--progress); }
