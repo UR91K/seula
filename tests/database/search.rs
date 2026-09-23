@@ -290,3 +290,48 @@ fn test_search_year_only() {
     let results = db.search_fts(&date_query).expect("Search failed");
     assert_eq!(results.len(), 2, "Should find both projects from 2024");
 }
+
+/// A quoted operator value used to end at its first space, so `plugin:"Pro-Q 3"`
+/// searched for `"Pro-Q` and left `3"` as free text.
+#[test]
+fn quoted_operator_values_keep_their_spaces() {
+    let query = SearchQuery::parse(r#"plugin:"Pro-Q 3" collection:'night drives' bass"#);
+    assert_eq!(query.plugin.as_deref(), Some("Pro-Q 3"));
+    assert_eq!(query.collection.as_deref(), Some("night drives"));
+    assert_eq!(query.text, "bass");
+
+    let unterminated = SearchQuery::parse(r#"collection:"night drives"#);
+    assert_eq!(unterminated.collection.as_deref(), Some("night drives"));
+}
+
+#[test]
+fn collection_operator_filters_to_the_collections_projects() {
+    let mut db = ProjectDatabase::new(PathBuf::from(":memory:")).expect("in-memory database");
+    let mut add = |name: &str| {
+        let project = crate::common::create_test_live_set_from_parse(name, LiveSetBuilder::new().build());
+        db.insert_project(&project).expect("insert project");
+        project.id.to_string()
+    };
+    let (alpha, beta, _gamma) = (add("Alpha Song.als"), add("Beta Song.als"), add("Gamma Song.als"));
+    let night = db.create_collection("Night Drives", None, None).unwrap();
+    db.add_project_to_collection(&night, &beta).unwrap();
+    db.add_project_to_collection(&night, &alpha).unwrap();
+
+    let names = |db: &mut ProjectDatabase, q: &str| -> Vec<String> {
+        db.search_fts(&SearchQuery::parse(q))
+            .expect("search runs")
+            .into_iter()
+            .map(|r| r.project.name)
+            .collect()
+    };
+
+    // Alone, it is the collection in its own order; the name matches in any case.
+    assert_eq!(names(&mut db, r#"collection:"night drives""#), ["Beta Song.als", "Alpha Song.als"]);
+    // With other terms, it narrows what they match: all three match "Song".
+    assert_eq!(names(&mut db, r#"collection:"Night Drives" Alpha"#), ["Alpha Song.als"]);
+    assert_eq!(names(&mut db, r#"Gamma collection:"night drives""#), Vec::<String>::new());
+    assert_eq!(names(&mut db, "collection:nowhere"), Vec::<String>::new());
+
+    let results = db.search_fts(&SearchQuery::parse(r#"collection:"night drives""#)).unwrap();
+    assert!(matches!(&results[0].match_reason[..], [MatchReason::Collection(c)] if c == "night drives"));
+}

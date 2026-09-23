@@ -13,7 +13,7 @@ Last reviewed: 2026-09-24.
 | Parallel parsing | **Done** | Hand-rolled pool. Was silently serial until 2026-09-15; ADR-0002 |
 | Project scanning / discovery | **Done** | `src/scan/project_scanner.rs` |
 | SQLite storage | **Done** | 5NF schema, `src/database/core.rs` |
-| FTS5 search | **Done** | Operators: `plugin:`, `bpm:`, `key:`, `missing:` |
+| FTS5 search | **Done** | Operators: `name:`, `path:`, `plugin:`, `sample:`, `tag:`, `collection:`, `key:`, `bpm:`, `ts:`, `version:`, `dc:`, `dm:`. `collection:` filters by membership, not text. Quoted values keep their spaces |
 | CLI | **Done** | 33+ commands, table/JSON/CSV via `src/cli/output.rs` |
 | gRPC API | **Done** | 12 services in `proto/services/` |
 | HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
@@ -108,6 +108,12 @@ Resolved:
   indistinguishable and a task could not lead to its project. The HTTP route now sends
   the id in `project_id` and the name in `project_name`; gRPC is unchanged. Test:
   `collection_tasks_carry_the_project_id_and_name` (`tests/database/collections.rs`).
+- **A quoted search operator value stopped at its first space** (found 2026-09-24, fixed
+  2026-09-24). The parser split terms on spaces before looking at quotes, so
+  `plugin:"Pro-Q 3"` searched for `"Pro-Q` and left `3"` as free text, and no multi-word
+  plugin, sample or tag could be searched for by operator. Found adding `collection:`,
+  whose values are mostly more than one word. Regression test:
+  `quoted_operator_values_keep_their_spaces` (`tests/database/search.rs`).
 - **Sample sizes were invented, and the presence refresh froze the app** (found
   2026-09-23, fixed 2026-09-23). The "estimated" sample size was a guessed size per
   extension, summed; and `refresh_sample_presence_status` checked every file while holding

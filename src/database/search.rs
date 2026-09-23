@@ -30,6 +30,9 @@ pub struct SearchQuery {
     pub plugin: Option<String>,
     pub sample: Option<String>,
     pub tag: Option<String>,
+    /// A collection's name, matched whole and case-insensitively. Collections are
+    /// not in the FTS table, so this filters by membership instead of matching text.
+    pub collection: Option<String>,
 
     // Full text search
     pub text: String,
@@ -49,6 +52,7 @@ pub enum MatchReason {
     Plugin(String),
     Sample(String),
     Tag(String),
+    Collection(String),
     KeySignature(String),
     TimeSignature(String),
     Tempo(String),
@@ -108,10 +112,25 @@ impl SearchQuery {
                         }
                     }
                     _ => {
-                        // Handle other operators as before
-                        let value = &rest[colon_pos + 1..term_end];
+                        // A quoted value runs to its closing quote, spaces and all, so
+                        // `collection:"night drives"` and `plugin:"Pro-Q 3"` are one
+                        // term each. Unterminated, it runs to the end of the input.
+                        let value_start = colon_pos + 1;
+                        if let Some(&quote) = rest.as_bytes().get(value_start) {
+                            if quote == b'"' || quote == b'\'' {
+                                term_end = rest[value_start + 1..]
+                                    .find(quote as char)
+                                    .map(|close| value_start + 1 + close + 1)
+                                    .unwrap_or(rest.len());
+                            }
+                        }
+                        let value = &rest[value_start..term_end];
                         debug!("Found operator '{}' with value '{}'", operator, value);
-                        let cleaned_value = Self::strip_quotes(value);
+                        let mut cleaned_value = Self::strip_quotes(value);
+                        if cleaned_value.len() == value.trim().len() {
+                            // Unterminated: only the opening quote to drop.
+                            cleaned_value = cleaned_value.trim_start_matches(['"', '\'']).to_string();
+                        }
                         match operator {
                             "path" => query.path = Some(cleaned_value),
                             "name" => query.name = Some(cleaned_value),
@@ -123,6 +142,7 @@ impl SearchQuery {
                             "plugin" => query.plugin = Some(cleaned_value),
                             "sample" => query.sample = Some(cleaned_value),
                             "tag" => query.tag = Some(cleaned_value),
+                            "collection" => query.collection = Some(cleaned_value),
                             _ => {
                                 debug!("Unknown operator '{}', treating as text", operator);
                                 remaining_text.push(&rest[..term_end]);
@@ -225,6 +245,21 @@ impl SearchQuery {
 }
 
 impl ProjectDatabase {
+    /// The ids of the projects in the collection with this name, in tracklist order.
+    /// Empty when no collection has the name.
+    fn collection_member_ids(&mut self, name: &str) -> Result<Vec<String>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT cp.project_id FROM collection_projects cp
+             JOIN collections c ON c.id = cp.collection_id
+             WHERE c.name = ? COLLATE NOCASE
+             ORDER BY cp.position",
+        )?;
+        let ids = stmt
+            .query_map([name], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        Ok(ids)
+    }
+
     pub fn search_simple(&mut self, query: &str) -> Result<Vec<Project>, DatabaseError> {
         debug!("Performing search with query: {}", query);
         let tx = self.conn.transaction()?;
@@ -423,12 +458,33 @@ impl ProjectDatabase {
     pub fn search_fts(&mut self, query: &SearchQuery) -> Result<Vec<SearchResult>, DatabaseError> {
         debug!("Performing FTS5 search with query: {:?}", query);
 
+        let members = match &query.collection {
+            Some(name) => Some(self.collection_member_ids(name)?),
+            None => None,
+        };
+
         // Check if query is effectively empty
         let (sql_query, params) = query.build_fts5_query();
         if params.is_empty() || params[0].is_empty() {
-            debug!("Empty query detected, returning empty results");
-            return Ok(Vec::new());
+            // `collection:` alone is a whole query: the collection's projects, in
+            // its order. Archived ones are left out, as the FTS path leaves them.
+            let (Some(name), Some(members)) = (&query.collection, members) else {
+                debug!("Empty query detected, returning empty results");
+                return Ok(Vec::new());
+            };
+            let mut results = Vec::new();
+            for id in members {
+                if let Some(project) = self.get_project_by_id(&id)? {
+                    results.push(SearchResult {
+                        project,
+                        rank: 0.0,
+                        match_reason: vec![MatchReason::Collection(name.clone())],
+                    });
+                }
+            }
+            return Ok(results);
         }
+        let members: Option<HashSet<String>> = members.map(|ids| ids.into_iter().collect());
 
         // First collect all matching paths in a transaction
         let matching_paths = {
@@ -468,6 +524,9 @@ impl ProjectDatabase {
         let mut search_results = Vec::new();
         #[allow(unused)]
         for (project_id, rank, name, path, plugins, samples) in matching_paths {
+            if members.as_ref().is_some_and(|m| !m.contains(&project_id)) {
+                continue;
+            }
             debug!("Processing match: {} ({})", name, path);
             if let Ok(Some(project)) = self.get_project_by_path(&path) {
                 let mut match_reason = Vec::new();
@@ -484,6 +543,9 @@ impl ProjectDatabase {
                         debug!("  Found plugin match!");
                         match_reason.push(MatchReason::Plugin(plugin_query.clone()));
                     }
+                }
+                if let Some(collection) = &query.collection {
+                    match_reason.push(MatchReason::Collection(collection.clone()));
                 }
                 if let Some(bpm) = &query.bpm {
                     match_reason.push(MatchReason::Tempo(bpm.clone()));
