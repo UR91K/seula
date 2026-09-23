@@ -4,11 +4,13 @@
 //! storage/database failure during store/delete/set is a normal 200 with
 //! `success: false`, matching the gRPC handler exactly.
 
-use axum::body::Bytes;
+use axum::body::{boxed, Body, Bytes};
 use axum::extract::{Path, Query, State};
-use axum::http::{header, StatusCode};
-use axum::response::IntoResponse;
+use axum::http::{header, HeaderValue, Request};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+use tower::ServiceExt;
+use tower_http::services::ServeFile;
 
 use crate::http::dto::media::{
     CleanupQuery, CleanupResponse, MediaByTypeQuery, MediaFileDto, MediaFileListResponse,
@@ -78,10 +80,13 @@ pub async fn upload_audio_file(
     Ok(Json(response))
 }
 
+/// Streams the stored file with `Range` support, so an `<audio>` element can seek in
+/// the audition audio (ADR-0033). `ServeFile` also answers conditional requests.
 pub async fn download_media(
     State(state): State<AppState>,
     Path(media_file_id): Path<String>,
-) -> Result<impl IntoResponse, ApiError> {
+    request: Request<Body>,
+) -> Result<Response, ApiError> {
     let media_file = state
         .services
         .media
@@ -95,20 +100,46 @@ pub async fn download_media(
         .file_path(&media_file)
         .map_err(|e| ApiError::Internal(format!("Failed to get file path: {}", e)))?;
 
-    let file_data = tokio::fs::read(&file_path)
+    let mime: mime::Mime = media_file
+        .mime_type
+        .parse()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+
+    // ServeFile's error type is Infallible; a missing file comes back as a 404 response.
+    let mut response = ServeFile::new_with_mime(&file_path, &mime)
+        .oneshot(request)
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to read file: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("Failed to serve file: {}", e)))?;
 
-    let headers = [
-        (header::CONTENT_TYPE, media_file.mime_type.clone()),
-        (header::CONTENT_LENGTH, file_data.len().to_string()),
-        (
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", media_file.original_filename),
-        ),
-    ];
+    // Browsers ignore this for <img> and <audio>; it makes opening the URL directly
+    // download the file under its original name.
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        content_disposition(&media_file.original_filename),
+    );
 
-    Ok((StatusCode::OK, headers, file_data))
+    Ok(response.map(boxed))
+}
+
+/// `attachment` with the original file name, RFC 6266 style: an ASCII fallback plus a
+/// percent-encoded UTF-8 form, since a header value cannot carry raw non-ASCII.
+fn content_disposition(filename: &str) -> HeaderValue {
+    let ascii: String = filename
+        .chars()
+        .map(|c| if (c.is_ascii_graphic() && c != '"' && c != '\\') || c == ' ' { c } else { '_' })
+        .collect();
+    let encoded: String = filename
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{:02X}", b)
+            }
+        })
+        .collect();
+    HeaderValue::from_str(&format!("attachment; filename=\"{}\"; filename*=UTF-8''{}", ascii, encoded))
+        .unwrap_or_else(|_| HeaderValue::from_static("attachment"))
 }
 
 pub async fn delete_media(

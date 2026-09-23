@@ -46,7 +46,10 @@ prost = "0.12"
 # are already transitively present in this tree via tonic 0.10; axum 0.7+ pulls hyper 1.0
 # alongside it, doubling the hyper/tower generations in the build.
 axum = "0.6"
-tower-http = { version = "0.4", features = ["cors"] }
+tower-http = { version = "0.4", features = ["cors", "fs"] }
+# Both already in the tree via axum; direct only for ServeFile in the media handler.
+tower = { version = "0.4", features = ["util"] }
+mime = "0.3"
 tokio-stream = "0.1"
 async-trait = "0.1"
 strum = "0.27.1"
