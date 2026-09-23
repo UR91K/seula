@@ -168,17 +168,34 @@ the one shell question ADR-0032 leaves to the mockup.
 ### Plugins
 
 A paginated list from `/api/v1/plugins`. Per row: name, vendor, format, installed status
-with a visual indicator, project count (ADR-0034). Selecting a row fills the inspector
-with version and SDK details and the projects using it (`/api/v1/plugins/:id/projects`).
+as an icon and a colour (never colour alone), project count (ADR-0034). The list can be
+grouped by vendor or by format: sorted on that column, with a header row per group that
+carries the group's totals from `/api/v1/plugins/vendors` or `/api/v1/plugins/formats`
+(plugins; installed, missing and not scanned; projects using them).
 
-Filters, in the view toolbar: text search on name and vendor (`/api/v1/plugins/search`),
-format dropdown (`/api/v1/plugins/formats`), vendor dropdown
-(`/api/v1/plugins/vendors`), and a tri-state installed filter (all, installed, missing).
-The status bar shows total, installed, missing and unique-vendor counts from
-`/api/v1/plugins/stats`, recomputed for the current filter.
+Selecting a row fills the inspector from `GET /api/v1/plugins/:id`, which returns the
+row and `details`: everything the scan recorded (path, category, channels and buses,
+presets, parameters, latency, GUI, vendor URL, the format's own extras, the VST3
+classes, when it was last scanned), and the references projects know the plugin by, with
+the name each project gives it. Below that, the projects using it
+(`/api/v1/plugins/:id/projects`). A plugin no scan has found has no scanner data, and
+the inspector says why instead of showing empty fields.
 
-The installed flag is tri-state (ADR-0012). "Unknown" is a real state the UI must render
-distinctly from "missing".
+Filters, in the view toolbar: format dropdown, vendor dropdown, and an installed filter
+that takes any of installed, missing and not scanned (`install_states`, ADR-0025). The
+top-bar search goes to `/api/v1/plugins/search` on this view (name, vendor, format). The
+status bar shows total, installed, missing, not-scanned and unique-vendor counts from
+`/api/v1/plugins/stats`, passed the same filters so it counts what the list shows.
+
+"Scan plugins" in the toolbar starts `POST /api/v1/plugins/scan` (ADR-0038). Progress
+shows in the status bar like a project scan's, and when the stream ends the list and the
+counts are fetched again. The button is disabled while any scan runs.
+
+Context menu: Show in Explorer (installed plugins, native-only), Show projects using it
+(the projects view, searching `plugin:` for it), Copy name.
+
+The installed flag is tri-state (ADR-0012). "Not scanned" is a real state the UI must
+render distinctly from "missing".
 
 ### Samples
 
@@ -210,14 +227,16 @@ that trial resolves:
 | Feature | Why the browser cannot | Where it appears |
 |---|---|---|
 | Open in Ableton | launches a program | project context menu |
-| Show in Explorer | reveals a path | project and sample context menus |
+| Show in Explorer | reveals a path | project, plugin and sample context menus |
 | Import from an arbitrary path, including drag and drop | a browser drop yields bytes, not a path; `/api/v1/projects/add` needs a path | projects view import |
 
 ## Live updates
 
-Two SSE streams from ADR-0024: scan progress at `/api/v1/system/scan-status` drives the
-status bar; watcher events at `/api/v1/system/watcher/events` invalidate the projects
-table.
+Two SSE streams from ADR-0024. Scan progress streams from the request that starts the
+scan (`POST /api/v1/system/scan`, `POST /api/v1/plugins/scan`), and
+`GET /api/v1/system/scan-status` answers the current state to a window that did not
+start it; one scan runs at a time (ADR-0038). Watcher events at
+`/api/v1/system/watcher/events` invalidate the projects table.
 
 ## Preferences
 
