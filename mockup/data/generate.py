@@ -117,7 +117,11 @@ COLLECTIONS = [
     ("game music", "Loops and stingers for the jam entry.", "cover-08"),
     ("transcription", "Covers and learning pieces.", "cover-09-ns"),
     ("unsorted demos", None, None),  # deliberately no cover art
+    ("live set 2027", "For the spring shows. Nothing chosen yet.", None),
 ]
+# Collections seeded with no projects, for the empty tracklist. Last in the list and
+# without a cover, so the random stream, and every other row, is unchanged.
+EMPTY_COLLECTIONS = {"live set 2027"}
 
 # (name, vendor, kind, is_instrument, installed) -- installed None = never scanned.
 PLUGINS = [
@@ -492,7 +496,8 @@ def seed() -> None:
         conn.execute("INSERT INTO collections VALUES (?,?,?,?,?,?,?)",
                      (cid, name, desc, None, created, rand_time(created, now),
                       cover_ids.get(cover)))
-        for pos, p in enumerate(rng.sample(project_ids, rng.randint(3, 14))):
+        members = [] if name in EMPTY_COLLECTIONS else rng.sample(project_ids, rng.randint(3, 14))
+        for pos, p in enumerate(members):
             conn.execute("INSERT INTO collection_projects VALUES (?,?,?,?)",
                          (cid, p, pos, rand_time(created, now)))
 
@@ -575,22 +580,33 @@ def scan_streams() -> dict:
 
 
 def dedupe_projects(api: dict) -> None:
-    """Store a plugin's or sample's "used in" list as project ids.
+    """Store a plugin's or sample's "used in" list, and a collection's tracklist, as
+    project ids.
 
-    It holds the same project DTOs as ``/api/v1/projects``, and written out in full for
-    every plugin they would be most of the file. Each is checked equal to the main list's
-    copy before it is replaced, and the mockup puts them back (``apiGet`` in shell.js).
-    Equal up to the order of a project's plugins and samples, which the API does not
-    define and which differs between the two routes.
+    They hold the same project DTOs as ``/api/v1/projects`` (and, under ``scope=all``,
+    ``?scope=deleted``), and written out in full for every plugin they would be most of
+    the file. Each is checked equal to the main list's copy before it is replaced, and
+    the mockup puts them back (``apiGet`` in shell.js). Equal up to the order of a
+    project's plugins and samples, which the API does not define and which differs
+    between routes. A collection's tracklist is a bare list, so it is stored as
+    ``{"project_ids": [...], "as_list": true}`` and given back as a list.
     """
     def canonical(p):
         return {**p, **{k: sorted(p[k], key=lambda x: x["id"]) for k in ("plugins", "samples")}}
 
-    by_id = {p["id"]: canonical(p) for p in api["/api/v1/projects?limit=10000"]["projects"]}
+    by_id = {p["id"]: canonical(p)
+             for key in ("/api/v1/projects?limit=10000", "/api/v1/projects?scope=deleted&limit=10000")
+             for p in api[key]["projects"]}
+    same = lambda projects: all(by_id.get(p["id"]) == canonical(p) for p in projects)
     for path, body in api.items():
+        if path.startswith("/api/v1/collections/") and path.split("?")[0].endswith("/projects") and isinstance(body, list):
+            if not same(body):
+                sys.exit(f"{path}: a project differs from the main list's copy")
+            api[path] = {"project_ids": [p["id"] for p in body], "as_list": True}
+            continue
         if not path.startswith(("/api/v1/plugins/", "/api/v1/samples/")) or not isinstance(body, dict) or "projects" not in body:
             continue
-        if all(by_id.get(p["id"]) == canonical(p) for p in body["projects"]):
+        if same(body["projects"]):
             body["project_ids"] = [p["id"] for p in body.pop("projects")]
 
 
@@ -649,12 +665,20 @@ def snapshot() -> None:
             api[f"/api/v1/samples/stats?{sq}"] = get(f"/api/v1/samples/stats?{sq}")
         api[f"/api/v1/samples/search?query=kick&{big}"] = get(f"/api/v1/samples/search?query=kick&{big}")
 
-        cols = api[f"/api/v1/collections?{big}"]
-        cols = cols.get("collections", cols) if isinstance(cols, dict) else cols
-        for c in cols:
+        # Collections (ADR-0043, ADR-0044): the list in each order the grid's Sort menu
+        # and the table's headers ask for, in both scopes, and a search; then each
+        # collection's detail, tracklist, tasks and statistics, in both scopes.
+        api[f"/api/v1/collections?scope=all&{big}"] = get(f"/api/v1/collections?scope=all&{big}")
+        for sort in ("name", "project_count", "total_duration", "created_at", "modified_at"):
+            for desc in ("false", "true"):
+                path = f"/api/v1/collections?sort_by={sort}&sort_desc={desc}&{big}"
+                api[path] = get(path)
+        api[f"/api/v1/collections/search?query=tape&{big}"] = get(f"/api/v1/collections/search?query=tape&{big}")
+        for c in api[f"/api/v1/collections?{big}"]["collections"]:
             cid = c["id"]
             for sub in ("", "/projects", "/tasks", "/statistics"):
                 api[f"/api/v1/collections/{cid}{sub}"] = get(f"/api/v1/collections/{cid}{sub}")
+                api[f"/api/v1/collections/{cid}{sub}?scope=all"] = get(f"/api/v1/collections/{cid}{sub}?scope=all")
     finally:
         server.terminate()
         server.wait(timeout=10)
