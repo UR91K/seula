@@ -6,7 +6,9 @@ use tokio::sync::Mutex;
 use crate::config::CONFIG;
 use crate::database::batch::BatchInsertManager;
 use crate::database::plugins::PluginRefreshResult;
+use crate::database::samples::SampleRefreshResult;
 use crate::database::ProjectDatabase;
+use crate::scan::sample_check::{check_sample_files, default_threads};
 use crate::error::DatabaseError;
 use crate::grpc::common::{ScanStatus, WatcherEventType};
 use crate::grpc::scanning::ScanProgressResponse;
@@ -89,14 +91,15 @@ impl SystemService {
     }
 
     /// Claims the scan status for a new scan, or returns false when one is already
-    /// running. A project scan and a plugin scan share the status, so one can be
-    /// running at a time (ADR-0038).
+    /// running. Project scans, plugin scans and sample checks share the status, so one
+    /// runs at a time (ADR-0038, ADR-0041).
     async fn begin_scan(&self, status: ScanStatus) -> bool {
         let mut current = self.scan_status.lock().await;
         let running = matches!(
             *current,
             ScanStatus::ScanStarting
                 | ScanStatus::ScanScanningPlugins
+                | ScanStatus::ScanCheckingSamples
                 | ScanStatus::ScanDiscovering
                 | ScanStatus::ScanParsing
                 | ScanStatus::ScanInserting
@@ -260,6 +263,87 @@ impl SystemService {
                 }
                 Err(e) => {
                     let message = format!("Plugin scan failed: {}", e);
+                    on_progress(report(0, 1, message, ScanStatus::ScanError), None);
+                }
+            }
+        });
+        true
+    }
+
+    /// Checks every sample file in the background (ADR-0041): whether it is still
+    /// there, and its size. Reports like the other scans, as `checking_samples` with
+    /// progress by folder, then `completed` (carrying what changed) or `error`.
+    ///
+    /// The database is locked only to read the paths and to write the result. Returns
+    /// false, and starts nothing, when a scan is already running.
+    pub async fn start_sample_check<F>(&self, on_progress: F) -> bool
+    where
+        F: Fn(ScanProgressResponse, Option<SampleRefreshResult>) + Send + Sync + 'static,
+    {
+        if !self.begin_scan(ScanStatus::ScanCheckingSamples).await {
+            return false;
+        }
+
+        let db = Arc::clone(&self.db);
+        let scan_status = Arc::clone(&self.scan_status);
+        let scan_progress = Arc::clone(&self.scan_progress);
+
+        tokio::task::spawn_blocking(move || {
+            // blocking_lock is right here: this is a blocking thread, not a task.
+            let report = |completed: u32, total: u32, message: String, status: ScanStatus| {
+                let response = ScanProgressResponse {
+                    completed,
+                    total,
+                    progress: if total == 0 { 0.0 } else { completed as f32 / total as f32 },
+                    message,
+                    status: status as i32,
+                };
+                *scan_status.blocking_lock() = status;
+                *scan_progress.blocking_lock() = Some(response.clone());
+                response
+            };
+
+            // Its own statement: a guard taken inside the `and_then` chain would live to
+            // the end of it, holding the database through the whole check, and then
+            // deadlock on the lock below (the trap ADR-0002 records).
+            let paths = db.blocking_lock().sample_paths();
+            let outcome = paths.and_then(|paths| {
+                on_progress(
+                    report(0, 0, format!("Checking {} samples...", paths.len()), ScanStatus::ScanCheckingSamples),
+                    None,
+                );
+                // One event per folder would be thousands on a big library; about 200
+                // is plenty for a progress bar.
+                let mut on_folder = |done: usize, total: usize, folder: &Path| {
+                    if done != total && done % (total / 200).max(1) != 0 {
+                        return;
+                    }
+                    let name = folder.file_name().and_then(|n| n.to_str()).unwrap_or("folder");
+                    on_progress(
+                        report(
+                            done as u32,
+                            total as u32,
+                            format!("Checked {} ({}/{})", name, done, total),
+                            ScanStatus::ScanCheckingSamples,
+                        ),
+                        None,
+                    );
+                };
+                let found = check_sample_files(&paths, default_threads(), &mut on_folder);
+                db.blocking_lock().record_sample_check(&found)
+            });
+
+            match outcome {
+                Ok(result) => {
+                    let message = format!(
+                        "Sample check completed: {} checked, {} now missing, {} found again",
+                        result.total_samples_checked, result.samples_now_missing, result.samples_now_present
+                    );
+                    let total = result.total_samples_checked.max(0) as u32;
+                    on_progress(report(total, total, message, ScanStatus::ScanCompleted), Some(result));
+                }
+                Err(e) => {
+                    let message = format!("Sample check failed: {}", e);
                     on_progress(report(0, 1, message, ScanStatus::ScanError), None);
                 }
             }

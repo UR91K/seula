@@ -192,6 +192,40 @@ mod tests {
         assert_eq!(current_progress.message, "Test progress");
     }
 
+    /// The background sample check finishes, releasing the database while it looks at
+    /// files. It once held the lock through the whole check and then deadlocked taking
+    /// it again to write the result (ADR-0041).
+    ///
+    /// A hand-built runtime, shut down with a timeout: a deadlocked blocking thread
+    /// would otherwise hang the test forever instead of failing it.
+    #[test]
+    fn the_background_sample_check_finishes() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let outcome = rt.block_on(async {
+            let server = create_test_server().await;
+            let system = server.system_handler.service.clone();
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            assert!(system.start_sample_check(move |event, result| { let _ = tx.send((event, result)); }).await);
+
+            let last = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                let mut last = None;
+                while let Some(event) = rx.recv().await {
+                    last = Some(event);
+                }
+                last
+            })
+            .await;
+            (last, system)
+        });
+        // Before any assertion: a failing one would drop the runtime, which waits.
+        rt.shutdown_timeout(std::time::Duration::from_secs(1));
+        let (last, system) = outcome;
+        let last = last.expect("the check finishes").expect("it reports");
+        assert_eq!(last.0.status, ScanStatus::ScanCompleted as i32, "{}", last.0.message);
+        assert!(last.1.is_some(), "the final event carries the result");
+        assert_eq!(*system.scan_status_handle().blocking_lock(), ScanStatus::ScanCompleted);
+    }
+
     /// A project scan and a plugin scan share the status; neither starts while the
     /// other runs (ADR-0038).
     #[tokio::test]
@@ -201,10 +235,14 @@ mod tests {
         *system.scan_status_handle().lock().await = ScanStatus::ScanParsing;
 
         assert!(!system.start_plugin_scan(|_, _| {}).await);
+        assert!(!system.start_sample_check(|_, _| {}).await);
         assert!(!system.start_scan(|_| {}).await);
         assert_eq!(*system.scan_status_handle().lock().await, ScanStatus::ScanParsing);
 
         *system.scan_status_handle().lock().await = ScanStatus::ScanScanningPlugins;
         assert!(!system.start_scan(|_| {}).await);
+
+        *system.scan_status_handle().lock().await = ScanStatus::ScanCheckingSamples;
+        assert!(!system.start_plugin_scan(|_, _| {}).await);
     }
 }

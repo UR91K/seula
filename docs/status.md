@@ -90,6 +90,12 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **Sample sizes were invented, and the presence refresh froze the app** (found
+  2026-09-23, fixed 2026-09-23). The "estimated" sample size was a guessed size per
+  extension, summed; and `refresh_sample_presence_status` checked every file while holding
+  the shared database mutex. Sizes are now measured by a background check that lists each
+  folder once, on several threads, and locks the database only to read the paths and write
+  the result (ADR-0041).
 - **The sample list failed on a project-count filter combined with any other filter**
   (found 2026-09-23, fixed 2026-09-23). The count query referred to the table alias `s`
   from outside the subquery that defined it, so SQLite answered "no such column:

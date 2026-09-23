@@ -145,6 +145,8 @@ enum ScanStatus {
   SCAN_ERROR = 6;
   // The first-run plugin scan, which runs before projects are discovered.
   SCAN_SCANNING_PLUGINS = 7;
+  // Checking that each sample file is still there, and its size (ADR-0041).
+  SCAN_CHECKING_SAMPLES = 8;
 }
 
 enum WatcherEventType {

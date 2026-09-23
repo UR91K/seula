@@ -1,12 +1,65 @@
 use crate::error::DatabaseError;
 use crate::models::{Sample, SampleFormat};
+use crate::scan::sample_check::SampleFileState;
+use std::collections::HashMap;
 use rusqlite::params;
 use std::path::PathBuf;
 use uuid::Uuid;
 
 use super::ProjectDatabase;
 
+/// The filters the sample list and search routes share, for counting what they return.
+/// A field left `None` does not filter. `query` matches the way `search_samples` does:
+/// a substring of the name or path.
+#[derive(Debug, Default, Clone)]
+pub struct SampleFilter {
+    pub query: Option<String>,
+    /// A format id, one of its extensions, or `other` (ADR-0039).
+    pub format: Option<String>,
+    pub present: Option<bool>,
+}
+
+impl SampleFilter {
+    /// The `WHERE` conditions over `samples s`, and the values they bind in order.
+    fn conditions(&self) -> (Vec<String>, Vec<Box<dyn rusqlite::ToSql>>) {
+        let mut conditions = Vec::new();
+        let mut bound: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        if let Some(query) = self.query.as_deref().filter(|q| !q.is_empty()) {
+            conditions.push("(s.name LIKE ? OR s.path LIKE ?)".to_string());
+            let like = format!("%{}%", query);
+            bound.push(Box::new(like.clone()));
+            bound.push(Box::new(like));
+        }
+        if let Some(format) = &self.format {
+            conditions.push(SampleFormat::sql_filter(format, "s.path").unwrap_or_else(|| "0".into()));
+        }
+        if let Some(present) = self.present {
+            conditions.push("s.is_present = ?".to_string());
+            bound.push(Box::new(present));
+        }
+        (conditions, bound)
+    }
+}
+
 impl ProjectDatabase {
+    /// Sizes the last sample check measured, keyed by sample id. Samples never measured
+    /// are absent.
+    pub fn sample_sizes(&self, ids: &[String]) -> Result<HashMap<String, i64>, DatabaseError> {
+        let mut sizes = HashMap::new();
+        for chunk in ids.chunks(500) {
+            let placeholders = vec!["?"; chunk.len()].join(", ");
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT sample_id, size_bytes FROM sample_files WHERE sample_id IN ({placeholders})"
+            ))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(chunk), |row| Ok((row.get(0)?, row.get(1)?)))?;
+            for row in rows {
+                let (id, size) = row?;
+                sizes.insert(id, size);
+            }
+        }
+        Ok(sizes)
+    }
+
     /// Get all samples with pagination and sorting
     pub fn get_all_samples(
         &self,
@@ -240,74 +293,65 @@ impl ProjectDatabase {
         Ok((samples?, total_count))
     }
 
-    /// Get sample statistics for status bar
+    /// Sample counts for the status bar, over every sample.
     pub fn get_sample_stats(&self) -> Result<SampleStats, DatabaseError> {
-        let total_samples: i32 =
-            self.conn
-                .query_row("SELECT COUNT(*) FROM samples", [], |row| row.get(0))?;
+        self.get_sample_stats_filtered(&SampleFilter::default())
+    }
 
-        let present_samples: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM samples WHERE is_present = true",
-            [],
-            |row| row.get(0),
-        )?;
+    /// Sample counts over the samples a list or search with the same filter returns,
+    /// so a status bar can describe what is on screen. Sizes are the ones a sample
+    /// check measured (ADR-0041); a present sample no check has measured yet adds
+    /// nothing, and `sized_samples` says how many were.
+    pub fn get_sample_stats_filtered(&self, filter: &SampleFilter) -> Result<SampleStats, DatabaseError> {
+        let (conditions, bound) = filter.conditions();
+        let params: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b.as_ref()).collect();
+        let where_with = |extra: &str| {
+            let mut all = conditions.clone();
+            if !extra.is_empty() {
+                all.push(extra.to_string());
+            }
+            if all.is_empty() {
+                String::new()
+            } else {
+                format!("WHERE {}", all.join(" AND "))
+            }
+        };
 
-        let missing_samples = total_samples - present_samples;
+        let (total_samples, present_samples, sized_samples, total_size_bytes): (i32, i32, i32, i64) =
+            self.conn.query_row(
+                &format!(
+                    "SELECT COUNT(*),
+                            COALESCE(SUM(s.is_present), 0),
+                            COALESCE(SUM(s.is_present AND f.size_bytes IS NOT NULL), 0),
+                            COALESCE(SUM(CASE WHEN s.is_present THEN f.size_bytes END), 0)
+                     FROM samples s LEFT JOIN sample_files f ON f.sample_id = s.id {}",
+                    where_with("")
+                ),
+                params.as_slice(),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )?;
 
-        let unique_paths: i32 =
-            self.conn
-                .query_row("SELECT COUNT(DISTINCT path) FROM samples", [], |row| {
-                    row.get(0)
-                })?;
-
-        // Get samples by extension
-        let mut samples_by_extension = std::collections::HashMap::new();
+        let mut samples_by_extension = HashMap::new();
         let mut stmt = self.conn.prepare(&format!(
-            r#"
-            SELECT 
-                {format_case} as extension,
-                COUNT(*) as count
-            FROM samples 
-            GROUP BY extension
-            "#,
-            format_case = SampleFormat::sql_case("path")
+            "SELECT {} AS format, COUNT(*) FROM samples s {} GROUP BY format",
+            SampleFormat::sql_case("s.path"),
+            where_with("")
         ))?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-        })?;
-
+        let rows = stmt.query_map(params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)))?;
         for row in rows {
-            let (extension, count) = row?;
-            samples_by_extension.insert(extension, count);
+            let (format, count) = row?;
+            samples_by_extension.insert(format, count);
         }
-
-        // Estimate total size (this is a rough estimate based on typical file sizes)
-        let total_estimated_size_bytes = self.conn.query_row(
-            r#"
-            SELECT SUM(
-                CASE 
-                    WHEN path LIKE '%.wav' THEN 5000000  -- ~5MB avg for WAV
-                    WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 5000000  -- ~5MB avg for AIFF
-                    WHEN path LIKE '%.mp3' THEN 500000   -- ~500KB avg for MP3
-                    WHEN path LIKE '%.flac' THEN 2500000 -- ~2.5MB avg for FLAC
-                    WHEN path LIKE '%.ogg' THEN 500000   -- ~500KB avg for OGG
-                    WHEN path LIKE '%.m4a' THEN 500000   -- ~500KB avg for M4A
-                    ELSE 1000000  -- ~1MB for other formats
-                END
-            )
-            FROM samples WHERE is_present = true
-            "#,
-            [],
-            |row| row.get::<_, Option<i64>>(0),
-        )?;
 
         Ok(SampleStats {
             total_samples,
             present_samples,
-            missing_samples,
-            unique_paths,
+            missing_samples: total_samples - present_samples,
+            // `path` is unique, so this always equals `total_samples`. Kept for gRPC.
+            unique_paths: total_samples,
             samples_by_extension,
-            total_estimated_size_bytes: total_estimated_size_bytes.unwrap_or(0),
+            total_size_bytes,
+            sized_samples,
         })
     }
 
@@ -342,55 +386,67 @@ impl ProjectDatabase {
         Ok(usage_info?)
     }
 
-    /// Refresh sample presence status by checking if files still exist
-    pub fn refresh_sample_presence_status(&mut self) -> Result<SampleRefreshResult, DatabaseError> {
-        let mut total_checked = 0;
-        let mut now_present = 0;
-        let mut now_missing = 0;
-        let mut unchanged = 0;
+    /// Every sample's path, for a check to look at (ADR-0041).
+    pub fn sample_paths(&self) -> Result<Vec<String>, DatabaseError> {
+        let mut stmt = self.conn.prepare("SELECT path FROM samples")?;
+        let paths = stmt.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?;
+        Ok(paths)
+    }
 
-        // Get all samples from our database
-        let mut stmt = self.conn.prepare("SELECT id, name, path, is_present FROM samples")?;
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>("id")?,
-                row.get::<_, String>("name")?,
-                row.get::<_, String>("path")?,
-                row.get::<_, bool>("is_present")?,
-            ))
-        })?;
-
-        for row_result in rows {
-            let (sample_id, _name, path_str, current_present) = row_result?;
-            total_checked += 1;
-
-            // Check if file exists
-            let path = PathBuf::from(path_str);
-            let is_present = path.exists();
-
-            if current_present != is_present {
-                // Status changed, update it
-                self.conn.execute(
-                    "UPDATE samples SET is_present = ? WHERE id = ?",
-                    params![is_present, sample_id]
-                )?;
-
-                if is_present {
-                    now_present += 1;
+    /// Write what a check found, in one transaction (ADR-0041). The check itself runs
+    /// before this, without the database. `found` maps a path to its file, or `None`
+    /// when it is not there; paths it does not mention, such as samples added while it
+    /// ran, are left alone.
+    ///
+    /// A found file's size and time are recorded. A missing one keeps the size it last
+    /// had, so a missing sample still says how big it was.
+    pub fn record_sample_check(
+        &mut self,
+        found: &HashMap<String, Option<SampleFileState>>,
+    ) -> Result<SampleRefreshResult, DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        let tx = self.conn.transaction()?;
+        let mut result = SampleRefreshResult {
+            total_samples_checked: 0,
+            samples_now_present: 0,
+            samples_now_missing: 0,
+            samples_unchanged: 0,
+        };
+        {
+            let mut read = tx.prepare("SELECT id, path, is_present FROM samples")?;
+            let rows: Vec<(String, String, bool)> = read
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+                .collect::<Result<_, _>>()?;
+            let mut set_present = tx.prepare("UPDATE samples SET is_present = ? WHERE id = ?")?;
+            let mut set_file = tx.prepare(
+                "INSERT INTO sample_files (sample_id, size_bytes, modified_at, checked_at)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT(sample_id) DO UPDATE SET
+                    size_bytes = EXCLUDED.size_bytes,
+                    modified_at = EXCLUDED.modified_at,
+                    checked_at = EXCLUDED.checked_at",
+            )?;
+            for (id, path, was_present) in rows {
+                let Some(state) = found.get(&path) else { continue };
+                result.total_samples_checked += 1;
+                let present = state.is_some();
+                if present != was_present {
+                    set_present.execute(params![present, id])?;
+                    if present {
+                        result.samples_now_present += 1;
+                    } else {
+                        result.samples_now_missing += 1;
+                    }
                 } else {
-                    now_missing += 1;
+                    result.samples_unchanged += 1;
                 }
-            } else {
-                unchanged += 1;
+                if let Some(file) = state {
+                    set_file.execute(params![id, file.size_bytes as i64, file.modified_at, now])?;
+                }
             }
         }
-
-        Ok(SampleRefreshResult {
-            total_samples_checked: total_checked,
-            samples_now_present: now_present,
-            samples_now_missing: now_missing,
-            samples_unchanged: unchanged,
-        })
+        tx.commit()?;
+        Ok(result)
     }
 
     /// Get comprehensive sample analytics
@@ -494,20 +550,12 @@ impl ProjectDatabase {
                 SUM(CASE WHEN is_present THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN NOT is_present THEN 1 ELSE 0 END) as missing_count,
                 AVG(COALESCE(usage_count, 0)) as avg_usage_count,
-                SUM(
-                    CASE 
-                        WHEN path LIKE '%.wav' THEN 5000000  -- ~5MB avg for WAV
-                        WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 5000000  -- ~5MB avg for AIFF
-                        WHEN path LIKE '%.mp3' THEN 500000   -- ~500KB avg for MP3
-                        WHEN path LIKE '%.flac' THEN 2500000 -- ~2.5MB avg for FLAC
-                        WHEN path LIKE '%.ogg' THEN 500000   -- ~500KB avg for OGG
-                        WHEN path LIKE '%.m4a' THEN 500000   -- ~500KB avg for M4A
-                        ELSE 1000000  -- ~1MB for other formats
-                    END
-                ) as total_size_bytes
+                -- Measured by the last check, present samples only (ADR-0041)
+                COALESCE(SUM(CASE WHEN is_present THEN size_bytes END), 0) as total_size_bytes
             FROM (
-                SELECT s.*, COALESCE(usage_stats.usage_count, 0) as usage_count
+                SELECT s.*, COALESCE(usage_stats.usage_count, 0) as usage_count, f.size_bytes
                 FROM samples s
+                LEFT JOIN sample_files f ON f.sample_id = s.id
                 LEFT JOIN (
                     SELECT sample_id, COUNT(*) as usage_count
                     FROM project_samples
@@ -569,39 +617,12 @@ impl ProjectDatabase {
         Ok((missing_percentage, present_percentage))
     }
 
-    /// Get storage usage statistics
+    /// Storage as the last check measured it (ADR-0041). Missing samples count at the
+    /// size they last had.
     fn get_storage_usage(&self) -> Result<(i64, i64, i64), DatabaseError> {
         let (total_storage, present_storage) = self.conn.query_row(
-            r#"
-            SELECT 
-                SUM(
-                    CASE 
-                        WHEN path LIKE '%.wav' THEN 5000000  -- ~5MB avg for WAV
-                        WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 5000000  -- ~5MB avg for AIFF
-                        WHEN path LIKE '%.mp3' THEN 500000   -- ~500KB avg for MP3
-                        WHEN path LIKE '%.flac' THEN 2500000 -- ~2.5MB avg for FLAC
-                        WHEN path LIKE '%.ogg' THEN 500000   -- ~500KB avg for OGG
-                        WHEN path LIKE '%.m4a' THEN 500000   -- ~500KB avg for M4A
-                        ELSE 1000000  -- ~1MB for other formats
-                    END
-                ) as total_storage,
-                SUM(
-                    CASE 
-                        WHEN is_present THEN
-                            CASE 
-                                WHEN path LIKE '%.wav' THEN 5000000
-                                WHEN path LIKE '%.aif' OR path LIKE '%.aiff' THEN 5000000
-                                WHEN path LIKE '%.mp3' THEN 500000
-                                WHEN path LIKE '%.flac' THEN 2500000
-                                WHEN path LIKE '%.ogg' THEN 500000
-                                WHEN path LIKE '%.m4a' THEN 500000
-                                ELSE 1000000
-                            END
-                        ELSE 0
-                    END
-                ) as present_storage
-            FROM samples
-            "#,
+            "SELECT SUM(f.size_bytes), SUM(CASE WHEN s.is_present THEN f.size_bytes ELSE 0 END)
+             FROM samples s JOIN sample_files f ON f.sample_id = s.id",
             [],
             |row| Ok((row.get::<_, Option<i64>>(0)?.unwrap_or(0), row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
         )?;
@@ -658,8 +679,13 @@ pub struct SampleStats {
     pub present_samples: i32,
     pub missing_samples: i32,
     pub unique_paths: i32,
+    /// Keyed by format id (ADR-0039), despite the name.
     pub samples_by_extension: std::collections::HashMap<String, i32>,
-    pub total_estimated_size_bytes: i64,
+    /// Measured by the last sample check, over present samples (ADR-0041). It used to
+    /// be an estimate from a guessed size per extension.
+    pub total_size_bytes: i64,
+    /// Present samples a check has measured, of `present_samples`.
+    pub sized_samples: i32,
 }
 
 #[derive(serde::Serialize)]

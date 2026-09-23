@@ -18,18 +18,41 @@ pub struct SampleDto {
     pub path: String,
     pub is_present: bool,
     pub project_count: i32,
+    /// As the last sample check measured it (ADR-0041); `null` if no check has found
+    /// the file. A missing sample keeps the size it last had.
+    pub size_bytes: Option<i64>,
 }
 
 impl SampleDto {
-    pub fn new(sample: Sample, project_count: i32) -> Self {
+    pub fn new(sample: Sample, project_count: i32, size_bytes: Option<i64>) -> Self {
         Self {
             id: sample.id.to_string(),
             name: sample.name,
             path: sample.path.to_string_lossy().to_string(),
             is_present: sample.is_present,
             project_count,
+            size_bytes,
         }
     }
+}
+
+/// The list and search filters, so the status bar counts what the list shows. All
+/// optional; none given counts every sample.
+#[derive(Deserialize)]
+pub struct SampleStatsQuery {
+    pub query: Option<String>,
+    pub format_filter: Option<String>,
+    pub present_only: Option<bool>,
+    pub missing_only: Option<bool>,
+}
+
+/// One event of the sample check stream (ADR-0041): the same progress fields as the
+/// other scans, and on the final `completed` event, what the check changed.
+#[derive(Serialize)]
+pub struct SampleCheckEventDto {
+    #[serde(flatten)]
+    pub progress: crate::http::dto::system::ScanProgressDto,
+    pub result: Option<crate::database::samples::SampleRefreshResult>,
 }
 
 /// Maps the HTTP sort key onto the database layer's, which still calls it

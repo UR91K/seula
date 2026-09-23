@@ -262,6 +262,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/samples/refresh-presence-status",
             post(sample_handlers::refresh_sample_presence_status),
         )
+        .route("/api/v1/samples/check", post(sample_handlers::check_samples))
         .route(
             "/api/v1/samples/:sample_id",
             get(sample_handlers::get_sample),

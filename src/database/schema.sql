@@ -153,6 +153,17 @@ CREATE TABLE IF NOT EXISTS samples (
     is_present BOOLEAN NOT NULL
 );
 
+-- What the last sample check found on disk for each sample it found (ADR-0041). A
+-- sample never found has no row; a sample found once and missing since keeps the size
+-- it had. A table of its own so the samples table, and SCHEMA_VERSION, are untouched.
+CREATE TABLE IF NOT EXISTS sample_files (
+    sample_id TEXT PRIMARY KEY,
+    size_bytes INTEGER NOT NULL,
+    modified_at INTEGER,          -- the file's own mtime, epoch seconds
+    checked_at INTEGER NOT NULL,  -- when a check last found it
+    FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS media_files (
     id TEXT PRIMARY KEY,
     original_filename TEXT NOT NULL,

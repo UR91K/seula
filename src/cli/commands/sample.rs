@@ -281,8 +281,13 @@ impl TableDisplay for SampleStatsDisplay {
         simple_table_row!(table, "Overview", "Unique Paths", self.stats.unique_paths);
 
         // Storage info
-        let total_gb = self.stats.total_estimated_size_bytes as f64 / 1_000_000_000.0;
-        simple_table_row!(table, "Storage", "Estimated Total Size", format!("{:.2} GB", total_gb));
+        let total_gb = self.stats.total_size_bytes as f64 / 1_000_000_000.0;
+        simple_table_row!(
+            table,
+            "Storage",
+            "Total Size",
+            format!("{:.2} GB ({} of {} measured)", total_gb, self.stats.sized_samples, self.stats.present_samples)
+        );
 
         // Usage distribution
         simple_table_row!(table, "Usage", "Most Used (≥5)", self.analytics.most_used_samples_count);

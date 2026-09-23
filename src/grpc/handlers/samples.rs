@@ -125,7 +125,8 @@ impl SamplesHandler {
             missing_samples: stats.missing_samples,
             unique_paths: stats.unique_paths,
             samples_by_extension: stats.samples_by_extension,
-            total_estimated_size_bytes: stats.total_estimated_size_bytes,
+            // Now measured, not estimated (ADR-0041); the proto keeps its old name.
+            total_estimated_size_bytes: stats.total_size_bytes,
         }))
     }
 

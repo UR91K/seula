@@ -206,10 +206,11 @@ async fn test_get_sample_analytics() {
     assert_eq!(analytics.present_samples_percentage, 66); // 2 out of 3 samples present (66.67% rounded down)
     assert_eq!(analytics.missing_samples_percentage, 33); // 1 out of 3 samples missing (33.33% rounded down)
     
-    // Check storage usage
-    assert!(analytics.total_storage_bytes > 0);
-    assert!(analytics.present_storage_bytes > 0);
-    assert!(analytics.missing_storage_bytes > 0);
+    // Storage is measured by a sample check (ADR-0041), and none has run here. It used
+    // to be a guessed size per extension, which is why these were once non-zero.
+    assert_eq!(analytics.total_storage_bytes, 0);
+    assert_eq!(analytics.present_storage_bytes, 0);
+    assert_eq!(analytics.missing_storage_bytes, 0);
     
     // Check top used samples
     assert_eq!(analytics.top_used_samples.len(), 3);
@@ -528,9 +529,9 @@ async fn test_get_sample_extensions() {
     assert_eq!(mp3_stats.missing_count, 1); // 1 missing
     assert_eq!(mp3_stats.average_usage_count, 1.0); // used in 1 project
 
-    // Check that total_size_bytes is reasonable (estimated sizes)
-    assert!(wav_stats.total_size_bytes > 0);
-    assert!(mp3_stats.total_size_bytes > 0);
+    // Sizes come from a sample check (ADR-0041); none has run here.
+    assert_eq!(wav_stats.total_size_bytes, 0);
+    assert_eq!(mp3_stats.total_size_bytes, 0);
 }
 
 #[tokio::test]

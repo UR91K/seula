@@ -2,12 +2,13 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::database::samples::{
-    ExtensionAnalytics, SampleAnalytics, SampleRefreshResult, SampleStats, SampleUsageInfo,
+    ExtensionAnalytics, SampleAnalytics, SampleFilter, SampleRefreshResult, SampleStats, SampleUsageInfo,
 };
 use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
 use crate::models::Sample;
 use crate::project::Project;
+use crate::scan::sample_check::{check_sample_files, default_threads};
 
 #[derive(Clone)]
 pub struct SamplesService {
@@ -30,6 +31,16 @@ impl SamplesService {
         scope: ProjectScope,
     ) -> Result<std::collections::HashMap<String, i32>, DatabaseError> {
         self.db.lock().await.sample_project_counts(ids, scope)
+    }
+
+    /// Sizes the last sample check measured, keyed by id (ADR-0041).
+    pub async fn sizes(&self, ids: &[String]) -> Result<std::collections::HashMap<String, i64>, DatabaseError> {
+        self.db.lock().await.sample_sizes(ids)
+    }
+
+    /// Sample counts over the samples `filter` selects.
+    pub async fn get_sample_stats_filtered(&self, filter: &SampleFilter) -> Result<SampleStats, DatabaseError> {
+        self.db.lock().await.get_sample_stats_filtered(filter)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -111,9 +122,17 @@ impl SamplesService {
         db.get_projects_by_sample_id(sample_id, limit, offset, scope)
     }
 
+    /// Check every sample file and record what was found, answering when it is done.
+    /// The database is locked only to read the paths and to write the result
+    /// (ADR-0041). The HTTP API's background check is `SystemService::start_sample_check`.
     pub async fn refresh_sample_presence_status(&self) -> Result<SampleRefreshResult, DatabaseError> {
-        let mut db = self.db.lock().await;
-        db.refresh_sample_presence_status()
+        let paths = self.db.lock().await.sample_paths()?;
+        let found = tokio::task::spawn_blocking(move || {
+            check_sample_files(&paths, default_threads(), &mut |_, _, _| {})
+        })
+        .await
+        .map_err(|e| DatabaseError::ConnectionError(format!("Sample check task failed: {}", e)))?;
+        self.db.lock().await.record_sample_check(&found)
     }
 
     pub async fn get_sample_analytics(&self) -> Result<SampleAnalytics, DatabaseError> {

@@ -156,6 +156,7 @@ pub fn scan_status_name(status: crate::grpc::common::ScanStatus) -> String {
         ScanUnknown => "unknown",
         ScanStarting => "starting",
         ScanScanningPlugins => "scanning_plugins",
+        ScanCheckingSamples => "checking_samples",
         ScanDiscovering => "discovering",
         ScanParsing => "parsing",
         ScanInserting => "inserting",
