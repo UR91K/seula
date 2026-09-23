@@ -105,7 +105,7 @@ textarea.notes::placeholder { color: var(--text-3); }
   height: var(--row); padding: 0 calc(var(--u) * 4);
   white-space: nowrap;
 }
-.picker .it .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.picker .it .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); }
 .picker .it .n { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .picker .it:hover, .picker .it.hot { background: var(--select); }
 .picker .it.create { color: var(--accent); }
@@ -195,8 +195,8 @@ table.grid td.check .cb, table.grid th.check .cb { vertical-align: top; margin-t
 tr:hover .addaudio, .addaudio.show { visibility: visible; }
 
 .namecell { display: flex; align-items: center; gap: calc(var(--u) * 2); min-width: 0; }
-.namecell .n { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-.namecell .f { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; }
+.namecell .n { overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); flex: 0 1 auto; }
+.namecell .f { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); flex: 0 100 auto; }
 .namecell .edit { color: var(--text-3); visibility: hidden; flex: none; margin-left: auto; }
 tr:hover .namecell .edit, .namecell .edit.show { visibility: visible; }
 .namecell input {

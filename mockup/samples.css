@@ -7,8 +7,8 @@ table.grid.samples td .n { overflow: hidden; text-overflow: ellipsis; }
 /* a folder in a table cell: truncated in the middle, so the drive and the folder's own
    name both stay visible, like the inspector's path chip but without its box */
 .pathcell { display: flex; min-width: 0; color: var(--text-2); }
-.pathcell .head { overflow: hidden; text-overflow: ellipsis; min-width: calc(var(--u) * 6); }
-.pathcell .tail { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.pathcell .head { overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); min-width: calc(var(--u) * 6); }
+.pathcell .tail { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); color: var(--text); }
 table.grid tbody tr.sel .pathcell { color: var(--text); }
 
 /* a format with no samples, listed so the list of formats is always the same */

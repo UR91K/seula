@@ -28,6 +28,11 @@ html { font-size: 9pt; }  /* the one value that scales the whole UI */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* A truncating box (overflow: hidden, for the ellipsis) clips at its own edge, and one
+   --line is shorter than Segoe UI's descenders: at 9pt and below they are cut off short
+   of the row. Grow the clip box by --u each way and take it back in margin, so nothing
+   moves. Every truncating text box one --line tall carries these two declarations. */
+
 body {
   font: 1rem/var(--line) var(--font);
   background: var(--bg);
@@ -258,8 +263,8 @@ table.grid .faint { color: var(--text-3); }
   white-space: nowrap; cursor: copy;
 }
 .path:hover { border-color: var(--border); color: var(--text); }
-.path .head { overflow: hidden; text-overflow: ellipsis; min-width: calc(var(--u) * 6); }
-.path .tail { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.path .head { overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); min-width: calc(var(--u) * 6); }
+.path .tail { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding-block: var(--u); margin-block: calc(var(--u) * -1); }
 .path.copied { border-color: var(--ok); }
 .path.copied::after { content: "copied"; margin-left: calc(var(--u) * 3); color: var(--ok); flex: none; }
 
