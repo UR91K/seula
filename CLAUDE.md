@@ -14,6 +14,7 @@ src/
     parallel.rs    manual worker pool                      (ADR-0002)
     plugins/       system plugin scanning, supervisor      (ADR-0004)
   database/      SQLite, one module per entity, FTS5 search
+    schema.sql     every table, index and trigger; include_str!'d by core.rs
     batch.rs       project batch insert; resolves plugin references (ADR-0005, 0009)
     plugin_scan.rs persists plugin scan results                     (ADR-0007, 0012)
   grpc/          12 services, one handler each
