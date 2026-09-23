@@ -199,13 +199,31 @@ render distinctly from "missing".
 
 ### Samples
 
-Same shape as plugins over `/api/v1/samples`. Per row: name, truncated path with the
-full path in a tooltip, extension, present status, project count (ADR-0034). The
-inspector shows the full path and the projects using it. Filters: search
-(`/api/v1/samples/search`), extension dropdown (`/api/v1/samples/extensions`), tri-state
-present filter. Status bar: total, present, missing, unique-path count, estimated total
-size and a breakdown by type from `/api/v1/samples/stats` and
-`/api/v1/samples/analytics`. Context menu has show-in-Explorer, native-only.
+Same shape as plugins over `/api/v1/samples`. Per row: name, the folder as a truncated
+path with the full path in a tooltip, format, present status, size, project count
+(ADR-0034). No grouping; a folder tree is proposed for later (ADR-0042).
+
+Selecting a row fills the inspector from `/api/v1/samples/:id`: the full path, format,
+size and when a check last measured it, and the projects using it
+(`/api/v1/samples/:id/projects`). A missing sample shows the size it last had.
+
+Filters, in the view toolbar: format dropdown from `/api/v1/samples/formats`, where AIFF
+covers `.aif`, `.aiff` and `.aifc` (ADR-0039), and a present filter (all, present,
+missing). The top-bar search goes to `/api/v1/samples/search` on this view (name and
+path). The status bar shows total, present, missing and measured size from
+`/api/v1/samples/stats`, passed the same filters. Until a check has measured the
+library, the size says so rather than showing zero.
+
+"Check samples" in the toolbar starts `POST /api/v1/samples/check` (ADR-0041): whether
+each file is still there, and its size. Progress shows in the status bar like the other
+scans; the button is disabled while any scan runs.
+
+Context menu: Show in Explorer and Play, both native-only (ADR-0030), Show projects
+using it, Copy path.
+
+Project counts and used-in lists here and in the plugins view take `scope=active|all`
+(ADR-0040). The choice is a preference, active by default; under `all`, archived
+projects in a used-in list are marked.
 
 ### Stats
 
@@ -228,6 +246,7 @@ that trial resolves:
 |---|---|---|
 | Open in Ableton | launches a program | project context menu |
 | Show in Explorer | reveals a path | project, plugin and sample context menus |
+| Play a sample | the file is on the local disk, and the API serves only stored media (ADR-0033) | sample context menu and inspector |
 | Import from an arbitrary path, including drag and drop | a browser drop yields bytes, not a path; `/api/v1/projects/add` needs a path | projects view import |
 
 ## Live updates
@@ -252,7 +271,6 @@ Found while mapping the sketch onto the routes. Each is small; none blocks the m
 - A get/set pair for the UI preferences blob (ADR-0031).
 - Tag rename cascade is assumed to be the existing tag update route; verify it rewrites
   `project_tags` rather than creating a new tag.
-- Estimated total sample size on disk. Presence is tracked, size may not be.
 - `GET /api/v1/media/:id` serves media bytes, streamed and with `Range` support
   (ADR-0033). Image and audio URLs are built from `cover_art_id` and `audio_file_id`.
 
