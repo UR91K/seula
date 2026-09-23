@@ -238,7 +238,9 @@ impl SystemService {
                     report(
                         index as u32,
                         total as u32,
-                        format!("Scanning {}", name),
+                        // Counted like the project scan's messages; this one is
+                        // being loaded, not yet done.
+                        format!("Scanning {} ({}/{})", name, index + 1, total),
                         ScanStatus::ScanScanningPlugins,
                     ),
                     None,
