@@ -53,6 +53,15 @@
 
   --close:           #c42b1c;  /* window close button hover, the Windows red */
   --close-text:      #ffffff;
+
+  /* floating surfaces: menus, pickers, popovers, dialogs */
+  --popup:           #262626;
+  --shadow:          rgba(0, 0, 0, 0.5);
+  --scrim:           rgba(0, 0, 0, 0.45);  /* behind a modal dialog */
+
+  /* a glyph drawn over cover art, which can be any colour */
+  --on-art:          #ffffff;
+  --on-art-shadow:   #000000;
 }
 
 [data-theme="light"] {
@@ -93,4 +102,12 @@
 
   --close:           #c42b1c;
   --close-text:      #ffffff;
+
+  --popup:           #f9f9f9;
+  --shadow:          rgba(0, 0, 0, 0.18);
+  --scrim:           rgba(0, 0, 0, 0.25);
+
+  /* a glyph drawn over cover art, which can be any colour */
+  --on-art:          #ffffff;
+  --on-art-shadow:   #000000;
 }

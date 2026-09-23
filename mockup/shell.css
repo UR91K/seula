@@ -54,6 +54,7 @@ button, input, select { font: inherit; color: inherit; }
 /* ------------------------------------------------------------------ window */
 
 .win {
+  position: relative;  /* overlays (menus, dialogs) position against the window */
   display: grid;
   grid-template-rows: auto 1fr auto;
   background: var(--bg);
@@ -299,3 +300,14 @@ ul.plain li .faint { color: var(--text-3); }
   border: 1px solid var(--border); background: var(--field);
 }
 .statusbar .progress i { display: block; height: 100%; background: var(--progress); }
+
+/* The ♯/♭ key spelling switch (ADR-0035), at the right end of the status bar. */
+.statusbar > span.ks { padding: 0 var(--u); display: flex; align-items: center; }
+.keyswitch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.keyswitch button {
+  width: calc(var(--u) * 9); height: calc(var(--u) * 8);
+  line-height: 1; background: none; border: 0; color: var(--text-3); cursor: default;
+}
+.keyswitch button + button { border-left: 1px solid var(--border); }
+.keyswitch button:hover { color: var(--text); background: var(--hover); }
+.keyswitch button.on { color: var(--text); background: var(--select-inactive); }

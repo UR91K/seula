@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula projects board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script src="components.js"></script>
+<script src="screens.js"></script>
+<script src="board.js"></script>
+<script>
+  // This page only chooses frames and their starting states (ADR-0036). Every frame,
+  // screen or component, is drawn by the shared renderers.
+
+  // ---------------------------------------------------------------- picking real rows
+
+  const firstPage = pageOf(projectsState(), projectRows(projectsState()));
+  const pick = (pred, from = firstPage) => from.find(pred) || data.projects.find(pred);
+
+  // A project that exercises every inspector section, near the top so it is in view.
+  // Searched across all projects: the first page rarely has one with every section filled.
+  const showcase = [
+    (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 3 && p.notes && p.tags.length && missingPlugins(p),
+    (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 2 && p.notes && p.tags.length,
+    (p) => p.audio_file_id && projectCover(p) && p.tasks.length >= 2 && p.notes && p.tags.length,
+    (p) => p.audio_file_id && projectCover(p) && p.tasks.length >= 2,
+  ].map((f) => data.projects.find(f)).find(Boolean);
+  const sparse = pick((p) => !p.tags.length && !p.tasks.length && !p.notes && !p.collection_ids.length && !p.audio_file_id);
+  const heavy = [...data.projects].sort((a, b) => (missingPlugins(b) + missingSamples(b)) - (missingPlugins(a) + missingSamples(a)))[0];
+  const three = firstPage.slice(3, 6);
+  const renameMe = pick((p) => fileStem(p.path) !== p.name && p.tags.length);
+  const hoverMe = pick((p) => missingPlugins(p) && p.plugins.some((x) => x.installed == null)) || pick((p) => missingPlugins(p));
+  const hoverSamples = pick((p) => missingSamples(p) >= 2);
+
+  // Three projects that share a tag, for "remove a tag" and the shared inspector.
+  const sharedTag = [...data.tags].sort((a, b) => b.project_count - a.project_count)[0];
+  const tagged3 = data.projects.filter((p) => p.tags.some((t) => t.id === sharedTag.tag_id)).slice(0, 3);
+  const archived2 = data.archived.slice(0, 2);
+  const tagToRename = data.tags.find((t) => t.name === "needs master") || data.tags[0];
+
+  // ---------------------------------------------------------------- frame helpers
+
+  const screen = (id, label, note, overrides) =>
+    ({ id, label, note, kind: "screen", live: true, render: projectsScreen(projectsState(overrides)) });
+  const comp = (id, label, note, html) => ({ id, label, note, render: (el) => { el.innerHTML = typeof html === "function" ? html() : html; } });
+  /** A component inside a panel the size it has in the window. */
+  const panel = (cls, w, h, inner) => () => `<div class="${cls}" style="width:calc(var(--u) * ${w});height:calc(var(--u) * ${h});overflow:auto">${inner()}</div>`;
+  const viewbarStrip = (overrides, total) => () =>
+    `<div class="viewbar" style="width:calc(var(--u) * 526)">${projectsViewbar(projectsState(overrides), total)}<button class="tb-btn on">${icon("right_panel_close")}</button></div>`;
+  const ids = (list) => new Set(list.map((p) => p.id));
+
+  /** The fixed leading cells in each of their states, with what each row shows. */
+  function leadStates() {
+    const withCover = pick((p) => p.audio_file_id && projectCover(p));
+    const noCover = pick((p) => p.audio_file_id && !projectCover(p));
+    const noAudio = pick((p) => !p.audio_file_id && p.tags.length);
+    const rows = [
+      [withCover, {}, "audition audio; cover from its one collection"],
+      [noCover, {}, "audition audio; no single collection, so no cover"],
+      [noAudio, { showAdd: true }, "no audio: + adds some (shown on row hover)"],
+      [renameMe, {}, "display name differs from the file name"],
+      [renameMe, { showEdit: true }, "row hover: pencil renames (F2)"],
+      [renameMe, { renaming: true }, "renaming inline: Enter saves, Esc cancels"],
+    ];
+    return `<table class="grid fixed" style="width:calc(var(--u) * 290)"><thead><tr>
+      <th class="lead" style="width:calc(var(--u) * 12)">${cb(false)}</th><th style="width:calc(var(--u) * 100)">Name</th><th style="width:calc(var(--u) * 64)">Tags</th><th>State</th></tr></thead>
+      <tbody>${rows.map(([p, o, what]) => `<tr>${leadCells(p, o)}<td class="faint">${what}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // ---------------------------------------------------------------- the board
+
+  board({
+    title: "Seula · Projects",
+    intro: `<p>The projects view (ADR-0036). <b>Screen</b> frames on the left are live: click and
+      Ctrl/Shift-click rows, right-click for the menu, hover a plugins or samples count, sort by
+      a header, page, and open the batch menus. <b>Component</b> columns show each part in every
+      state, drawn by the same renderers as the screen.</p>
+      <p>All data is the real API over the seeded database (<code>mockup/data/generate.py</code>).
+      The <b>♯/♭</b> switch at the right of every status bar re-spells every key on the board.</p>`,
+    columns: [
+      { title: "Screen", frames: [
+        screen("1", "Default", "sorted by date modified, newest first; inspector open with nothing selected", {}),
+        screen("1b", "One project selected", "the inspector in full: audition, properties, tags, notes, tasks, collections, plugins, samples",
+          { selected: ids([showcase]) }),
+        screen("1c", "Three selected", "the toolbar swaps filters for batch actions; Delete stays off until they are archived; the inspector shows what they share",
+          { selected: ids(three) }),
+        screen("1d", "Context menu, Tags flyout open", "ticked tags are on this project; Enter, F2 and Del are the keyboard routes",
+          { selected: ids([showcase]), menu: { id: showcase.id, sub: "tags" } }),
+        screen("1e", "Hovering a plugins count", "the list the count stands for, with installed, missing and never-scanned",
+          { selected: new Set(), hot: { id: hoverMe.id, kind: "plugins" } }),
+        screen("1f", "Renaming inline", "the display name only; the .als file keeps its name",
+          { selected: ids([renameMe]), renaming: renameMe.id }),
+        screen("1g", "Search", "ranked by /api/v1/search, which returns order but no score, so there is no relevance column; clicking a header sorts instead",
+          { query: "techno", sort: null }),
+        screen("1h", "Batch: add a tag", "Tags ▾ › Add tags…, autocompleting over existing tags",
+          { selected: ids(tagged3), popover: "picker-tag" }),
+        screen("1i", "Archived, two selected", "Show: Archived. Reactivate, or delete from Seula's database",
+          { scope: "archived", selected: ids(archived2) }),
+        screen("1j", "Delete from Seula", "says plainly that the files on disk are untouched",
+          { scope: "archived", selected: ids(archived2), dialog: "delete" }),
+        screen("1k", "Manage tags", "reached from the context menu or Tags ▾",
+          { dialog: "tags" }),
+        screen("1l", "Choosing columns", "fixed leading columns are locked; the rest show, hide and reorder",
+          { popover: "columns" }),
+        screen("1m", "Sidebar collapsed, inspector closed", "the whole table width; the sidebar keeps its icons",
+          { sidebarCollapsed: true, inspectorOpen: false }),
+        screen("1n", "Browser target", "no window controls, no import button, and Open in Ableton / Show in Explorer are absent (ADR-0030)",
+          { tauri: false, selected: ids([showcase]), menu: { id: showcase.id } }),
+        screen("1o", "First run", "no folders configured; the message is /api/v1/config/status's own",
+          { firstRun: true, inspectorOpen: false }),
+        screen("1p", "Search with no results", "",
+          { query: "field recording", sort: null }),
+      ]},
+      { title: "Inspector", frames: [
+        comp("2a", "One project, everything present", "", panel("inspector", 150, 300, () => projectInspector(showcase))),
+        comp("2b", "Tasks being tidied", "two selected; the bulk actions light up", panel("inspector", 150, 300, () =>
+          projectInspector(showcase, { tasksSel: new Set(showcase.tasks.slice(0, 2).map((t) => t.id)) }))),
+        comp("2c", "A bare project", "no cover, audio, tags, notes, tasks or collections: each section's empty state", panel("inspector", 150, 300, () => projectInspector(sparse))),
+        comp("2d", "The most missing", "missing plugins and samples counted in the section headers", panel("inspector", 150, 300, () => projectInspector(heavy))),
+        comp("2e", "Three selected, sharing a tag", "what they have in common, not three inspectors", panel("inspector", 150, 300, () => multiInspector(tagged3))),
+        comp("2f", "Nothing selected", "", panel("inspector", 150, 120, inspectorEmpty)),
+      ]},
+      { title: "Context menu", frames: [
+        comp("3a", "One project", "Tauri target", () => projectContextMenu({ hot: "open" })),
+        comp("3b", "Tags flyout", "", () => `<div style="display:flex;align-items:flex-start">${projectContextMenu({ hot: "tags" })}<div style="margin-top:calc(var(--u) * 35)">${tagSubmenu([showcase])}</div></div>`),
+        comp("3c", "Several selected", "single-item entries disabled", () => projectContextMenu({ many: true })),
+        comp("3d", "An archived project", "", () => projectContextMenu({ archived: true })),
+        comp("3e", "Browser target", "the native-only entries are gone, not disabled", () => projectContextMenu({ tauri: false })),
+      ]},
+      { title: "View toolbar", frames: [
+        comp("4a", "Default", "scope, tag filter, import (Tauri), columns; pager on the right", viewbarStrip({}, data.projects.length)),
+        comp("4b", "Batch, active projects", "", viewbarStrip({ selected: ids(three) }, data.projects.length)),
+        comp("4c", "Batch, archived projects", "", viewbarStrip({ scope: "archived", selected: ids(archived2) }, data.archived.length)),
+        comp("4d", "Search active", "", viewbarStrip({ query: "techno", sort: null }, API["/api/v1/search?query=techno&limit=200"].projects.length)),
+        comp("4e", "Tags ▾", "", batchTagsMenu),
+        comp("4f", "Collection ▾", "", batchCollectionMenu),
+      ]},
+      { title: "Pickers", frames: [
+        comp("5a", "Add a tag", "most-used first", () => tagPicker("")),
+        comp("5b", "Add a tag, typing", "", () => tagPicker("m", 0)),
+        comp("5c", "Add a tag, no match", "Enter creates it", () => tagPicker("field recording")),
+        comp("5d", "Remove a tag", `only tags on all selected; here, three sharing “${esc(sharedTag.name)}”`, () => untagPicker(tagged3)),
+        comp("5e", "Add to a collection", "create-new first", () => collectionPicker("")),
+        comp("5f", "Add to a collection, no match", "", () => collectionPicker("tape")),
+      ]},
+      { title: "Table parts", frames: [
+        comp("6a", "Leading cells", "the fixed columns in each state", leadStates),
+        comp("6b", "Plugins hover list", "", () => countHoverList(hoverMe, "plugins")),
+        comp("6c", "Samples hover list", "path on hover", () => countHoverList(hoverSamples, "samples")),
+        comp("6d", "Column chooser", "", () => columnChooser(projectsState().columns)),
+      ]},
+      { title: "Dialogs", frames: [
+        comp("7a", "Manage tags", "", () => tagManager()),
+        comp("7b", "Manage tags, renaming one", "", () => tagManager({ rename: tagToRename.tag_id })),
+        comp("7c", "Delete a tag", "", () => tagManager({ confirmDelete: tagToRename.tag_id })),
+        comp("7d", "Delete one project from Seula", "", () => deletePermanentDialog(archived2.slice(0, 1))),
+        comp("7e", "Delete several", "", () => deletePermanentDialog(archived2)),
+        comp("7f", "New collection from selection", "", () => newCollectionDialog(three)),
+      ]},
+    ],
+  });
+</script>
+</body>
+</html>

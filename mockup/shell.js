@@ -15,6 +15,9 @@ const data = {
   plugins: API[`/api/v1/plugins?${BIG}`].plugins,
   samples: API[`/api/v1/samples?${BIG}`].samples,
   media: API[`/api/v1/media?${BIG}`].media_files,
+  tags: API[`/api/v1/tags/with-usage?${BIG}`].tags,
+  system: API["/api/v1/system/info"],
+  config: API["/api/v1/config/status"],
 };
 
 // ------------------------------------------------------------------ formatting
@@ -33,10 +36,25 @@ function fmtLength(seconds) {
   return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 }
 
-/** The API sends both spellings (ADR-0035); the sharp/flat switch picks one. */
+/** The API sends both spellings (ADR-0035); the sharp/flat switch picks one. It is
+ *  app-wide, so flipping it redraws every frame on the board. */
 let keySpelling = "sharp";
 function fmtKey(key) {
   return key ? key[keySpelling] : "";
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-keyspell]");
+  if (!b || b.dataset.keyspell === keySpelling) return;
+  keySpelling = b.dataset.keyspell;
+  if (typeof refreshBoard === "function") refreshBoard();
+});
+
+/** The ♯/♭ switch that sits at the right end of the status bar. */
+function keySwitch() {
+  const b = (v, label, title) =>
+    `<button class="${keySpelling === v ? "on" : ""}" data-keyspell="${v}" title="${title}">${label}</button>`;
+  return `<span class="keyswitch">${b("sharp", "♯", "Show keys with sharps")}${b("flat", "♭", "Show keys with flats")}</span>`;
 }
 
 function fmtTempo(t) {
@@ -104,6 +122,12 @@ function sampleStatus(present) {
 
 // ------------------------------------------------------------------ shell
 
+/** From /api/v1/system/info. The mock daemon watches nothing, so this reads "off". */
+function watcherStatus() {
+  const n = data.system.watch_paths.length;
+  return data.system.watcher_active ? `Watching ${n} folder${n === 1 ? "" : "s"}` : "Watcher off";
+}
+
 const VIEWS = [
   { id: "projects", label: "Projects", icon: "audio_file", count: () => data.projects.length },
   { id: "collections", label: "Collections", icon: "album", count: () => data.collections.length },
@@ -124,6 +148,7 @@ const LOGO = `<svg class="logo" viewBox="0 0 216.54 406" role="img" aria-label="
  *   viewbar: html, content: html, inspector: html,
  *   status: [html, ...]   left-hand status segments
  *   scan: null | { done, total, message }
+ *   overlay: html          menus, popovers and dialogs, positioned against the window
  * }
  */
 function renderShell(s) {
@@ -175,7 +200,9 @@ function renderShell(s) {
     <footer class="statusbar">
       ${(s.status || []).map((x) => `<span>${x}</span>`).join("")}
       ${scan}
-      <span>${s.scan ? "Watcher paused" : "Watching 3 folders"}</span>
+      <span>${watcherStatus()}</span>
+      <span class="ks">${keySwitch()}</span>
     </footer>
+    ${s.overlay || ""}
   </div>`;
 }

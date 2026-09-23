@@ -1,0 +1,71 @@
+/* The review board every view page sits on (ADR-0036). Not part of the app.
+ *
+ * A sticky control bar, then one wide canvas: a screen column on the left and a column
+ * per component beside it, each frame labelled nekko-style. Measures are in root-font
+ * units like the app's, so the board scales with it; zoom is a separate CSS zoom on
+ * the canvas and never touches the root font.
+ */
+
+body { background: var(--bg); }
+
+.board-bar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: calc(var(--u) * 6);
+  padding: calc(var(--u) * 3) calc(var(--u) * 8);
+  background: var(--bar);
+  border-bottom: 1px solid var(--border);
+}
+.board-bar h1 { font-size: var(--step-up); font-weight: 600; }
+.board-bar .grow { flex: 1; }
+.board-bar .ctl { display: flex; align-items: center; gap: calc(var(--u) * 2); color: var(--text-2); }
+.board-bar .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.board-bar .seg button {
+  height: calc(var(--u) * 10); padding: 0 calc(var(--u) * 4);
+  background: var(--field); border: 0; border-right: 1px solid var(--border);
+  color: var(--text-2); cursor: default;
+}
+.board-bar .seg button:last-child { border-right: 0; }
+.board-bar .seg button.on { background: var(--select); color: var(--text); }
+.board-bar a { color: var(--accent); text-decoration: none; }
+
+.board-intro {
+  max-width: calc(var(--u) * 600);
+  padding: calc(var(--u) * 8) calc(var(--u) * 8) 0;
+  color: var(--text-2);
+}
+.board-intro p + p, .board-intro p + ul, .board-intro ul + p { margin-top: calc(var(--u) * 3); }
+.board-intro ul { margin-left: calc(var(--u) * 8); }
+.board-intro code, .board-intro b { color: var(--text); font-weight: 600; }
+
+.canvas {
+  display: flex; align-items: flex-start; gap: calc(var(--u) * 20);
+  padding: calc(var(--u) * 10) calc(var(--u) * 8) calc(var(--u) * 30);
+  width: max-content;
+}
+
+.board-col { display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+.board-col > h2 {
+  font-size: var(--step-up); font-weight: 600; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding-bottom: calc(var(--u) * 2);
+  border-bottom: 1px solid var(--border);
+}
+
+.frame-wrap { display: flex; flex-direction: column; gap: calc(var(--u) * 3); }
+.frame-label { font-weight: 600; max-width: calc(var(--u) * 600); }
+.frame-label .note { font-weight: normal; color: var(--text-2); }
+.frame-label .live {
+  font-weight: normal; color: var(--accent);
+  margin-left: calc(var(--u) * 2);
+}
+
+/* A component frame: the component on a plain surface, at its real size. */
+.frame.component {
+  position: relative;
+  padding: calc(var(--u) * 6);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  width: max-content;
+}
+/* 1520x760 at 9pt: the app on a 1920-wide display, where every default column fits beside the inspector */
+.frame.screen > .win { width: calc(var(--u) * 760); height: calc(var(--u) * 380); }
