@@ -23,6 +23,14 @@ impl SamplesService {
         Arc::clone(&self.db)
     }
 
+    /// How many projects use each sample, keyed by id (ADR-0034).
+    pub async fn project_counts(
+        &self,
+        ids: &[String],
+    ) -> Result<std::collections::HashMap<String, i32>, DatabaseError> {
+        self.db.lock().await.sample_project_counts(ids)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub async fn get_all_samples(
         &self,

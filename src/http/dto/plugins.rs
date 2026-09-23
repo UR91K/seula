@@ -28,6 +28,8 @@ pub fn parse_install_states(raw: Option<&str>) -> Vec<InstallState> {
         .collect()
 }
 
+/// `project_count` is always populated (ADR-0034); the old `usage_count` always equalled
+/// it and is gone.
 #[derive(Serialize)]
 pub struct PluginDto {
     pub id: String,
@@ -37,8 +39,7 @@ pub struct PluginDto {
     pub installed: Option<bool>,
     pub vendor: Option<String>,
     pub version: Option<String>,
-    pub usage_count: Option<i32>,
-    pub project_count: Option<i32>,
+    pub project_count: i32,
 }
 
 impl From<GrpcPlugin> for PluginDto {
@@ -51,14 +52,14 @@ impl From<GrpcPlugin> for PluginDto {
             installed: grpc_plugin.plugin.installed,
             vendor: grpc_plugin.plugin.vendor,
             version: grpc_plugin.plugin.version,
-            usage_count: Some(grpc_plugin.usage_count),
-            project_count: Some(grpc_plugin.project_count),
+            project_count: grpc_plugin.project_count,
         }
     }
 }
 
-impl From<DomainPlugin> for PluginDto {
-    fn from(plugin: DomainPlugin) -> Self {
+impl PluginDto {
+    /// For the routes that return plain plugins; the handler supplies the count.
+    pub fn new(plugin: DomainPlugin, project_count: i32) -> Self {
         Self {
             id: plugin.id.to_string(),
             dev_identifier: plugin.dev_identifier,
@@ -67,11 +68,7 @@ impl From<DomainPlugin> for PluginDto {
             installed: plugin.installed,
             vendor: plugin.vendor,
             version: plugin.version,
-            // Matches the gRPC handlers this mirrors: usage/project counts are
-            // only populated by get_all_plugins (which starts from GrpcPlugin),
-            // not by the plain-Plugin-returning queries.
-            usage_count: None,
-            project_count: None,
+            project_count,
         }
     }
 }
@@ -85,7 +82,13 @@ pub struct GetAllPluginsQuery {
     pub vendor_filter: Option<String>,
     pub format_filter: Option<String>,
     pub install_states: Option<String>,
-    pub min_usage_count: Option<i32>,
+    pub min_project_count: Option<i32>,
+}
+
+/// Maps the HTTP sort key onto the database layer's, which still calls it
+/// `usage_count` (ADR-0034).
+pub fn plugin_sort_key(sort_by: Option<String>) -> Option<String> {
+    sort_by.map(|s| if s == "project_count" { "usage_count".to_string() } else { s })
 }
 
 #[derive(Deserialize)]
@@ -136,8 +139,6 @@ pub struct FormatListResponse {
 #[derive(Serialize)]
 pub struct GetPluginResponse {
     pub plugin: PluginDto,
-    pub usage_count: i32,
-    pub project_count: i32,
 }
 
 #[derive(Deserialize)]

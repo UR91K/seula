@@ -248,6 +248,10 @@ CREATE INDEX IF NOT EXISTS idx_plugin_classes_class_id ON plugin_classes(class_i
 CREATE INDEX IF NOT EXISTS idx_plugin_classes_plugin ON plugin_classes(plugin_id);
 CREATE INDEX IF NOT EXISTS idx_plugin_buses_plugin ON plugin_buses(plugin_id);
 CREATE INDEX IF NOT EXISTS idx_samples_path ON samples(path);
+-- The junction primary keys lead with project_id, so they cannot answer "how many
+-- projects use this item". These serve the per-row project counts (ADR-0034).
+CREATE INDEX IF NOT EXISTS idx_project_samples_sample ON project_samples(sample_id);
+CREATE INDEX IF NOT EXISTS idx_project_plugins_plugin ON project_plugins(plugin_id);
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 CREATE INDEX IF NOT EXISTS idx_collection_projects_position ON collection_projects(collection_id, position);
 CREATE INDEX IF NOT EXISTS idx_projects_is_active ON projects(is_active);

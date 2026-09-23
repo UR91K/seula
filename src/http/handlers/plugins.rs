@@ -6,13 +6,28 @@ use axum::response::IntoResponse;
 use axum::Json;
 
 use crate::http::dto::plugins::{
-    parse_install_states, ByInstalledStatusQuery, FormatListResponse, GetAllPluginsQuery,
+    parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FormatListResponse,
+    GetAllPluginsQuery,
     GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse, ProjectsByPluginQuery,
     SearchPluginsQuery, VendorListResponse,
 };
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+use crate::models::Plugin as DomainPlugin;
+
+/// Attach each plugin's project count with one query for the page (ADR-0034).
+async fn with_counts(state: &AppState, plugins: Vec<DomainPlugin>) -> Result<Vec<PluginDto>, ApiError> {
+    let ids: Vec<String> = plugins.iter().map(|p| p.id.to_string()).collect();
+    let counts = state.services.plugins.project_counts(&ids).await?;
+    Ok(plugins
+        .into_iter()
+        .map(|p| {
+            let count = counts.get(&p.id.to_string()).copied().unwrap_or(0);
+            PluginDto::new(p, count)
+        })
+        .collect())
+}
 
 pub async fn get_all_plugins(
     State(state): State<AppState>,
@@ -26,12 +41,12 @@ pub async fn get_all_plugins(
         .get_all_plugins(
             query.limit,
             query.offset,
-            query.sort_by,
+            plugin_sort_key(query.sort_by),
             query.sort_desc,
             query.vendor_filter,
             query.format_filter,
             &install_states,
-            query.min_usage_count,
+            query.min_project_count,
         )
         .await?;
 
@@ -54,13 +69,13 @@ pub async fn get_plugins_by_installed_status(
             &install_states,
             query.limit,
             query.offset,
-            query.sort_by,
+            plugin_sort_key(query.sort_by),
             query.sort_desc,
         )
         .await?;
 
     Ok(Json(PluginListResponse {
-        plugins: plugins.into_iter().map(PluginDto::from).collect(),
+        plugins: with_counts(&state, plugins).await?,
         total_count,
     }))
 }
@@ -85,7 +100,7 @@ pub async fn search_plugins(
         .await?;
 
     Ok(Json(PluginListResponse {
-        plugins: plugins.into_iter().map(PluginDto::from).collect(),
+        plugins: with_counts(&state, plugins).await?,
         total_count,
     }))
 }
@@ -130,13 +145,8 @@ pub async fn get_plugin(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Plugin with ID {} not found", plugin_id)))?;
 
-    let usage_count = grpc_plugin.usage_count;
-    let project_count = grpc_plugin.project_count;
-
     Ok(Json(GetPluginResponse {
         plugin: PluginDto::from(grpc_plugin),
-        usage_count,
-        project_count,
     }))
 }
 

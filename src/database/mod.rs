@@ -4,6 +4,7 @@ mod core;
 mod helpers;
 mod media;
 mod models;
+mod project_counts;
 pub mod notes;
 pub mod plugin_scan;
 pub mod plugins;

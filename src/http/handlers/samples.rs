@@ -7,11 +7,25 @@ use axum::Json;
 
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::dto::samples::{
-    ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto, SampleListResponse,
-    SearchSamplesQuery,
+    sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto,
+    SampleListResponse, SearchSamplesQuery,
 };
+use crate::models::Sample;
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+
+/// Attach each sample's project count with one query for the page (ADR-0034).
+async fn with_counts(state: &AppState, samples: Vec<Sample>) -> Result<Vec<SampleDto>, ApiError> {
+    let ids: Vec<String> = samples.iter().map(|s| s.id.to_string()).collect();
+    let counts = state.services.samples.project_counts(&ids).await?;
+    Ok(samples
+        .into_iter()
+        .map(|s| {
+            let count = counts.get(&s.id.to_string()).copied().unwrap_or(0);
+            SampleDto::new(s, count)
+        })
+        .collect())
+}
 
 pub async fn get_all_samples(
     State(state): State<AppState>,
@@ -23,18 +37,18 @@ pub async fn get_all_samples(
         .get_all_samples(
             query.limit,
             query.offset,
-            query.sort_by,
+            sample_sort_key(query.sort_by),
             query.sort_desc,
             query.present_only,
             query.missing_only,
             query.extension_filter,
-            query.min_usage_count,
-            query.max_usage_count,
+            query.min_project_count,
+            query.max_project_count,
         )
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: samples.into_iter().map(SampleDto::from).collect(),
+        samples: with_counts(&state, samples).await?,
         total_count,
     }))
 }
@@ -50,7 +64,8 @@ pub async fn get_sample(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Sample not found with ID: {}", sample_id)))?;
 
-    Ok(Json(SampleDto::from(sample)))
+    let mut dtos = with_counts(&state, vec![sample]).await?;
+    Ok(Json(dtos.remove(0)))
 }
 
 pub async fn get_samples_by_presence(
@@ -64,13 +79,13 @@ pub async fn get_samples_by_presence(
             query.is_present,
             query.limit,
             query.offset,
-            query.sort_by,
+            sample_sort_key(query.sort_by),
             query.sort_desc,
         )
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: samples.into_iter().map(SampleDto::from).collect(),
+        samples: with_counts(&state, samples).await?,
         total_count,
     }))
 }
@@ -86,7 +101,7 @@ pub async fn search_samples(
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: samples.into_iter().map(SampleDto::from).collect(),
+        samples: with_counts(&state, samples).await?,
         total_count,
     }))
 }

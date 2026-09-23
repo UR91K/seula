@@ -9,23 +9,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::Sample;
 
+/// `project_count` is always populated (ADR-0034). There is no separate usage count:
+/// a project either uses a sample or does not, so the two would always agree.
 #[derive(Serialize)]
 pub struct SampleDto {
     pub id: String,
     pub name: String,
     pub path: String,
     pub is_present: bool,
+    pub project_count: i32,
 }
 
-impl From<Sample> for SampleDto {
-    fn from(sample: Sample) -> Self {
+impl SampleDto {
+    pub fn new(sample: Sample, project_count: i32) -> Self {
         Self {
             id: sample.id.to_string(),
             name: sample.name,
             path: sample.path.to_string_lossy().to_string(),
             is_present: sample.is_present,
+            project_count,
         }
     }
+}
+
+/// Maps the HTTP sort key onto the database layer's, which still calls it
+/// `usage_count` (ADR-0034).
+pub fn sample_sort_key(sort_by: Option<String>) -> Option<String> {
+    sort_by.map(|s| if s == "project_count" { "usage_count".to_string() } else { s })
 }
 
 #[derive(Serialize)]
@@ -43,8 +53,8 @@ pub struct GetAllSamplesQuery {
     pub present_only: Option<bool>,
     pub missing_only: Option<bool>,
     pub extension_filter: Option<String>,
-    pub min_usage_count: Option<i32>,
-    pub max_usage_count: Option<i32>,
+    pub min_project_count: Option<i32>,
+    pub max_project_count: Option<i32>,
 }
 
 #[derive(Deserialize)]
