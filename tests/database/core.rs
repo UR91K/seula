@@ -352,17 +352,18 @@ fn test_notes_and_tasks() {
 
     // Test getting collection tasks
     let collection_tasks = db
-        .get_collection_tasks(&collection_id)
+        .get_collection_tasks(&collection_id, seula::database::ProjectScope::All)
         .expect("Failed to get collection tasks");
     assert_eq!(collection_tasks.len(), 2);
 
     // Verify collection tasks contain project name and correct completion status
     let completed_collection_task = collection_tasks
         .iter()
-        .find(|(id, _, desc, _, _)| desc == "Fix the bass mix")
+        .find(|(_, _, _, desc, _, _)| desc == "Fix the bass mix")
         .expect("Couldn't find completed task in collection");
-    assert!(completed_collection_task.3); // Check completion status
-    assert_eq!(completed_collection_task.1, "test_project.als"); // Check project name
+    assert!(completed_collection_task.4); // Check completion status
+    assert_eq!(completed_collection_task.1, project_id); // Check project id
+    assert_eq!(completed_collection_task.2, "test_project.als"); // Check project name
 
     // Create a second project with tasks
     let project2 =
@@ -380,13 +381,14 @@ fn test_notes_and_tasks() {
 
     // Verify collection tasks show tasks from both projects in correct order
     let collection_tasks = db
-        .get_collection_tasks(&collection_id)
+        .get_collection_tasks(&collection_id, seula::database::ProjectScope::All)
         .expect("Failed to get collection tasks after adding second project");
     assert_eq!(collection_tasks.len(), 3);
 
     // Tasks should be ordered by project position in collection
-    assert_eq!(collection_tasks[0].1, "test_project.als");
-    assert_eq!(collection_tasks[2].1, "Second Project.als");
+    assert_eq!(collection_tasks[0].2, "test_project.als");
+    assert_eq!(collection_tasks[2].2, "Second Project.als");
+    assert_eq!(collection_tasks[2].1, project2_id);
 }
 
 #[test]

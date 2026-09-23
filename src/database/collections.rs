@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use super::ProjectDatabase;
+use super::{ProjectDatabase, ProjectScope};
 
 impl ProjectDatabase {
     // Collection methods
@@ -43,9 +43,12 @@ impl ProjectDatabase {
         Ok(collection_id)
     }
 
+    /// A collection and its member project ids in order. Under `ProjectScope::Active`
+    /// the ids leave archived projects out (ADR-0043).
     pub fn get_collection_by_id(
         &mut self,
         collection_id: &str,
+        scope: ProjectScope,
     ) -> Result<
         Option<(
             String,
@@ -81,9 +84,10 @@ impl ProjectDatabase {
             collection_data
         {
             // Get project IDs for this collection
-            let mut stmt = self.conn.prepare(
-                "SELECT project_id FROM collection_projects WHERE collection_id = ? ORDER BY position"
-            )?;
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT cp.project_id FROM collection_projects cp {} WHERE cp.collection_id = ? ORDER BY cp.position",
+                scope.join("cp.project_id")
+            ))?;
             let project_ids: Vec<String> = stmt
                 .query_map([collection_id], |row| row.get(0))?
                 .filter_map(|r| r.ok())
@@ -424,26 +428,29 @@ impl ProjectDatabase {
     pub fn get_collection_projects(
         &mut self,
         collection_id: &str,
+        scope: ProjectScope,
     ) -> Result<Vec<Project>, DatabaseError> {
         debug!("Getting projects in collection: {}", collection_id);
         let tx = self.conn.transaction()?;
         let mut results = Vec::new();
 
         {
-            let mut stmt = tx.prepare(
+            let mut stmt = tx.prepare(&format!(
                 r#"
                 SELECT p.id, p.path, p.name, p.hash, p.notes, p.created_at, p.modified_at, p.last_parsed_at,
                        p.tempo, p.time_signature_numerator, p.time_signature_denominator,
                        p.key_signature_tonic, p.key_signature_scale, p.duration_seconds, p.furthest_bar,
                        p.daw_type, p.daw_version_display,
-                       a.version_major, a.version_minor, a.version_patch, a.version_beta
+                       a.version_major, a.version_minor, a.version_patch, a.version_beta,
+                       p.is_active
                 FROM projects p
                 JOIN collection_projects cp ON cp.project_id = p.id
                 JOIN project_ableton_metadata a ON a.project_id = p.id
-                WHERE cp.collection_id = ?
+                WHERE cp.collection_id = ? {}
                 ORDER BY cp.position
                 "#,
-            )?;
+                scope.and_projects()
+            ))?;
 
             let mut rows = stmt.query([collection_id])?;
             while let Some(row) = rows.next()? {
@@ -455,7 +462,7 @@ impl ProjectDatabase {
                 let parsed_timestamp: i64 = row.get(7)?;
 
                 let mut live_set = Project {
-                    is_active: true,
+                    is_active: row.get(21)?,
                     id: Uuid::parse_str(&project_id).map_err(|_| {
                         rusqlite::Error::InvalidParameterName("Invalid UUID".into())
                     })?,
@@ -571,17 +578,29 @@ impl ProjectDatabase {
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
+        scope: ProjectScope,
     ) -> Result<(Vec<(String, String, Option<String>)>, i32), DatabaseError> {
         debug!("Listing collections with pagination: limit={:?}, offset={:?}, sort_by={:?}, sort_desc={:?}", 
                limit, offset, sort_by, sort_desc);
 
+        // The counted sorts are subqueries: the collections table has no count or
+        // duration column, and `ORDER BY project_count` used to fail on exactly that.
+        // They count in `scope`, as the rows' own counts do (ADR-0043).
         let sort_column = match sort_by.as_deref() {
-            Some("name") => "name",
-            Some("description") => "description",
-            Some("created_at") => "created_at",
-            Some("modified_at") => "modified_at",
-            Some("project_count") => "project_count",
-            _ => "name", // default sort
+            Some("name") => "c.name".to_string(),
+            Some("description") => "c.description".to_string(),
+            Some("created_at") => "c.created_at".to_string(),
+            Some("modified_at") => "c.modified_at".to_string(),
+            Some("project_count") => format!(
+                "(SELECT COUNT(*) FROM collection_projects cp {} WHERE cp.collection_id = c.id)",
+                scope.join("cp.project_id")
+            ),
+            Some("total_duration") => format!(
+                "(SELECT COALESCE(SUM(p.duration_seconds), 0) FROM collection_projects cp
+                  JOIN projects p ON p.id = cp.project_id WHERE cp.collection_id = c.id {})",
+                scope.and_projects()
+            ),
+            _ => "c.name".to_string(), // default sort
         };
 
         let sort_order = if sort_desc.unwrap_or(false) {
@@ -597,7 +616,7 @@ impl ProjectDatabase {
 
         // Build query with pagination
         let query = format!(
-            "SELECT id, name, description FROM collections ORDER BY {} {} LIMIT ? OFFSET ?",
+            "SELECT c.id, c.name, c.description FROM collections c ORDER BY {} {}, c.name LIMIT ? OFFSET ?",
             sort_column, sort_order
         );
 
@@ -695,19 +714,21 @@ impl ProjectDatabase {
     pub fn get_collection_statistics(
         &mut self,
         collection_id: &str,
+        scope: ProjectScope,
     ) -> Result<(Option<f64>, i32), DatabaseError> {
         debug!("Getting statistics for collection {}", collection_id);
 
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             r#"
-            SELECT 
+            SELECT
                 SUM(COALESCE(p.duration_seconds, 0)) as total_duration,
                 COUNT(p.id) as project_count
             FROM collection_projects cp
-            LEFT JOIN projects p ON p.id = cp.project_id
-            WHERE cp.collection_id = ?
+            JOIN projects p ON p.id = cp.project_id
+            WHERE cp.collection_id = ? {}
             "#,
-        )?;
+            scope.and_projects()
+        ))?;
 
         let result = stmt.query_row([collection_id], |row| {
             let total_duration: Option<f64> = row.get(0)?;
@@ -731,92 +752,99 @@ impl ProjectDatabase {
     pub fn get_collection_detailed_statistics(
         &mut self,
         collection_id: &str,
+        scope: ProjectScope,
     ) -> Result<CollectionStatistics, DatabaseError> {
         debug!("Getting detailed statistics for collection {}", collection_id);
+        let in_scope = scope.and_projects();
+        let join = scope.join("cp.project_id");
 
         // Get basic project stats
-        let (total_duration, project_count) = self.get_collection_statistics(collection_id)?;
+        let (total_duration, project_count) = self.get_collection_statistics(collection_id, scope)?;
 
         // Get average tempo
         let average_tempo: Option<f64> = self.conn.query_row(
-            r#"
+            &format!(r#"
             SELECT AVG(p.tempo) as avg_tempo
             FROM collection_projects cp
             JOIN projects p ON p.id = cp.project_id
-            WHERE cp.collection_id = ?
-            "#,
+            WHERE cp.collection_id = ? {in_scope}
+            "#),
             [collection_id],
             |row| row.get::<_, Option<f64>>(0),
         ).optional()?.flatten();
 
         // Get total unique plugins
         let total_plugins: i32 = self.conn.query_row(
-            r#"
+            &format!(r#"
             SELECT COUNT(DISTINCT pp.plugin_id) as total_plugins
             FROM collection_projects cp
+            {join}
             JOIN project_plugins pp ON pp.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#,
+            "#),
             [collection_id],
             |row| row.get(0),
         ).unwrap_or(0);
 
         // Get total unique samples
         let total_samples: i32 = self.conn.query_row(
-            r#"
+            &format!(r#"
             SELECT COUNT(DISTINCT ps.sample_id) as total_samples
             FROM collection_projects cp
+            {join}
             JOIN project_samples ps ON ps.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#,
+            "#),
             [collection_id],
             |row| row.get(0),
         ).unwrap_or(0);
 
         // Get total unique tags
         let total_tags: i32 = self.conn.query_row(
-            r#"
+            &format!(r#"
             SELECT COUNT(DISTINCT pt.tag_id) as total_tags
             FROM collection_projects cp
+            {join}
             JOIN project_tags pt ON pt.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#,
+            "#),
             [collection_id],
             |row| row.get(0),
         ).unwrap_or(0);
 
         // Get most common key signature
         let most_common_key: Option<String> = self.conn.query_row(
-            r#"
-            SELECT 
+            &format!(r#"
+            SELECT
                 p.key_signature_tonic || ' ' || p.key_signature_scale as key_sig,
                 COUNT(*) as count
             FROM collection_projects cp
             JOIN projects p ON p.id = cp.project_id
-            WHERE cp.collection_id = ? 
-                AND p.key_signature_tonic IS NOT NULL 
+            WHERE cp.collection_id = ?
+                AND p.key_signature_tonic IS NOT NULL
                 AND p.key_signature_scale IS NOT NULL
+                {in_scope}
             GROUP BY key_sig
             ORDER BY count DESC
             LIMIT 1
-            "#,
+            "#),
             [collection_id],
             |row| row.get(0),
         ).optional()?;
 
         // Get most common time signature
         let most_common_time_signature: Option<String> = self.conn.query_row(
-            r#"
-            SELECT 
+            &format!(r#"
+            SELECT
                 CAST(p.time_signature_numerator AS TEXT) || '/' || CAST(p.time_signature_denominator AS TEXT) as time_sig,
                 COUNT(*) as count
             FROM collection_projects cp
             JOIN projects p ON p.id = cp.project_id
-            WHERE cp.collection_id = ?
+            WHERE cp.collection_id = ? {in_scope}
             GROUP BY time_sig
             ORDER BY count DESC
             LIMIT 1
-            "#,
+            "#),
             [collection_id],
             |row| row.get(0),
         ).optional()?;

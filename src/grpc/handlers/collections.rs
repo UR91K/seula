@@ -5,6 +5,10 @@ use super::super::collections::*;
 use super::super::common::*;
 use crate::services::{CollectionDetail, CollectionsService};
 
+// Collections here count archived projects too (`ProjectScope::All`), as they always
+// did on this surface. The scope is an HTTP parameter (ADR-0043), and gRPC is being
+// retired (ADR-0028), so its behaviour is left as it was.
+
 impl From<CollectionDetail> for Collection {
     fn from(d: CollectionDetail) -> Self {
         Collection {
@@ -41,7 +45,7 @@ impl CollectionsHandler {
 
         let (collections, total_count) = self
             .service
-            .list_collections(req.limit, req.offset, req.sort_by, req.sort_desc)
+            .list_collections(req.limit, req.offset, req.sort_by, req.sort_desc, crate::database::ProjectScope::All)
             .await?;
 
         Ok(Response::new(GetCollectionsResponse {
@@ -57,7 +61,7 @@ impl CollectionsHandler {
         debug!("GetCollection request: {:?}", request);
         let req = request.into_inner();
 
-        let collection = self.service.get_collection(&req.collection_id).await?;
+        let collection = self.service.get_collection(&req.collection_id, crate::database::ProjectScope::All).await?;
         if collection.is_none() {
             debug!("Collection {} not found", req.collection_id);
         }
@@ -185,7 +189,7 @@ impl CollectionsHandler {
         let req = request.into_inner();
 
         self.service
-            .reorder_collection(&req.collection_id, &req.project_ids)
+            .reorder_collection(&req.collection_id, &req.project_ids, crate::database::ProjectScope::All)
             .await
             .map_err(|e| match e {
                 crate::error::DatabaseError::InvalidOperation(msg) => {
@@ -209,11 +213,11 @@ impl CollectionsHandler {
         debug!("GetCollectionTasks request: {:?}", request);
         let req = request.into_inner();
 
-        let tasks_data = self.service.get_collection_tasks(&req.collection_id).await?;
+        let tasks_data = self.service.get_collection_tasks(&req.collection_id, crate::database::ProjectScope::All).await?;
 
         let mut tasks = Vec::new();
         let mut completed_count = 0;
-        for (id, project_name, description, completed, created_at) in tasks_data {
+        for (id, _project_id, project_name, description, completed, created_at) in tasks_data {
             if completed {
                 completed_count += 1;
             }
@@ -256,7 +260,7 @@ impl CollectionsHandler {
 
         let (collections, total_count) = self
             .service
-            .search_collections(&req.query, req.limit, req.offset)
+            .search_collections(&req.query, req.limit, req.offset, crate::database::ProjectScope::All)
             .await?;
 
         Ok(Response::new(SearchCollectionsResponse {
@@ -274,7 +278,7 @@ impl CollectionsHandler {
 
         let stats = self
             .service
-            .get_collection_statistics(&req.collection_id)
+            .get_collection_statistics(&req.collection_id, crate::database::ProjectScope::All)
             .await?;
 
         Ok(Response::new(GetCollectionStatisticsResponse {

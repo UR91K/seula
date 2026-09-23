@@ -72,8 +72,12 @@ impl From<CollectionDetail> for CollectionDto {
 pub struct ListCollectionsQuery {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+    /// `name`, `description`, `created_at`, `modified_at`, `project_count` or
+    /// `total_duration`; the last two count in `scope`.
     pub sort_by: Option<String>,
     pub sort_desc: Option<bool>,
+    /// `active` (default) or `all`; see `parse_project_scope` (ADR-0043).
+    pub scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -81,6 +85,13 @@ pub struct SearchCollectionsQuery {
     pub query: String,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+    pub scope: Option<String>,
+}
+
+/// Routes whose only option is the project scope (ADR-0043).
+#[derive(Deserialize)]
+pub struct ScopeQuery {
+    pub scope: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -115,10 +126,14 @@ pub struct ReorderCollectionRequest {
     pub project_ids: Vec<String>,
 }
 
+/// A task in a collection's consolidated list. It carries its project's id, so the
+/// UI can reach the project, and its name, so it can say which project it is without
+/// a lookup. (The gRPC surface put the name in `project_id` instead.)
 #[derive(Serialize)]
 pub struct TaskDto {
     pub id: String,
     pub project_id: String,
+    pub project_name: String,
     pub description: String,
     pub completed: bool,
     pub created_at: i64,

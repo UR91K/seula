@@ -52,7 +52,7 @@ impl CliCommand for CollectionCommands {
 
 impl CollectionCommands {
     async fn get_collections_list(&self, collections: &CollectionsService) -> Result<CollectionsList, CliError> {
-        let (list, total_count) = collections.list_collections(None, None, None, None).await?;
+        let (list, total_count) = collections.list_collections(None, None, None, None, crate::database::ProjectScope::default()).await?;
 
         let displayed = list
             .into_iter()
@@ -74,16 +74,16 @@ impl CollectionCommands {
         collections: &CollectionsService,
         collection_id: &str,
     ) -> Result<CollectionDetails, CliError> {
-        let detail = collections.get_collection(collection_id).await?.ok_or_else(|| {
+        let detail = collections.get_collection(collection_id, crate::database::ProjectScope::default()).await?.ok_or_else(|| {
             Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("Collection {} not found", collection_id)
             )) as CliError
         })?;
 
-        let stats = collections.get_collection_statistics(collection_id).await?;
+        let stats = collections.get_collection_statistics(collection_id, crate::database::ProjectScope::default()).await?;
 
-        let projects = collections.get_collection_projects(collection_id).await?;
+        let projects = collections.get_collection_projects(collection_id, crate::database::ProjectScope::default()).await?;
         let project_rows = projects
             .into_iter()
             .map(|project| ProjectInCollectionRow {

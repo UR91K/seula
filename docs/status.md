@@ -3,7 +3,7 @@
 The single source of truth for what is done, in progress, deliberately out of scope, or
 known-broken. If status appears anywhere else in this repo, that copy is wrong.
 
-Last reviewed: 2026-09-23.
+Last reviewed: 2026-09-24.
 
 ## Subsystems
 
@@ -90,6 +90,24 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **Sorting the collection list by project count failed** (found 2026-09-24, fixed
+  2026-09-24). `list_collections` accepted `sort_by=project_count` and put it straight
+  into `ORDER BY`, but the collections table has no such column, so SQLite answered "no
+  such column: project_count". The sort is now a subquery, a `total_duration` sort was
+  added beside it, and both count in the project scope (ADR-0043). Regression test:
+  `the_list_sorts_by_project_count_and_length_in_either_scope`
+  (`tests/database/collections.rs`).
+- **Every project in a collection came back as active** (found 2026-09-24, fixed
+  2026-09-24). `get_collection_projects` built each project with `is_active: true`
+  instead of reading the column, so an archived project in a tracklist could not be
+  marked. Regression test: `a_collections_projects_say_whether_they_are_archived`
+  (`tests/database/collections.rs`).
+- **A collection's tasks could not be matched to their projects** (found 2026-09-24,
+  fixed 2026-09-24). `/collections/:id/tasks` put the project's name in `project_id`,
+  copied from the gRPC handler, so two projects with the same name were
+  indistinguishable and a task could not lead to its project. The HTTP route now sends
+  the id in `project_id` and the name in `project_name`; gRPC is unchanged. Test:
+  `collection_tasks_carry_the_project_id_and_name` (`tests/database/collections.rs`).
 - **Sample sizes were invented, and the presence refresh froze the app** (found
   2026-09-23, fixed 2026-09-23). The "estimated" sample size was a guessed size per
   extension, summed; and `refresh_sample_presence_status` checked every file while holding

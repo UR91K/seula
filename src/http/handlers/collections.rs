@@ -6,6 +6,9 @@
 //! possible now because the projects domain's `ProjectDto`/`project_to_dto`
 //! already exist; the tags domain's equivalent (`GetProjectsByTag`) had to
 //! wait for exactly this, and now it can be revisited too.
+//!
+//! Every route that counts or lists a collection's projects takes `scope`
+//! (ADR-0043): `active` by default, leaving archived projects out, or `all`.
 
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
@@ -16,9 +19,10 @@ use crate::http::dto::collections::{
     BatchCreateCollectionFromResponse, BatchOperationResponse, CollectionDto,
     CollectionStatisticsDto,
     CollectionListResponse, CollectionTasksResponse, CreateCollectionRequest,
-    DuplicateCollectionRequest, ListCollectionsQuery, ReorderCollectionRequest,
+    DuplicateCollectionRequest, ListCollectionsQuery, ReorderCollectionRequest, ScopeQuery,
     SearchCollectionsQuery, TaskDto, UpdateCollectionRequest,
 };
+use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::project_to_dto;
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
@@ -27,10 +31,11 @@ pub async fn list_collections(
     State(state): State<AppState>,
     Query(query): Query<ListCollectionsQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let (collections, total_count) = state
         .services
         .collections
-        .list_collections(query.limit, query.offset, query.sort_by, query.sort_desc)
+        .list_collections(query.limit, query.offset, query.sort_by, query.sort_desc, scope)
         .await?;
 
     Ok(Json(CollectionListResponse {
@@ -43,10 +48,11 @@ pub async fn search_collections(
     State(state): State<AppState>,
     Query(query): Query<SearchCollectionsQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let (collections, total_count) = state
         .services
         .collections
-        .search_collections(&query.query, query.limit, query.offset)
+        .search_collections(&query.query, query.limit, query.offset, scope)
         .await?;
 
     Ok(Json(CollectionListResponse {
@@ -58,11 +64,13 @@ pub async fn search_collections(
 pub async fn get_collection(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let collection = state
         .services
         .collections
-        .get_collection(&collection_id)
+        .get_collection(&collection_id, scope)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Collection {} not found", collection_id)))?;
 
@@ -72,11 +80,13 @@ pub async fn get_collection(
 pub async fn get_collection_projects(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let projects = state
         .services
         .collections
-        .get_collection_projects(&collection_id)
+        .get_collection_projects(&collection_id, scope)
         .await?;
 
     let db_arc = state.services.projects.db_handle();
@@ -172,15 +182,19 @@ pub async fn remove_project_from_collection(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+/// Under `scope=active` (the default) the order given is of the active projects
+/// only, as the caller was shown them; archived members keep their slots.
 pub async fn reorder_collection(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
     Json(req): Json<ReorderCollectionRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     state
         .services
         .collections
-        .reorder_collection(&collection_id, &req.project_ids)
+        .reorder_collection(&collection_id, &req.project_ids, scope)
         .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
@@ -188,21 +202,25 @@ pub async fn reorder_collection(
 pub async fn get_collection_tasks(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let tasks_data = state.services.collections.get_collection_tasks(&collection_id).await?;
+    let scope = parse_project_scope(query.scope.as_deref())?;
+    let tasks_data = state
+        .services
+        .collections
+        .get_collection_tasks(&collection_id, scope)
+        .await?;
 
     let mut tasks = Vec::new();
     let mut completed_count = 0;
-    for (id, project_name, description, completed, created_at) in tasks_data {
+    for (id, project_id, project_name, description, completed, created_at) in tasks_data {
         if completed {
             completed_count += 1;
         }
-        // project_name, not project_id, per the gRPC handler this mirrors: it
-        // shows which project the task belongs to rather than an id the caller
-        // would have to resolve.
         tasks.push(TaskDto {
             id,
-            project_id: project_name,
+            project_id,
+            project_name,
             description,
             completed,
             created_at,
@@ -229,11 +247,13 @@ pub async fn get_collection_tasks(
 pub async fn get_collection_statistics(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let stats = state
         .services
         .collections
-        .get_collection_statistics(&collection_id)
+        .get_collection_statistics(&collection_id, scope)
         .await?;
     Ok(Json(CollectionStatisticsDto::from(stats)))
 }

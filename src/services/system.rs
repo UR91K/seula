@@ -675,10 +675,10 @@ impl SystemService {
         let (average_projects_per_collection, largest_collection_id) = db.get_collection_analytics()?;
 
         let largest_collection = if let Some(collection_id) = largest_collection_id {
-            match db.get_collection_by_id(&collection_id) {
+            match db.get_collection_by_id(&collection_id, crate::database::ProjectScope::All) {
                 Ok(Some((id, name, description, notes, created_at, modified_at, project_ids, cover_art_id))) => {
                     let (total_duration_seconds, project_count) =
-                        db.get_collection_statistics(&id).unwrap_or((None, 0));
+                        db.get_collection_statistics(&id, crate::database::ProjectScope::All).unwrap_or((None, 0));
                     Some(crate::grpc::common::Collection {
                         id,
                         name,

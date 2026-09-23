@@ -124,37 +124,43 @@ impl ProjectDatabase {
         Ok(tasks)
     }
 
+    /// Every task of every project in the collection, in tracklist order, as
+    /// `(task id, project id, project name, description, completed, created_at)`.
+    /// Under `ProjectScope::Active` archived projects' tasks are left out (ADR-0043).
     pub fn get_collection_tasks(
         &mut self,
         collection_id: &str,
-    ) -> Result<Vec<(String, String, String, bool, i64)>, DatabaseError> {
+        scope: crate::database::ProjectScope,
+    ) -> Result<Vec<(String, String, String, String, bool, i64)>, DatabaseError> {
         debug!(
             "Getting tasks for all projects in collection {}",
             collection_id
         );
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             r#"
-            SELECT t.id, p.name, t.description, t.completed, t.created_at
+            SELECT t.id, p.id, p.name, t.description, t.completed, t.created_at
             FROM project_tasks t
             JOIN projects p ON p.id = t.project_id
             JOIN collection_projects cp ON cp.project_id = p.id
-            WHERE cp.collection_id = ?
+            WHERE cp.collection_id = ? {}
             ORDER BY cp.position, t.created_at
             "#,
-        )?;
+            scope.and_projects()
+        ))?;
 
         let tasks = stmt
             .query_map([collection_id], |row| {
                 let id: String = row.get(0)?;
-                let project_name: String = row.get(1)?;
-                let description: String = row.get(2)?;
-                let completed: bool = row.get(3)?;
-                let created_at: i64 = row.get(4)?;
+                let project_id: String = row.get(1)?;
+                let project_name: String = row.get(2)?;
+                let description: String = row.get(3)?;
+                let completed: bool = row.get(4)?;
+                let created_at: i64 = row.get(5)?;
                 debug!(
                     "Found task: {} ({}) from project {} created at {}",
                     description, id, project_name, created_at
                 );
-                Ok((id, project_name, description, completed, created_at))
+                Ok((id, project_id, project_name, description, completed, created_at))
             })?
             .filter_map(|r| r.ok())
             .collect();
