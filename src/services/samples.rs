@@ -38,6 +38,11 @@ impl SamplesService {
         self.db.lock().await.sample_sizes(ids)
     }
 
+    /// What the last check found for one sample (ADR-0041).
+    pub async fn file(&self, sample_id: &str) -> Result<Option<(i64, Option<i64>, i64)>, DatabaseError> {
+        self.db.lock().await.sample_file(sample_id)
+    }
+
     /// Sample counts over the samples `filter` selects.
     pub async fn get_sample_stats_filtered(&self, filter: &SampleFilter) -> Result<SampleStats, DatabaseError> {
         self.db.lock().await.get_sample_stats_filtered(filter)

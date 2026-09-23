@@ -60,6 +60,20 @@ impl ProjectDatabase {
         Ok(sizes)
     }
 
+    /// What the last check found for one sample: (size, file modified, checked at).
+    /// `None` when no check has found the file.
+    pub fn sample_file(&self, sample_id: &str) -> Result<Option<(i64, Option<i64>, i64)>, DatabaseError> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT size_bytes, modified_at, checked_at FROM sample_files WHERE sample_id = ?",
+                [sample_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?)
+    }
+
     /// Get all samples with pagination and sorting
     pub fn get_all_samples(
         &self,

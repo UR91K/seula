@@ -14,7 +14,7 @@ use crate::database::samples::SampleFilter;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::dto::samples::{
     sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto,
-    SampleCheckEventDto, SampleFormatDto, SampleFormatListResponse, SampleListResponse,
+    SampleCheckEventDto, SampleDetailDto, SampleFileDto, SampleFormatDto, SampleFormatListResponse, SampleListResponse,
     SampleStatsQuery, ScopeQuery, SearchSamplesQuery,
 };
 use crate::database::ProjectScope;
@@ -86,7 +86,13 @@ pub async fn get_sample(
         .ok_or_else(|| ApiError::NotFound(format!("Sample not found with ID: {}", sample_id)))?;
 
     let mut dtos = with_counts(&state, vec![sample], scope).await?;
-    Ok(Json(dtos.remove(0)))
+    let file = state
+        .services
+        .samples
+        .file(&sample_id)
+        .await?
+        .map(|(size_bytes, modified_at, checked_at)| SampleFileDto { size_bytes, modified_at, checked_at });
+    Ok(Json(SampleDetailDto { sample: dtos.remove(0), file }))
 }
 
 pub async fn get_samples_by_presence(

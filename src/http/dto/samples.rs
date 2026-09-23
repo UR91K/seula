@@ -36,6 +36,25 @@ impl SampleDto {
     }
 }
 
+/// `GET /api/v1/samples/:id`: the row, and what the last sample check found (ADR-0041).
+#[derive(Serialize)]
+pub struct SampleDetailDto {
+    #[serde(flatten)]
+    pub sample: SampleDto,
+    /// `null` when no check has found the file. For a missing sample, what the check
+    /// found the last time it was there.
+    pub file: Option<SampleFileDto>,
+}
+
+#[derive(Serialize)]
+pub struct SampleFileDto {
+    pub size_bytes: i64,
+    /// The file's own modification time, epoch seconds.
+    pub modified_at: Option<i64>,
+    /// When a check last found the file, epoch seconds.
+    pub checked_at: i64,
+}
+
 /// The list and search filters, so the status bar counts what the list shows. All
 /// optional; none given counts every sample.
 #[derive(Deserialize)]
