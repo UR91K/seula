@@ -67,6 +67,42 @@ fn install_state_condition(states: &[InstallState], column: &str) -> Option<Stri
     ))
 }
 
+/// The filters the plugin list and search routes share, for counting what they return.
+/// A field left `None` (or empty) does not filter. `query` matches the way
+/// `search_plugins` does: a substring of the name, vendor or format.
+#[derive(Debug, Default, Clone)]
+pub struct PluginFilter {
+    pub query: Option<String>,
+    pub vendor: Option<String>,
+    pub format: Option<String>,
+    pub install_states: Vec<InstallState>,
+}
+
+impl PluginFilter {
+    /// The `WHERE` conditions, and the values they bind in order.
+    fn conditions(&self) -> (Vec<String>, Vec<String>) {
+        let mut conditions = Vec::new();
+        let mut bound = Vec::new();
+        if let Some(query) = self.query.as_deref().filter(|q| !q.is_empty()) {
+            conditions.push("(name LIKE ? OR vendor LIKE ? OR format LIKE ?)".to_string());
+            let like = format!("%{}%", query);
+            bound.extend([like.clone(), like.clone(), like]);
+        }
+        if let Some(vendor) = &self.vendor {
+            conditions.push("vendor = ?".to_string());
+            bound.push(vendor.clone());
+        }
+        if let Some(format) = &self.format {
+            conditions.push("format = ?".to_string());
+            bound.push(format.clone());
+        }
+        if let Some(condition) = install_state_condition(&self.install_states, "installed") {
+            conditions.push(condition);
+        }
+        (conditions, bound)
+    }
+}
+
 impl ProjectDatabase {
     /// Get all plugins with pagination, sorting, and filtering, including usage data
     pub fn get_all_plugins(
@@ -187,7 +223,7 @@ impl ProjectDatabase {
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 {} 
                 {} COALESCE(usage_stats.usage_count, 0) >= ?
-                ORDER BY {} {} LIMIT ? OFFSET ?
+                ORDER BY {} {}, p.name ASC LIMIT ? OFFSET ?
                 "#,
                 where_clause,
                 where_prefix,
@@ -210,7 +246,7 @@ impl ProjectDatabase {
                     GROUP BY pp.plugin_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 {}
-                ORDER BY {} {} LIMIT ? OFFSET ?
+                ORDER BY {} {}, p.name ASC LIMIT ? OFFSET ?
                 "#,
                 where_clause,
                 sort_column, sort_order
@@ -404,61 +440,66 @@ impl ProjectDatabase {
         Ok((plugins?, total_count))
     }
 
-    /// Get plugin statistics for status bar
+    /// Plugin counts for the status bar, over every plugin.
     pub fn get_plugin_stats(&self) -> Result<PluginStats, DatabaseError> {
-        let total_plugins: i32 =
-            self.conn
-                .query_row("SELECT COUNT(*) FROM plugins", [], |row| row.get(0))?;
+        self.get_plugin_stats_filtered(&PluginFilter::default())
+    }
 
-        let installed_plugins: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM plugins WHERE installed = true",
-            [],
-            |row| row.get(0),
-        )?;
+    /// Plugin counts over the plugins a list or search with the same filter returns,
+    /// so a status bar can describe what is on screen.
+    pub fn get_plugin_stats_filtered(&self, filter: &PluginFilter) -> Result<PluginStats, DatabaseError> {
+        let (conditions, bound) = filter.conditions();
+        let params: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b as &dyn rusqlite::ToSql).collect();
+        let where_with = |extra: &str| {
+            let mut all = conditions.clone();
+            if !extra.is_empty() {
+                all.push(extra.to_string());
+            }
+            if all.is_empty() {
+                String::new()
+            } else {
+                format!("WHERE {}", all.join(" AND "))
+            }
+        };
+        let count = |extra: &str| -> Result<i32, DatabaseError> {
+            let sql = format!("SELECT COUNT(*) FROM plugins {}", where_with(extra));
+            Ok(self.conn.query_row(&sql, params.as_slice(), |row| row.get(0))?)
+        };
 
-        let missing_plugins: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM plugins WHERE installed = false",
-            [],
-            |row| row.get(0),
-        )?;
-
+        let total_plugins = count("")?;
+        let installed_plugins = count("installed = 1")?;
+        let missing_plugins = count("installed = 0")?;
         // Never scanned for. Not the same as looked-for-and-absent, and deriving it as
         // `total - installed` would quietly merge the two.
-        let unknown_plugins: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM plugins WHERE installed IS NULL",
-            [],
-            |row| row.get(0),
-        )?;
-
+        let unknown_plugins = count("installed IS NULL")?;
         let unique_vendors: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT vendor) FROM plugins WHERE vendor IS NOT NULL",
-            [],
+            &format!("SELECT COUNT(DISTINCT vendor) FROM plugins {}", where_with("vendor IS NOT NULL")),
+            params.as_slice(),
             |row| row.get(0),
         )?;
 
-        // Get plugins by format
         let mut plugins_by_format = std::collections::HashMap::new();
-        let mut stmt = self
-            .conn
-            .prepare("SELECT format, COUNT(*) FROM plugins GROUP BY format")?;
-        let rows = stmt.query_map([], |row| {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT format, COUNT(*) FROM plugins {} GROUP BY format",
+            where_with("")
+        ))?;
+        let rows = stmt.query_map(params.as_slice(), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
         })?;
-
         for row in rows {
             let (format, count) = row?;
             plugins_by_format.insert(format, count);
         }
 
-        // Get plugins by vendor
+        // The ten vendors with the most plugins.
         let mut plugins_by_vendor = std::collections::HashMap::new();
-        let mut stmt = self.conn.prepare(
-            "SELECT vendor, COUNT(*) FROM plugins WHERE vendor IS NOT NULL GROUP BY vendor ORDER BY COUNT(*) DESC LIMIT 10"
-        )?;
-        let rows = stmt.query_map([], |row| {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT vendor, COUNT(*) FROM plugins {} GROUP BY vendor ORDER BY COUNT(*) DESC LIMIT 10",
+            where_with("vendor IS NOT NULL")
+        ))?;
+        let rows = stmt.query_map(params.as_slice(), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
         })?;
-
         for row in rows {
             let (vendor, count) = row?;
             plugins_by_vendor.insert(vendor, count);

@@ -1,8 +1,9 @@
 //! HTTP wire types for the plugins domain (ADR-0024).
 //!
-//! `PluginStats`, `VendorInfo`, `FormatInfo` and `PluginRefreshResult`
-//! (`src/database/plugins.rs`) already derive `Serialize` and are returned
-//! as-is, same reasoning as the other domains' reuse of already-serde types.
+//! `PluginStats`, `VendorInfo`, `FormatInfo`, `PluginRefreshResult`
+//! (`src/database/plugins.rs`) and `PluginDetails` (`src/database/plugin_details.rs`)
+//! already derive `Serialize` and are returned as-is, same reasoning as the other
+//! domains' reuse of already-serde types.
 
 use serde::{Deserialize, Serialize};
 
@@ -136,9 +137,23 @@ pub struct FormatListResponse {
     pub total_count: i32,
 }
 
+/// `plugin` is the list row; `details` is everything the scan recorded, for the
+/// inspector. A plugin no scan has found has `null` scanner fields and empty class and
+/// bus lists.
 #[derive(Serialize)]
 pub struct GetPluginResponse {
     pub plugin: PluginDto,
+    pub details: crate::database::plugin_details::PluginDetails,
+}
+
+/// The list and search filters, so the status bar counts what the list shows. All
+/// optional; none given counts every plugin.
+#[derive(Deserialize)]
+pub struct PluginStatsQuery {
+    pub query: Option<String>,
+    pub vendor_filter: Option<String>,
+    pub format_filter: Option<String>,
+    pub install_states: Option<String>,
 }
 
 #[derive(Deserialize)]

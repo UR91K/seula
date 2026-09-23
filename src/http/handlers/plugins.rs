@@ -7,10 +7,10 @@ use axum::Json;
 
 use crate::http::dto::plugins::{
     parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FormatListResponse,
-    GetAllPluginsQuery,
-    GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse, ProjectsByPluginQuery,
-    SearchPluginsQuery, VendorListResponse,
+    GetAllPluginsQuery, GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse,
+    PluginStatsQuery, ProjectsByPluginQuery, SearchPluginsQuery, VendorListResponse,
 };
+use crate::database::plugins::PluginFilter;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
@@ -105,8 +105,18 @@ pub async fn search_plugins(
     }))
 }
 
-pub async fn get_plugin_stats(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
-    let stats = state.services.plugins.get_plugin_stats().await?;
+/// Counts over the plugins the same filters list, or over every plugin with none.
+pub async fn get_plugin_stats(
+    State(state): State<AppState>,
+    Query(query): Query<PluginStatsQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let filter = PluginFilter {
+        query: query.query,
+        vendor: query.vendor_filter,
+        format: query.format_filter,
+        install_states: parse_install_states(query.install_states.as_deref()),
+    };
+    let stats = state.services.plugins.get_plugin_stats_filtered(&filter).await?;
     Ok(Json(stats))
 }
 
@@ -138,15 +148,18 @@ pub async fn get_plugin(
     State(state): State<AppState>,
     Path(plugin_id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let grpc_plugin = state
+    let not_found = || ApiError::NotFound(format!("Plugin with ID {} not found", plugin_id));
+    let grpc_plugin = state.services.plugins.get_plugin(&plugin_id).await?.ok_or_else(not_found)?;
+    let details = state
         .services
         .plugins
-        .get_plugin(&plugin_id)
+        .get_plugin_details(&plugin_id)
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Plugin with ID {} not found", plugin_id)))?;
+        .ok_or_else(not_found)?;
 
     Ok(Json(GetPluginResponse {
         plugin: PluginDto::from(grpc_plugin),
+        details,
     }))
 }
 

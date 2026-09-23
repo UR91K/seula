@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::database::plugin_details::PluginDetails;
 use crate::database::plugins::{
-    FormatInfo, InstallState, PluginRefreshResult, PluginStats, VendorInfo,
+    FormatInfo, InstallState, PluginFilter, PluginRefreshResult, PluginStats, VendorInfo,
 };
 use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
@@ -84,6 +85,17 @@ impl PluginsService {
     pub async fn get_plugin_stats(&self) -> Result<PluginStats, DatabaseError> {
         let db = self.db.lock().await;
         db.get_plugin_stats()
+    }
+
+    /// The same counts over only the plugins `filter` selects.
+    pub async fn get_plugin_stats_filtered(&self, filter: &PluginFilter) -> Result<PluginStats, DatabaseError> {
+        let db = self.db.lock().await;
+        db.get_plugin_stats_filtered(filter)
+    }
+
+    pub async fn get_plugin_details(&self, plugin_id: &str) -> Result<Option<PluginDetails>, DatabaseError> {
+        let db = self.db.lock().await;
+        db.get_plugin_details(plugin_id)
     }
 
     pub async fn get_plugin_vendors(
