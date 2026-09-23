@@ -282,6 +282,30 @@ def seed_scan_details(conn, pid, name, vendor, kind, instr, installed, uid_hex, 
         conn.execute("INSERT INTO plugin_buses VALUES (?,?,?,?,?,?,?)", (pid, *b))
 
 
+def seed_sample_file(conn, sid, fname, present, now):
+    """What the last sample check measured (ADR-0041).
+
+    From a per-sample stream, so every other row is unchanged. Recordings are long,
+    loops and breaks middling, one-shots small; compressed formats are smaller. Most
+    missing samples were found by an earlier check and keep the size they had; the rest
+    were never found, and have no row.
+    """
+    srng = random.Random(sid)
+    if not present and srng.random() < 0.3:
+        return
+    ext = fname.rsplit(".", 1)[-1].lower()
+    if fname[0].isupper():  # "Audio 12 [2024-...].wav": a recording
+        size = srng.randint(4_000_000, 90_000_000)
+    elif any(k in fname for k in ("loop", "break", "pad", "texture", "riser")):
+        size = srng.randint(600_000, 12_000_000)
+    else:
+        size = srng.randint(30_000, 1_800_000)
+    size = int(size * {"flac": 0.6, "mp3": 0.12}.get(ext, 1.0))
+    checked = now - 86400 if present else now - 86400 * srng.randint(20, 300)
+    conn.execute("INSERT INTO sample_files VALUES (?,?,?,?)",
+                 (sid, size, checked - srng.randint(86400, 86400 * 900), checked))
+
+
 def seed() -> None:
     if DB.exists():
         DB.unlink()
@@ -380,6 +404,7 @@ def seed() -> None:
         sid = uid()
         present = rng.random() > 0.09
         conn.execute("INSERT INTO samples VALUES (?,?,?,?)", (sid, fname, path, int(present)))
+        seed_sample_file(conn, sid, fname, present, now)
         samples.append(sid)
 
     # projects
@@ -515,12 +540,15 @@ def start_server(config: Path, port: int):
     sys.exit("server did not come up")
 
 
-def scan_events() -> list:
-    """The event stream of a real ``POST /api/v1/plugins/scan`` (ADR-0038).
+def scan_streams() -> dict:
+    """The event streams of a real ``POST /api/v1/plugins/scan`` (ADR-0038) and a real
+    ``POST /api/v1/samples/check`` (ADR-0041), keyed like the other responses.
 
-    The seeded plugins do not exist on disk, so this scans a folder of empty files named
-    like some of them. Every one fails to load, which a real scan reports the same way.
-    The scan writes its result, so it runs against a copy of the database.
+    The seeded plugins do not exist on disk, so the plugin scan looks at a folder of
+    empty files named like some of them; every one fails to load, which a real scan
+    reports the same way. The seeded sample paths do not exist either, so the check
+    finds every sample missing. Both write their result, so they run against a copy of
+    the database, one after the other (only one scan runs at a time).
     """
     shutil.rmtree(FAKE_PLUGINS, ignore_errors=True)
     FAKE_PLUGINS.mkdir()
@@ -529,10 +557,13 @@ def scan_events() -> list:
     shutil.copyfile(DB, SCAN_DB)
     write_config(SCAN_CONFIG, SCAN_DB, SCAN_GRPC_PORT, SCAN_HTTP_PORT, [FAKE_PLUGINS])
     server = start_server(SCAN_CONFIG, SCAN_HTTP_PORT)
+    streams = {}
     try:
-        req = urllib.request.Request(f"http://127.0.0.1:{SCAN_HTTP_PORT}/api/v1/plugins/scan", method="POST")
-        with urllib.request.urlopen(req, timeout=120) as r:
-            events = [json.loads(line[5:]) for line in r.read().decode().splitlines() if line.startswith("data:")]
+        for route in ("/api/v1/plugins/scan", "/api/v1/samples/check"):
+            req = urllib.request.Request(f"http://127.0.0.1:{SCAN_HTTP_PORT}{route}", method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:
+                streams[f"POST {route}"] = [json.loads(line[5:]) for line in r.read().decode().splitlines()
+                                            if line.startswith("data:")]
     finally:
         server.terminate()
         server.wait(timeout=10)
@@ -540,11 +571,11 @@ def scan_events() -> list:
         for suffix in ("", "-wal", "-shm"):
             Path(str(SCAN_DB) + suffix).unlink(missing_ok=True)
         SCAN_CONFIG.unlink(missing_ok=True)
-    return events
+    return streams
 
 
 def dedupe_projects(api: dict) -> None:
-    """Store a plugin's "used in" list as project ids.
+    """Store a plugin's or sample's "used in" list as project ids.
 
     It holds the same project DTOs as ``/api/v1/projects``, and written out in full for
     every plugin they would be most of the file. Each is checked equal to the main list's
@@ -557,7 +588,7 @@ def dedupe_projects(api: dict) -> None:
 
     by_id = {p["id"]: canonical(p) for p in api["/api/v1/projects?limit=10000"]["projects"]}
     for path, body in api.items():
-        if not path.startswith("/api/v1/plugins/") or not isinstance(body, dict) or "projects" not in body:
+        if not path.startswith(("/api/v1/plugins/", "/api/v1/samples/")) or not isinstance(body, dict) or "projects" not in body:
             continue
         if all(by_id.get(p["id"]) == canonical(p) for p in body["projects"]):
             body["project_ids"] = [p["id"] for p in body.pop("projects")]
@@ -581,7 +612,7 @@ def snapshot() -> None:
             f"/api/v1/plugins?{big}", "/api/v1/plugins/stats", f"/api/v1/plugins/vendors?{big}",
             "/api/v1/plugins/formats",
             f"/api/v1/samples?{big}", "/api/v1/samples/stats", "/api/v1/samples/analytics",
-            "/api/v1/samples/extensions",
+            "/api/v1/samples/formats",
             f"/api/v1/media?{big}", "/api/v1/tasks/statistics",
             "/api/v1/system/info", "/api/v1/system/statistics", "/api/v1/system/scan-status",
             "/api/v1/config/status",
@@ -606,6 +637,18 @@ def snapshot() -> None:
             api[f"/api/v1/plugins/stats?{sq}"] = get(f"/api/v1/plugins/stats?{sq}")
         api[f"/api/v1/plugins/search?query=pro&{big}"] = get(f"/api/v1/plugins/search?query=pro&{big}")
 
+        # Samples: each one's detail and used-in list, the status bar under each filter
+        # the toolbar can set and the frames' combinations, and a search.
+        for s in api[f"/api/v1/samples?{big}"]["samples"]:
+            api[f"/api/v1/samples/{s['id']}"] = get(f"/api/v1/samples/{s['id']}")
+            api[f"/api/v1/samples/{s['id']}/projects?{big}"] = get(f"/api/v1/samples/{s['id']}/projects?{big}")
+        sample_stats = [f"format_filter={f['format']}" for f in api["/api/v1/samples/formats"]["formats"]]
+        sample_stats += ["present_only=true", "missing_only=true", "query=kick",
+                         "format_filter=aiff&missing_only=true", "query=kick&missing_only=true"]
+        for sq in sample_stats:
+            api[f"/api/v1/samples/stats?{sq}"] = get(f"/api/v1/samples/stats?{sq}")
+        api[f"/api/v1/samples/search?query=kick&{big}"] = get(f"/api/v1/samples/search?query=kick&{big}")
+
         cols = api[f"/api/v1/collections?{big}"]
         cols = cols.get("collections", cols) if isinstance(cols, dict) else cols
         for c in cols:
@@ -616,7 +659,7 @@ def snapshot() -> None:
         server.terminate()
         server.wait(timeout=10)
 
-    api["POST /api/v1/plugins/scan"] = scan_events()
+    api.update(scan_streams())
     dedupe_projects(api)
 
     OUT_JSON.write_text(json.dumps(api, indent=1), "utf-8")
