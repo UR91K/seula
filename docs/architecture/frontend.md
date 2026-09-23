@@ -160,7 +160,7 @@ the one shell question ADR-0032 leaves to the mockup.
 ### Plugins
 
 A paginated list from `/api/v1/plugins`. Per row: name, vendor, format, installed status
-with a visual indicator, usage count, project count. Selecting a row fills the inspector
+with a visual indicator, project count (ADR-0034). Selecting a row fills the inspector
 with version and SDK details and the projects using it (`/api/v1/plugins/:id/projects`).
 
 Filters, in the view toolbar: text search on name and vendor (`/api/v1/plugins/search`),
@@ -175,7 +175,7 @@ distinctly from "missing".
 ### Samples
 
 Same shape as plugins over `/api/v1/samples`. Per row: name, truncated path with the
-full path in a tooltip, extension, present status, usage count, project count. The
+full path in a tooltip, extension, present status, project count (ADR-0034). The
 inspector shows the full path and the projects using it. Filters: search
 (`/api/v1/samples/search`), extension dropdown (`/api/v1/samples/extensions`), tri-state
 present filter. Status bar: total, present, missing, unique-path count, estimated total
@@ -226,11 +226,13 @@ Found while mapping the sketch onto the routes. Each is small; none blocks the m
 - Tag rename cascade is assumed to be the existing tag update route; verify it rewrites
   `project_tags` rather than creating a new tag.
 - Estimated total sample size on disk. Presence is tracked, size may not be.
-- Per-row usage and project counts for samples. `/api/v1/samples` returns id, name, path
-  and presence only, while plugins rows carry `usage_count` and `project_count`.
-- Media bytes are served by `GET /api/v1/media/:id`; the frontend builds image and audio
-  URLs from `cover_art_id` and `audio_file_id`. The handler reads the whole file into
-  memory, sends `Content-Disposition: attachment`, and has no `Range` support, so an
-  `<audio>` element may not be able to seek in the audition audio.
-- Keys arrive as `Tonic`/`Scale` enum names (`FSharp`, `HarmonicMinor`), including
-  `most_common_key` in collection statistics. The frontend formats them for display.
+- `GET /api/v1/media/:id` serves media bytes, streamed and with `Range` support
+  (ADR-0033). Image and audio URLs are built from `cover_art_id` and `audio_file_id`.
+
+## Keys
+
+Every key the API sends, whether on a project, in the statistics or as a collection's
+most common key, has four fields: `tonic` and `scale` as enum names for the filters, and
+`sharp` and `flat` as display strings such as "F♯ Minor" and "G♭ Minor" (ADR-0035). The
+UI shows one according to a sharp/flat switch, stored with the other preferences
+(ADR-0031). It never formats a key itself.
