@@ -40,6 +40,10 @@ pub struct Cli {
     #[arg(long)]
     pub cli: bool,
 
+    /// Run the gRPC and HTTP servers without the tray icon
+    #[arg(long, short = 's')]
+    pub server: bool,
+
     /// Output format (table, json, csv)
     #[arg(long, default_value = "table")]
     pub format: OutputFormat,
@@ -516,3 +520,21 @@ pub enum PluginCommands {
 pub use commands::*;
 pub use interactive::*;
 pub use output::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `--server` was checked by scanning raw argv *after* `Cli::parse()`, which
+    /// rejects any flag it does not declare, so server-only mode was unreachable from
+    /// the moment the clap CLI landed. It must be a declared flag.
+    #[test]
+    fn server_flag_parses() {
+        for flag in ["--server", "-s"] {
+            let cli = Cli::try_parse_from(["seula", flag]).expect(flag);
+            assert!(cli.server);
+            assert!(cli.command.is_none());
+        }
+        assert!(!Cli::try_parse_from(["seula"]).unwrap().server);
+    }
+}

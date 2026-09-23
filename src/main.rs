@@ -1,5 +1,4 @@
 use tracing::info;
-use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -27,14 +26,27 @@ use clap::Parser;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parsed before CONFIG is first touched, because `--config` has to be in place by
+    // the time the lazy static loads.
+    let cli = Cli::parse();
+
+    if let Some(path) = &cli.config {
+        // `find_config_file` quietly falls through when SEULA_CONFIG names a missing
+        // file. That suits an ambient env var, but an explicit flag that is silently
+        // ignored is how this flag went unnoticed, so a bad path is an error here.
+        if !path.is_file() {
+            eprintln!("Config file not found: {}", path.display());
+            std::process::exit(2);
+        }
+        std::env::set_var("SEULA_CONFIG", path);
+    }
+
     let config = CONFIG.as_ref().map_err(|e| {
         eprintln!("Failed to load configuration: {}", e);
         e
     })?;
 
     init_logging(&config.log_level);
-
-    let cli = Cli::parse();
 
     match &cli.command {
         Some(command) => {
@@ -43,15 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => {
             if cli.cli {
                 run_interactive_cli(cli.format, cli.no_color).await
+            } else if cli.server {
+                run_server_mode().await
             } else {
-                let args: Vec<String> = env::args().collect();
-                let run_as_server = args.contains(&"--server".to_string()) || args.contains(&"-s".to_string());
-
-                if run_as_server {
-                    run_server_mode().await
-                } else {
-                    run_tray_mode().await
-                }
+                run_tray_mode().await
             }
         }
     }
