@@ -164,7 +164,12 @@ const LOGO = `<svg class="logo" viewBox="0 0 216.54 406" role="img" aria-label="
  *   counts: { view: n }    sidebar counts for a state the snapshot does not hold (a fresh install)
  * }
  */
-/** The status bar alone: the view's segments, a running scan, the watcher, ♯/♭. */
+/** The views whose screens show keys, and so carry the ♯/♭ switch. Collections and stats
+ *  show keys too (frontend.md) and join this list when they are mocked up. */
+const KEY_VIEWS = ["projects"];
+
+/** The status bar alone: the view's segments, a running scan, the watcher, and ♯/♭ on a
+ *  view that shows keys. */
 function statusBar(s) {
   const scan = s.scan
     ? `<span class="grow"><span class="progress"><i style="width:${(100 * (s.scan.total ? s.scan.done / s.scan.total : 0)).toFixed(1)}%"></i></span>${esc(s.scan.message)}</span>`
@@ -173,7 +178,7 @@ function statusBar(s) {
       ${(s.status || []).map((x) => `<span>${x}</span>`).join("")}
       ${scan}
       <span>${watcherStatus()}</span>
-      <span class="ks">${keySwitch()}</span>
+      ${KEY_VIEWS.includes(s.view) ? `<span class="ks">${keySwitch()}</span>` : ""}
     </footer>`;
 }
 
