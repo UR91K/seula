@@ -14,6 +14,7 @@ use axum::Json;
 use crate::http::dto::collections::{
     BatchCollectionProjectsRequest, BatchCreateCollectionFromRequest,
     BatchCreateCollectionFromResponse, BatchOperationResponse, CollectionDto,
+    CollectionStatisticsDto,
     CollectionListResponse, CollectionTasksResponse, CreateCollectionRequest,
     DuplicateCollectionRequest, ListCollectionsQuery, ReorderCollectionRequest,
     SearchCollectionsQuery, TaskDto, UpdateCollectionRequest,
@@ -234,7 +235,7 @@ pub async fn get_collection_statistics(
         .collections
         .get_collection_statistics(&collection_id)
         .await?;
-    Ok(Json(stats))
+    Ok(Json(CollectionStatisticsDto::from(stats)))
 }
 
 pub async fn batch_add_to_collection(

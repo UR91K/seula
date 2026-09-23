@@ -33,12 +33,10 @@ function fmtLength(seconds) {
   return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 }
 
-/** The API sends Tonic/Scale FromStr names ("FSharp", "HarmonicMinor"). */
+/** The API sends both spellings (ADR-0035); the sharp/flat switch picks one. */
+let keySpelling = "sharp";
 function fmtKey(key) {
-  if (!key) return "";
-  const tonic = key.tonic.replace("Sharp", "♯");
-  const scale = key.scale.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  return `${tonic} ${scale}`;
+  return key ? key[keySpelling] : "";
 }
 
 function fmtTempo(t) {

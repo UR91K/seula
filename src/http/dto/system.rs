@@ -43,10 +43,9 @@ fn proto_project_to_dto(p: ProtoProject) -> ProjectDto {
                 numerator: 0,
                 denominator: 0,
             }),
-        key_signature: p.key_signature.map(|ks| KeySignatureDto {
-            tonic: ks.tonic,
-            scale: ks.scale,
-        }),
+        key_signature: p
+            .key_signature
+            .and_then(|ks| KeySignatureDto::from_names(&ks.tonic, &ks.scale)),
         duration_seconds: p.duration_seconds,
         furthest_bar: p.furthest_bar,
         ableton_version: p

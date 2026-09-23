@@ -88,6 +88,14 @@ pass. See CLAUDE.md.
 
 Resolved:
 
+- **Every scale except Major and Minor was stored as `Empty`** (found 2026-09-23, fixed
+  2026-09-23). `src/scan/parser.rs` mapped only those two of Ableton's scale names;
+  the rest fell to `Scale::Empty` behind an "add other scale mappings as needed"
+  comment. In the maintainer's files that was 1,048 key-detected clips, including 510
+  Mixolydian. Fixed by mapping through a full table of Ableton's names, with
+  `Scale::Other` keeping any name the table lacks (ADR-0035). Regression tests:
+  `models::key_name_tests`. **Projects parsed before the fix keep `Empty` until a forced
+  rescan**, because the scanner re-parses only changed files.
 - **`--config <path>` was accepted and ignored** (found 2026-09-23, fixed 2026-09-23).
   `Cli` declared the flag but nothing read it: `CONFIG` is a lazy static that loaded
   before `Cli::parse()` ran, from `SEULA_CONFIG` or the default locations. Fixed in

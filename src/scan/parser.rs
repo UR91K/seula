@@ -1352,12 +1352,9 @@ impl Parser {
                                 line,
                                 value
                             );
-                            let scale = match value.as_ref() {
-                                "Major" => Scale::Major,
-                                "Minor" => Scale::Minor,
-                                // Add other scale mappings as needed
-                                _ => Scale::Empty,
-                            };
+                            // Previously only Major and Minor were mapped and every
+                            // other scale became Empty (ADR-0035).
+                            let scale = Scale::from_ableton_name(value.as_ref());
                             if let Some((tonic, _)) = self.current_scale_info.as_ref() {
                                 self.current_scale_info = Some((tonic.clone(), scale));
                             } else {

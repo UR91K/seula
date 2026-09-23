@@ -1,12 +1,41 @@
 //! HTTP wire types for the collections domain (ADR-0024).
 //!
-//! `CollectionStatistics` (`src/models.rs`) already derives `Serialize` and is
-//! returned as-is, same reasoning as the tags domain's reuse of
-//! `TagStatistics`/`TagUsageInfo`.
+//! `CollectionStatistics` (`src/models.rs`) is mirrored as `CollectionStatisticsDto`
+//! only so that `most_common_key` goes out in the ADR-0035 key shape rather than as
+//! the `"<tonic> <scale>"` string the database builds.
 
 use serde::{Deserialize, Serialize};
 
+use crate::http::dto::projects::KeySignatureDto;
+use crate::models::CollectionStatistics;
 use crate::services::CollectionDetail;
+
+#[derive(Serialize)]
+pub struct CollectionStatisticsDto {
+    pub project_count: i32,
+    pub total_duration_seconds: Option<f64>,
+    pub average_tempo: Option<f64>,
+    pub total_plugins: i32,
+    pub total_samples: i32,
+    pub total_tags: i32,
+    pub most_common_key: Option<KeySignatureDto>,
+    pub most_common_time_signature: Option<String>,
+}
+
+impl From<CollectionStatistics> for CollectionStatisticsDto {
+    fn from(s: CollectionStatistics) -> Self {
+        Self {
+            project_count: s.project_count,
+            total_duration_seconds: s.total_duration_seconds,
+            average_tempo: s.average_tempo,
+            total_plugins: s.total_plugins,
+            total_samples: s.total_samples,
+            total_tags: s.total_tags,
+            most_common_key: s.most_common_key.as_deref().and_then(KeySignatureDto::from_joined),
+            most_common_time_signature: s.most_common_time_signature,
+        }
+    }
+}
 
 #[derive(Serialize)]
 pub struct CollectionDto {

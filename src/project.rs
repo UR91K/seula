@@ -197,7 +197,7 @@ impl Project {
             self.time_signature.denominator.to_string().cyan(),
             self.key_signature
                 .as_ref()
-                .map(|k| format!("{:?} {:?}", k.tonic, k.scale).cyan().to_string())
+                .map(|k| k.to_string().cyan().to_string())
                 .unwrap_or_else(|| "Not specified".bright_black().to_string())
         );
 

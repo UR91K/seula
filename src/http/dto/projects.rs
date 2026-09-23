@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::stats::ProjectStatistics;
 use crate::http::dto::tags::TagDto;
+use crate::models::{KeySignature, Scale, Tonic};
 use crate::project::Project as DomainProject;
 
 #[derive(Serialize)]
@@ -16,10 +17,50 @@ pub struct TimeSignatureDto {
     pub denominator: i32,
 }
 
+/// A key as sent over the wire (ADR-0035). `tonic` and `scale` are the enum names the
+/// filters take back as input; `sharp` and `flat` are the two display spellings, and
+/// the client shows whichever its sharp/flat switch selects.
 #[derive(Serialize)]
 pub struct KeySignatureDto {
     pub tonic: String,
     pub scale: String,
+    pub sharp: String,
+    pub flat: String,
+}
+
+impl From<KeySignature> for KeySignatureDto {
+    fn from(key: KeySignature) -> Self {
+        Self {
+            sharp: key.sharp_name(),
+            flat: key.flat_name(),
+            tonic: key.tonic.to_string(),
+            scale: key.scale.to_string(),
+        }
+    }
+}
+
+impl KeySignatureDto {
+    /// From the stored enum names, as found in `projects.key_signature_tonic` and
+    /// `key_signature_scale` or a proto `KeySignature`. `None` when neither half is a
+    /// key, and a half that does not parse counts as `Empty`.
+    pub fn from_names(tonic: &str, scale: &str) -> Option<Self> {
+        let key = KeySignature {
+            tonic: tonic.parse().unwrap_or(Tonic::Empty),
+            scale: scale.parse().unwrap_or(Scale::Empty),
+        };
+        if key.tonic == Tonic::Empty && key.scale == Scale::Empty {
+            return None;
+        }
+        Some(key.into())
+    }
+
+    /// From the `"<tonic> <scale>"` strings the statistics queries build in SQL. The
+    /// tonic is an enum name and never contains a space, so the first space splits the
+    /// two even when an unknown Ableton scale name has spaces of its own.
+    pub fn from_joined(joined: &str) -> Option<Self> {
+        let (tonic, scale) = joined.split_once(' ')?;
+        Self::from_names(tonic, scale)
+    }
 }
 
 #[derive(Serialize)]
@@ -130,10 +171,7 @@ pub fn project_to_dto(
             numerator: live_set.time_signature.numerator as i32,
             denominator: live_set.time_signature.denominator as i32,
         },
-        key_signature: live_set.key_signature.map(|ks| KeySignatureDto {
-            tonic: ks.tonic.to_string(),
-            scale: ks.scale.to_string(),
-        }),
+        key_signature: live_set.key_signature.map(KeySignatureDto::from),
         duration_seconds: live_set.estimated_duration.map(|d| d.num_seconds() as f64),
         furthest_bar: live_set.furthest_bar,
 
@@ -300,9 +338,10 @@ pub struct TempoRangeStatisticDto {
     pub count: i32,
 }
 
+/// `key_signature` is `null` for projects with no detected key.
 #[derive(Serialize)]
 pub struct KeySignatureStatisticDto {
-    pub key_signature: String,
+    pub key_signature: Option<KeySignatureDto>,
     pub count: i32,
 }
 
@@ -382,7 +421,10 @@ impl From<ProjectStatistics> for ProjectStatisticsDto {
             key_signature_distribution: stats
                 .key_signature_distribution
                 .into_iter()
-                .map(|(key_signature, count)| KeySignatureStatisticDto { key_signature, count })
+                .map(|(key_signature, count)| KeySignatureStatisticDto {
+                    key_signature: KeySignatureDto::from_joined(&key_signature),
+                    count,
+                })
                 .collect(),
             time_signature_distribution: stats
                 .time_signature_distribution
@@ -431,5 +473,21 @@ impl From<ProjectStatistics> for ProjectStatisticsDto {
                 )
                 .collect(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn statistics_key_strings_split_on_the_first_space_only() {
+        let dto = KeySignatureDto::from_joined("GSharp Some Future Scale").unwrap();
+        assert_eq!(dto.tonic, "GSharp");
+        assert_eq!(dto.scale, "Some Future Scale");
+        assert_eq!(dto.flat, "A\u{266D} Some Future Scale");
+
+        assert!(KeySignatureDto::from_joined("Unknown").is_none());
+        assert!(KeySignatureDto::from_joined("Empty Empty").is_none());
     }
 }

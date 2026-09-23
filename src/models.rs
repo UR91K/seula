@@ -231,6 +231,17 @@ pub enum Scale {
     Messiaen6,
     /// Messiaen mode 7
     Messiaen7,
+    /// Lydian mode
+    Lydian,
+    /// Indian Bhairav scale
+    Bhairav,
+    /// Japanese In-Sen scale
+    InSen,
+    /// Japanese Kumoi scale
+    Kumoi,
+    /// A scale name Ableton wrote that the table below does not know, kept verbatim
+    /// rather than dropped (ADR-0035). Covers scales added in later Live versions.
+    Other(String),
 }
 
 /// Musical tonic (root note) for key signatures.
@@ -386,7 +397,13 @@ impl FromStr for Scale {
             "Messiaen5" => Ok(Scale::Messiaen5),
             "Messiaen6" => Ok(Scale::Messiaen6),
             "Messiaen7" => Ok(Scale::Messiaen7),
-            _ => Err(format!("Invalid scale: {}", s)),
+            "Lydian" => Ok(Scale::Lydian),
+            "Bhairav" => Ok(Scale::Bhairav),
+            "InSen" => Ok(Scale::InSen),
+            "Kumoi" => Ok(Scale::Kumoi),
+            "" => Err("Invalid scale: empty".to_string()),
+            // A stored Scale::Other is its raw Ableton name.
+            other => Ok(Scale::Other(other.to_string())),
         }
     }
 }
@@ -410,9 +427,124 @@ impl fmt::Display for Tonic {
     }
 }
 
+/// The storage form: the variant name, or the raw Ableton name for `Other`. This is what
+/// goes into `key_signature_scale` and what `FromStr` reads back. For people, use
+/// [`Scale::display_name`].
 impl fmt::Display for Scale {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Scale::Other(name) => f.write_str(name),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+/// Every scale Ableton names, paired with the exact string it writes into
+/// `<ScaleInformation><Name Value=".."/>` (ADR-0035). The parser maps through this and
+/// display names derive from it. Names marked verified were read from real `.als` files;
+/// the rest follow Ableton's scale list and are unverified, which is why an unknown
+/// name falls through to `Scale::Other` instead of being lost.
+const ABLETON_SCALE_NAMES: &[(Scale, &str)] = &[
+    (Scale::Major, "Major"),                      // verified
+    (Scale::Minor, "Minor"),                      // verified
+    (Scale::Dorian, "Dorian"),
+    (Scale::Mixolydian, "Mixolydian"),            // verified
+    (Scale::Lydian, "Lydian"),
+    (Scale::Phrygian, "Phrygian"),
+    (Scale::Locrian, "Locrian"),                  // verified
+    (Scale::Aeolian, "Aeolian"),
+    (Scale::WholeTone, "Whole Tone"),             // verified
+    (Scale::HalfWholeDim, "Half-whole Dim."),
+    (Scale::WholeHalfDim, "Whole-half Dim."),
+    (Scale::MinorBlues, "Minor Blues"),
+    (Scale::MinorPentatonic, "Minor Pentatonic"), // verified
+    (Scale::MajorPentatonic, "Major Pentatonic"), // verified
+    (Scale::HarmonicMinor, "Harmonic Minor"),
+    (Scale::HarmonicMajor, "Harmonic Major"),
+    (Scale::Dorian4, "Dorian #4"),                // verified
+    (Scale::PhrygianDominant, "Phrygian Dominant"),
+    (Scale::MelodicMinor, "Melodic Minor"),
+    (Scale::LydianAugmented, "Lydian Augmented"),
+    (Scale::LydianDominant, "Lydian Dominant"),
+    (Scale::SuperLocrian, "Super Locrian"),
+    (Scale::BToneSpanish, "8-Tone Spanish"),
+    (Scale::Bhairav, "Bhairav"),
+    (Scale::HungarianMinor, "Hungarian Minor"),
+    (Scale::Hirajoshi, "Hirajoshi"),              // verified
+    (Scale::InSen, "In-Sen"),
+    (Scale::Iwato, "Iwato"),
+    (Scale::Kumoi, "Kumoi"),                      // verified
+    (Scale::PelogSelisir, "Pelog Selisir"),
+    (Scale::PelogTembung, "Pelog Tembung"),
+    (Scale::Messiaen1, "Messiaen 1"),
+    (Scale::Messiaen2, "Messiaen 2"),
+    (Scale::Messiaen3, "Messiaen 3"),             // verified
+    (Scale::Messiaen4, "Messiaen 4"),
+    (Scale::Messiaen5, "Messiaen 5"),
+    (Scale::Messiaen6, "Messiaen 6"),
+    (Scale::Messiaen7, "Messiaen 7"),
+];
+
+impl Scale {
+    /// Map the name Ableton writes in a `.als` file to a scale. An empty name is
+    /// `Empty`; a name not in the table is kept as `Other`.
+    pub fn from_ableton_name(name: &str) -> Scale {
+        if name.is_empty() {
+            return Scale::Empty;
+        }
+        ABLETON_SCALE_NAMES
+            .iter()
+            .find(|(_, n)| *n == name)
+            .map(|(scale, _)| scale.clone())
+            .unwrap_or_else(|| Scale::Other(name.to_string()))
+    }
+
+    /// Ableton's name with a real sharp sign: "Dorian ♯4", "Minor Pentatonic".
+    /// Empty for `Scale::Empty`.
+    pub fn display_name(&self) -> String {
+        let raw = match self {
+            Scale::Empty => "",
+            Scale::Other(name) => name.as_str(),
+            known => ABLETON_SCALE_NAMES
+                .iter()
+                .find(|(scale, _)| scale == known)
+                .map(|(_, n)| *n)
+                .unwrap_or(""),
+        };
+        raw.replace('#', "\u{266F}")
+    }
+}
+
+impl Tonic {
+    /// "C", "C♯", ... Empty for `Tonic::Empty`.
+    pub fn sharp_name(&self) -> &'static str {
+        match self {
+            Tonic::Empty => "",
+            Tonic::C => "C",
+            Tonic::CSharp => "C\u{266F}",
+            Tonic::D => "D",
+            Tonic::DSharp => "D\u{266F}",
+            Tonic::E => "E",
+            Tonic::F => "F",
+            Tonic::FSharp => "F\u{266F}",
+            Tonic::G => "G",
+            Tonic::GSharp => "G\u{266F}",
+            Tonic::A => "A",
+            Tonic::ASharp => "A\u{266F}",
+            Tonic::B => "B",
+        }
+    }
+
+    /// "C", "D♭", ... The same pitch as [`Tonic::sharp_name`], spelled with flats.
+    pub fn flat_name(&self) -> &'static str {
+        match self {
+            Tonic::CSharp => "D\u{266D}",
+            Tonic::DSharp => "E\u{266D}",
+            Tonic::FSharp => "G\u{266D}",
+            Tonic::GSharp => "A\u{266D}",
+            Tonic::ASharp => "B\u{266D}",
+            natural => natural.sharp_name(),
+        }
     }
 }
 
@@ -438,7 +570,7 @@ impl fmt::Display for Scale {
 /// };
 ///
 /// // Display formatting
-/// println!("{}", c_major); // "C Major"
+/// assert_eq!(c_major.to_string(), "C Major");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeySignature {
@@ -448,9 +580,31 @@ pub struct KeySignature {
     pub scale: Scale,
 }
 
+impl KeySignature {
+    /// "F♯ Harmonic Minor" (ADR-0035).
+    pub fn sharp_name(&self) -> String {
+        Self::join(self.tonic.sharp_name(), &self.scale.display_name())
+    }
+
+    /// "G♭ Harmonic Minor". Only the tonic changes; a scale name keeps any sharp it has,
+    /// as "Dorian ♯4" does in Ableton.
+    pub fn flat_name(&self) -> String {
+        Self::join(self.tonic.flat_name(), &self.scale.display_name())
+    }
+
+    fn join(tonic: &str, scale: &str) -> String {
+        match (tonic.is_empty(), scale.is_empty()) {
+            (false, false) => format!("{} {}", tonic, scale),
+            (false, true) => tonic.to_string(),
+            _ => scale.to_string(),
+        }
+    }
+}
+
+/// The sharp spelling, for places with no sharp/flat preference such as the CLI.
 impl fmt::Display for KeySignature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {:?}", self.tonic, self.scale)
+        f.write_str(&self.sharp_name())
     }
 }
 
@@ -1296,5 +1450,68 @@ mod plugin_key_tests {
             PluginKey::from_dev_identifier("device:vst:instr:1096184373"),
             PluginKey::from_dev_identifier("device:vst:instr:1096184373?n=Anything%20At%20All")
         );
+    }
+}
+
+#[cfg(test)]
+mod key_name_tests {
+    use super::*;
+
+    /// Every name found in real `.als` files on 2026-09-23 (ADR-0035). The parser used to
+    /// map only Major and Minor and send the rest to Empty.
+    #[test]
+    fn verified_ableton_scale_names_map_to_real_scales() {
+        let cases = [
+            ("Major", Scale::Major),
+            ("Minor", Scale::Minor),
+            ("Mixolydian", Scale::Mixolydian),
+            ("Minor Pentatonic", Scale::MinorPentatonic),
+            ("Major Pentatonic", Scale::MajorPentatonic),
+            ("Messiaen 3", Scale::Messiaen3),
+            ("Hirajoshi", Scale::Hirajoshi),
+            ("Locrian", Scale::Locrian),
+            ("Kumoi", Scale::Kumoi),
+            ("Dorian #4", Scale::Dorian4),
+            ("Whole Tone", Scale::WholeTone),
+        ];
+        for (name, scale) in cases {
+            assert_eq!(Scale::from_ableton_name(name), scale, "{name}");
+        }
+        assert_eq!(Scale::from_ableton_name(""), Scale::Empty);
+    }
+
+    #[test]
+    fn unknown_scale_names_are_kept_and_round_trip_through_storage() {
+        let scale = Scale::from_ableton_name("Some Future Scale");
+        assert_eq!(scale, Scale::Other("Some Future Scale".to_string()));
+        let stored = scale.to_string();
+        assert_eq!(stored, "Some Future Scale");
+        assert_eq!(stored.parse::<Scale>().unwrap(), scale);
+        assert_eq!(scale.display_name(), "Some Future Scale");
+    }
+
+    #[test]
+    fn known_scales_round_trip_through_storage() {
+        for (scale, _) in ABLETON_SCALE_NAMES {
+            assert_eq!(scale.to_string().parse::<Scale>().as_ref(), Ok(scale));
+        }
+    }
+
+    #[test]
+    fn keys_have_sharp_and_flat_names_with_real_symbols() {
+        let key = KeySignature { tonic: Tonic::FSharp, scale: Scale::HarmonicMinor };
+        assert_eq!(key.sharp_name(), "F\u{266F} Harmonic Minor");
+        assert_eq!(key.flat_name(), "G\u{266D} Harmonic Minor");
+
+        // A scale name keeps its own sharp in flat mode, as in Ableton.
+        let key = KeySignature { tonic: Tonic::ASharp, scale: Scale::Dorian4 };
+        assert_eq!(key.sharp_name(), "A\u{266F} Dorian \u{266F}4");
+        assert_eq!(key.flat_name(), "B\u{266D} Dorian \u{266F}4");
+
+        let natural = KeySignature { tonic: Tonic::C, scale: Scale::Major };
+        assert_eq!(natural.sharp_name(), natural.flat_name());
+
+        let tonic_only = KeySignature { tonic: Tonic::D, scale: Scale::Empty };
+        assert_eq!(tonic_only.sharp_name(), "D");
     }
 }
