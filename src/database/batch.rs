@@ -41,6 +41,10 @@ struct BatchTransaction<'a> {
     /// Reference rows to write once the plugins they point at exist.
     plugin_refs: Vec<PluginRef>,
     unique_samples: HashMap<String, Sample>, // path -> Sample
+    /// Presence of each sample path this batch's projects reference: present if any
+    /// of them found the file. Only these rows are written, and this value replaces
+    /// the stored one, so a rescan can mark a sample missing.
+    batch_presence: HashMap<String, bool>,
     plugin_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
     sample_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
     stats: BatchStats,
@@ -54,6 +58,7 @@ impl<'a> BatchTransaction<'a> {
             class_index: HashMap::new(),
             plugin_refs: Vec::new(),
             unique_samples: HashMap::new(),
+            batch_presence: HashMap::new(),
             plugin_id_map: HashMap::new(),
             sample_id_map: HashMap::new(),
             stats: BatchStats::default(),
@@ -233,15 +238,11 @@ impl<'a> BatchTransaction<'a> {
                 let old_id = sample.id.to_string();
                 let path_str = sample.path.to_string_lossy().to_string();
 
-                // Only update is_present status for existing samples
+                // Existing samples keep their stored id; presence is this scan's.
+                *self.batch_presence.entry(path_str.clone()).or_insert(false) |= sample.is_present;
                 let entry = self
                     .unique_samples
                     .entry(path_str)
-                    .and_modify(|existing| {
-                        if sample.is_present {
-                            existing.is_present = true;
-                        }
-                    })
                     .or_insert_with(|| sample.clone());
 
                 // Map the old UUID to the canonical UUID
@@ -330,9 +331,11 @@ impl<'a> BatchTransaction<'a> {
     }
 
     fn insert_samples(&mut self) -> Result<(), DatabaseError> {
-        debug!("Upserting {} samples", self.unique_samples.len());
+        debug!("Upserting {} samples", self.batch_presence.len());
 
-        for sample in self.unique_samples.values() {
+        // Only the samples this batch saw. The preloaded ones are there to resolve ids.
+        for (path, present) in &self.batch_presence {
+            let sample = &self.unique_samples[path];
             let sample_id = sample.id.to_string();
             self.tx.execute(
                 "INSERT INTO samples (
@@ -340,14 +343,9 @@ impl<'a> BatchTransaction<'a> {
                 ) VALUES (?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     name = EXCLUDED.name,
-                    is_present = EXCLUDED.is_present OR samples.is_present
+                    is_present = EXCLUDED.is_present
                 ",
-                params![
-                    sample_id,
-                    sample.name,
-                    sample.path.to_string_lossy().to_string(),
-                    sample.is_present,
-                ],
+                params![sample_id, sample.name, path, present],
             )?;
             self.stats.samples_inserted += 1;
         }

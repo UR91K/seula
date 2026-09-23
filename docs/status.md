@@ -90,6 +90,15 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **A rescan could never mark a sample missing** (found 2026-09-23, fixed 2026-09-23). The
+  batch insert preloaded every stored sample and merged a rescan's presence into it with
+  OR, then wrote it back with `is_present = EXCLUDED.is_present OR samples.is_present`.
+  Once a sample had been seen, only the manual presence refresh could mark it missing.
+  Every batch also rewrote every stored sample, including ones it never saw. Dated to
+  `6e4f8c9` (2025-01-22) with no recorded reason; the maintainer considers it a bug. Now a
+  batch writes only the samples its projects reference, and its answer replaces the stored
+  one (within a batch, a sample any project finds is present). Regression test:
+  `a_rescan_that_finds_a_sample_gone_marks_it_missing` (`tests/database/batch.rs`).
 - **A project's samples got a new random id on every read** (found 2026-09-23, fixed
   2026-09-23). The eight queries that load a project's samples (in
   `src/database/projects.rs` and `src/database/collections.rs`) built each `Sample` with

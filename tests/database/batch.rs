@@ -94,3 +94,49 @@ fn test_batch_insert() {
         assert_eq!(sample_links as usize, live_set.samples.len());
     }
 }
+
+/// Presence from a rescan wins. It used to be ORed with what was stored, so once a
+/// sample had been seen, no rescan could ever mark it missing.
+#[test]
+fn a_rescan_that_finds_a_sample_gone_marks_it_missing() {
+    use crate::common::{create_test_live_set_from_parse, LiveSetBuilder};
+
+    setup("error");
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let mut db = ProjectDatabase::new(temp_dir.path().join("test.db")).expect("database");
+
+    let scan = |db: &mut ProjectDatabase, project: &str, samples: &[(&str, bool)]| {
+        let mut parse = LiveSetBuilder::new().build();
+        for (name, present) in samples {
+            parse.samples.insert(seula::models::Sample {
+                id: uuid::Uuid::new_v4(),
+                name: name.to_string(),
+                path: PathBuf::from(format!("C:/samples/{}", name)),
+                is_present: *present,
+            });
+        }
+        let project = create_test_live_set_from_parse(project, parse);
+        BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(vec![project]))
+            .execute()
+            .expect("batch");
+    };
+    let present = |db: &ProjectDatabase, name: &str| -> bool {
+        db.conn
+            .query_row("SELECT is_present FROM samples WHERE name = ?", [name], |r| r.get(0))
+            .expect("sample row")
+    };
+
+    scan(&mut db, "a.als", &[("kick.wav", true), ("snare.wav", true)]);
+    scan(&mut db, "b.als", &[("hat.wav", true)]);
+    assert!(present(&db, "kick.wav"));
+
+    // a.als rescanned after kick.wav was deleted from disk
+    scan(&mut db, "a.als", &[("kick.wav", false), ("snare.wav", true)]);
+    assert!(!present(&db, "kick.wav"), "the rescan's answer replaces the stored one");
+    assert!(present(&db, "snare.wav"));
+    assert!(present(&db, "hat.wav"), "a sample this scan did not see is left alone");
+
+    // Within one scan, a sample any project finds is present.
+    scan(&mut db, "a.als", &[("kick.wav", true)]);
+    assert!(present(&db, "kick.wav"));
+}
