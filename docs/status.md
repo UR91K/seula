@@ -3,7 +3,7 @@
 The single source of truth for what is done, in progress, deliberately out of scope, or
 known-broken. If status appears anywhere else in this repo, that copy is wrong.
 
-Last reviewed: 2026-09-16.
+Last reviewed: 2026-09-23.
 
 ## Subsystems
 
@@ -29,7 +29,7 @@ Last reviewed: 2026-09-16.
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
 | `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
-| Analytics dashboard frontend | **Not started** | `FRONTEND_SPEC.md`, status unverified |
+| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029, OS bridge ADR-0030, preferences ADR-0031, shell and density ADR-0032. Static mockups come before any React. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round: the shell alone (`mockup/shell.html`), awaiting review before any view is built |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
@@ -87,6 +87,21 @@ pass. See CLAUDE.md.
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
 
 Resolved:
+
+- **`--config <path>` was accepted and ignored** (found 2026-09-23, fixed 2026-09-23).
+  `Cli` declared the flag but nothing read it: `CONFIG` is a lazy static that loaded
+  before `Cli::parse()` ran, from `SEULA_CONFIG` or the default locations. Fixed in
+  `src/main.rs` by parsing first and exporting the flag as `SEULA_CONFIG` before
+  `CONFIG` is touched. A missing path now exits with an error rather than falling
+  through to another config, which the env var still does. Checked by running the mock
+  data generator, which now passes `--config` and gets its own port.
+- **`seula --server` was unreachable** (found 2026-09-23, fixed 2026-09-23). Server-only
+  mode (2025-08-14) checked for `--server` by scanning raw argv, but a week later the
+  clap CLI put `Cli::parse()` in front of that check, and clap rejects any flag it does
+  not declare. So the mode could not be started for over a year. Found when the mockup
+  data generator needed a headless server. Fixed by declaring `--server`/`-s` on `Cli`
+  and branching on the parsed flag. Regression test: `server_flag_parses`
+  (`src/cli/mod.rs`).
 
 - **`plugin_count` inflation in the `plugin vendors` / `plugin formats` aggregates**
   (found 2026-09-16, fixed 2026-09-16). The `usage_stats` subquery has one row per
