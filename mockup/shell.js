@@ -20,15 +20,18 @@ const data = {
   config: API["/api/v1/config/status"],
 };
 
-/** One snapshotted response. A plugin's "used in" list is stored as project ids to
- *  keep the file small (the generator checks each equals the main list's copy), and is
- *  put back here, so callers get the response as the server sent it. */
+/** One snapshotted response. A plugin's or sample's "used in" list, and a collection's
+ *  tracklist, are stored as project ids to keep the file small (the generator checks
+ *  each equals the main lists' copy), and are put back here, so callers get the
+ *  response as the server sent it. A tracklist is a bare list (`as_list`). A
+ *  collection's own `project_ids` is a real field, and is left alone. */
 function apiGet(path) {
   const body = API[path];
-  if (!body || !body.project_ids) return body;
-  const byId = apiGet.byId || (apiGet.byId = new Map(data.projects.map((p) => [p.id, p])));
-  const { project_ids, ...rest } = body;
-  return { ...rest, projects: project_ids.map((id) => byId.get(id)) };
+  if (!body || !body.project_ids || body.id) return body;
+  const byId = apiGet.byId || (apiGet.byId = new Map([...data.projects, ...data.archived].map((p) => [p.id, p])));
+  const { project_ids, as_list, ...rest } = body;
+  const projects = project_ids.map((id) => byId.get(id));
+  return as_list ? projects : { ...rest, projects };
 }
 
 // ------------------------------------------------------------------ formatting
@@ -164,9 +167,9 @@ const LOGO = `<svg class="logo" viewBox="0 0 216.54 406" role="img" aria-label="
  *   counts: { view: n }    sidebar counts for a state the snapshot does not hold (a fresh install)
  * }
  */
-/** The views whose screens show keys, and so carry the ♯/♭ switch. Collections and stats
- *  show keys too (frontend.md) and join this list when they are mocked up. */
-const KEY_VIEWS = ["projects"];
+/** The views whose screens show keys, and so carry the ♯/♭ switch. Stats shows keys too
+ *  (frontend.md) and joins this list when it is mocked up. */
+const KEY_VIEWS = ["projects", "collections"];
 
 /** The status bar alone: the view's segments, a running scan, the watcher, and ♯/♭ on a
  *  view that shows keys. */

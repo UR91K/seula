@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula collections board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="collections.css">
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script src="components.js"></script>
+<script src="screens.js"></script>
+<script src="collections.js"></script>
+<script src="board.js"></script>
+<script>
+  // This page only chooses frames and their starting states (ADR-0036). Every frame,
+  // screen or component, is drawn by the shared renderers.
+
+  // ---------------------------------------------------------------- picking real rows
+
+  const cols = colList();
+  const byTasks = [...cols].sort((a, b) => colTasks(b.id).total_tasks - colTasks(a.id).total_tasks);
+  // The fullest collection: a cover, a description, and the most tasks.
+  const showcase = byTasks.find((c) => c.cover_art_id && c.description && c.project_count >= 6);
+  const noDesc = cols.find((c) => c.cover_art_id && !c.description && c.project_count);
+  const noCover = cols.find((c) => !c.cover_art_id && c.project_count);
+  const emptyCol = cols.find((c) => !c.project_count);
+  // One whose count differs between the scopes, for the `all` frames (ADR-0043).
+  const withArchived = colList("all").find((c) => c.description && c.project_count > colById(c.id).project_count);
+  const tracks = colTracks(showcase.id);
+  const track = tracks.find((p) => p.audio_file_id && p.tasks.length) || tracks[0];
+  const two = tracks.slice(2, 4);
+  const byTempo = { col: "tempo", desc: false };
+  const tasksPicked = new Set(colTasks(showcase.id).tasks.filter((t) => !t.completed).slice(0, 2).map((t) => t.id));
+
+  // ---------------------------------------------------------------- frame helpers
+
+  const screen = (id, label, note, overrides) =>
+    ({ id, label, note, kind: "screen", live: true, render: collectionsScreen(collectionsState(overrides)) });
+  const comp = (id, label, note, html) => ({ id, label, note, render: (el) => { el.innerHTML = typeof html === "function" ? html() : html; } });
+  const panel = (w, h, inner) => () => `<div class="inspector" style="width:calc(var(--u) * ${w});height:calc(var(--u) * ${h});overflow:auto">${inner()}</div>`;
+  const strip = (inner) => () => `<div style="width:calc(var(--u) * 526)">${inner()}</div>`;
+  const bar = (inner) => () => `<div class="viewbar" style="width:calc(var(--u) * 526)">${inner()}<span class="grow"></span><button class="tb-btn on">${icon("right_panel_close")}</button></div>`;
+  const opened = (c, o = {}) => collectionsState({ open: c.id, selected: c.id, ...o });
+  const statusStrip = (st) => strip(() => statusBar({ view: "collections", status: collectionStatusSegments(st, st.open ? trackRows(st) : collectionRows(st)) }));
+  const cards = (...list) => () => `<div class="cards" style="padding:0;grid-template-columns:repeat(${list.length}, calc(var(--u) * 80))">${list.map(([c, o]) => collectionCard(c, o)).join("")}</div>`;
+  const ids = (list) => new Set(list.map((p) => p.id));
+
+  /** The tracklist's leading cells in each of their states. */
+  function trackStates() {
+    const all = colTracks(withArchived.id, "all");
+    const gone = all.find((p) => !p.is_active);
+    const live = all.filter((p) => p.is_active);
+    const rows = [
+      [live[0], 1, { drag: true }, {}, "collection order: the handle shows on hover"],
+      [live[1], 2, { drag: true }, { sel: true }, "selected: the handle stays"],
+      [live[2], 3, { drag: false }, {}, "sorted by another column: number only, no dragging"],
+      [gone, all.indexOf(gone) + 1, { drag: true }, { archived: true }, "archived, under the all scope (ADR-0043)"],
+    ];
+    return `<table class="grid fixed tracks" style="width:calc(var(--u) * 330)"><thead><tr>
+      <th class="lead pos sorted" style="width:calc(var(--u) * 22)">#</th><th class="lead check" style="width:calc(var(--u) * 11)">${cb(false)}</th><th class="lead" style="width:calc(var(--u) * 10)"></th><th style="width:calc(var(--u) * 90)">Name</th><th style="width:calc(var(--u) * 60)">Tags</th><th>State</th></tr></thead>
+      <tbody>${rows.map(([p, n, pos, o, what]) => `<tr class="${o.sel ? "sel" : ""} ${o.archived ? "archived" : ""}">${positionCell(n, pos)}${leadCells(p, { checked: !!o.sel, archived: !!o.archived })}<td class="faint">${what}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // ---------------------------------------------------------------- the board
+
+  board({
+    title: "Seula · Collections",
+    intro: `<p>The collections view (ADR-0036, ADR-0044). <b>Screen</b> frames are live: click a card to
+      inspect it, <b>double-click to open it</b>, right-click for the menu, switch between the grid and the
+      details table at the right of the toolbar, and sort. In an opened collection, drag a row by its handle
+      (hover the # column) to reorder, sort by a header, click <b>#</b> to go back to collection order, and
+      select rows to remove them.</p>
+      <p>All data is the real API over the seeded database: the list in each order the Sort menu and the table
+      headers ask the server for (<code>sort_by=project_count</code> used to fail; ADR-0043), a search, and
+      each collection's detail, tracklist, tasks and statistics in both project scopes. Counts leave archived
+      projects out unless the scope preference says otherwise (ADR-0043). Reordering and removing change only
+      this page. The <b>♯/♭</b> switch re-spells the most common keys.</p>`,
+    columns: [
+      { title: "Screen", frames: [
+        screen("1", "Default", "the grid, by name; inspector open with nothing selected", {}),
+        screen("1b", "A collection selected", "its facts, the first ten of its tracklist, and every task across its projects, each naming its project",
+          { selected: showcase.id }),
+        screen("1c", "Context menu", "Open, Show in Projects (a collection: search), and the collection's own edits",
+          { selected: showcase.id, menu: { id: showcase.id, kind: "card", hot: "open" } }),
+        screen("1d", "Sort menu", "the server sorts, by name, count, length or date",
+          { popover: "sort" }),
+        screen("1e", "Sorted by most projects", "sort_by=project_count, counting active projects",
+          { sort: { col: "project_count", desc: true }, selected: showcase.id }),
+        screen("1f", "Details layout", "the same collections as a table, with the description and both dates",
+          { layout: "details", selected: showcase.id }),
+        screen("1g", "Details, longest first", "clicking a header sorts on the server: sort_by=total_duration",
+          { layout: "details", sort: { col: "total_duration", desc: true } }),
+        screen("1h", "Search", "/api/v1/collections/search: names, descriptions and notes",
+          { query: "tape" }),
+        screen("1i", "An opened collection", "double-clicked: the header band, then the projects table in collection order; the inspector shows the collection",
+          opened(showcase)),
+        screen("1j", "Opened, a project selected", "the inspector shows the project, as in Projects",
+          opened(showcase, { tracksSel: ids([track]) })),
+        screen("1k", "Opened, dragging a row", "the row it would land above is marked; letting go saves the order",
+          opened(showcase, { drag: { id: tracks[4].id, to: tracks[1].id }, tracksSel: ids([tracks[4]]) })),
+        screen("1l", "Opened, sorted by tempo", "a view sort only: the stored order is kept, and the handles are gone until # is clicked",
+          opened(showcase, { trackSort: byTempo })),
+        screen("1m", "Opened, two selected", "Remove from collection in the toolbar; the inspector shows what they share",
+          opened(showcase, { tracksSel: ids(two) })),
+        screen("1n", "Opened, row context menu", "the project menu, plus Remove from collection",
+          opened(showcase, { tracksSel: ids([track]), menu: { id: track.id, kind: "track", hot: "remove" } })),
+        screen("1o", "Counting archived projects", "the scope preference set to all: archived projects are listed and marked",
+          opened(withArchived, { scope: "all" })),
+        screen("1p", "An empty collection", "",
+          opened(emptyCol)),
+        screen("1q", "Edit details", "name, description and cover art together",
+          { selected: showcase.id, dialog: "edit" }),
+        screen("1r", "Delete a collection", "says plainly that the projects are untouched",
+          { selected: showcase.id, dialog: "delete" }),
+        screen("1s", "Browser target", "no window controls; Open in Ableton and Show in Explorer leave the row menu (ADR-0030)",
+          opened(showcase, { tauri: false, tracksSel: ids([track]), menu: { id: track.id, kind: "track" } })),
+        screen("1t", "No collections yet", "a library with projects but no collections",
+          { empty: true, inspectorOpen: false }),
+        screen("1u", "Search with no results", "",
+          { query: "field recording" }),
+      ]},
+      { title: "Cards", frames: [
+        comp("2a", "Cover and description", "the description is in the inspector and the table, not on the card", cards([showcase, {}])),
+        comp("2b", "Selected", "", cards([showcase, { selected: true }])),
+        comp("2c", "No cover", "", cards([noCover, {}])),
+        comp("2d", "Empty", "", cards([emptyCol, {}])),
+        comp("2e", "Renaming", "F2, or Rename in the menu", cards([noDesc, { renaming: true }])),
+      ]},
+      { title: "Inspector", frames: [
+        comp("3a", "A collection", "", panel(150, 300, () => collectionInspector(showcase))),
+        comp("3b", "Tasks being tidied", "two selected; the bulk actions light up", panel(150, 300, () => collectionInspector(showcase, { tasksSel: tasksPicked }))),
+        comp("3c", "No cover, no description", "", panel(150, 300, () => collectionInspector(noCover))),
+        comp("3d", "Empty", "", panel(150, 170, () => collectionInspector(emptyCol))),
+        comp("3e", "Counting archived projects", "the count says how many are archived, and the tracklist marks them", panel(150, 300, () => collectionInspector(colById(withArchived.id, "all"), { scope: "all" }))),
+        comp("3f", "Opened, nothing selected", "the tracklist is on screen, so it is left out here", panel(150, 300, () => collectionInspector(showcase, { opened: true }))),
+        comp("3g", "Nothing selected", "", panel(150, 120, collectionInspectorEmpty)),
+      ]},
+      { title: "Context menu", frames: [
+        comp("4a", "A collection", "no native-only entries, so the same in the browser", () => collectionContextMenu({ hot: "open" })),
+        comp("4b", "A row in an opened collection", "Tauri target", () => projectContextMenu({ inCollection: true, hot: "remove" })),
+        comp("4c", "Several rows", "single-item entries disabled", () => projectContextMenu({ inCollection: true, many: true })),
+        comp("4d", "A row, browser target", "", () => projectContextMenu({ inCollection: true, tauri: false })),
+      ]},
+      { title: "View toolbar", frames: [
+        comp("5a", "Grid", "Sort ▾, New collection, and the layout switch", bar(() => collectionsViewbar(collectionsState(), cols.length))),
+        comp("5b", "Details", "the headers sort, so there is no Sort ▾", bar(() => collectionsViewbar(collectionsState({ layout: "details" }), cols.length))),
+        comp("5c", "Search", "", bar(() => collectionsViewbar(collectionsState({ query: "tape" }), colSearch("tape").length))),
+        comp("5d", "Opened", "back, the path, and the column chooser", bar(() => openedViewbar(opened(showcase), showcase))),
+        comp("5e", "Opened, sorted", "", bar(() => openedViewbar(opened(showcase, { trackSort: byTempo }), showcase))),
+        comp("5f", "Opened, rows selected", "", bar(() => openedViewbar(opened(showcase, { tracksSel: ids(two) }), showcase))),
+        comp("5g", "Sort ▾", "", () => collectionSortMenu({ col: "name", desc: false })),
+      ]},
+      { title: "Opened parts", frames: [
+        comp("6a", "Header band", "facts from /collections/:id/statistics and /tasks", strip(() => collectionHeader(showcase, "active"))),
+        comp("6b", "Header band, no cover or description", "", strip(() => collectionHeader(noCover, "active"))),
+        comp("6c", "Header band, empty", "", strip(() => collectionHeader(emptyCol, "active"))),
+        comp("6d", "Tracklist leading cells", "the # column in each state", trackStates),
+        comp("6e", "Details table", "", strip(() => collectionTable(collectionsState({ selected: showcase.id }), [showcase, noCover, emptyCol]))),
+      ]},
+      { title: "Dialogs", frames: [
+        comp("7a", "New collection", "from the toolbar, so nothing is selected to add", () => newCollectionDialog([])),
+        comp("7b", "Edit details", "", () => editCollectionDialog(showcase)),
+        comp("7c", "Edit details, no cover", "", () => editCollectionDialog(noCover)),
+        comp("7d", "Duplicate", "", () => duplicateCollectionDialog(showcase)),
+        comp("7e", "Delete", "", () => deleteCollectionDialog(showcase)),
+        comp("7f", "Delete an empty one", "", () => deleteCollectionDialog(emptyCol)),
+      ]},
+      { title: "Status bar", frames: [
+        comp("8a", "The list", "", statusStrip(collectionsState())),
+        comp("8b", "Search", "", statusStrip(collectionsState({ query: "tape" }))),
+        comp("8c", "Opened", "count and length of what the tracklist shows", statusStrip(opened(showcase))),
+        comp("8d", "Opened, rows selected", "", statusStrip(opened(showcase, { tracksSel: ids(two) }))),
+        comp("8e", "Counting archived projects", "the preference, said where the counts are", statusStrip(opened(withArchived, { scope: "all" }))),
+      ]},
+    ],
+  });
+</script>
+</body>
+</html>

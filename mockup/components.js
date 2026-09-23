@@ -91,7 +91,9 @@ function pageOf(st, rows) {
   return rows.slice(start, start + st.pageSize);
 }
 
-function leadCells(p, { renaming = false, showEdit = false, showAdd = false, checked = false } = {}) {
+/** `archived` marks an archived project where a list can hold one: a collection's
+ *  tracklist under the `all` scope (ADR-0043). */
+function leadCells(p, { renaming = false, showEdit = false, showAdd = false, checked = false, archived = false } = {}) {
   const cover = projectCover(p);
   const audio = p.audio_file_id
     ? `<span class="play ${cover ? "cover" : ""}" ${cover ? `style="background-image:url('${cover}')"` : ""} title="Play audition audio">${icon("play_arrow", "fill")}</span>`
@@ -100,14 +102,27 @@ function leadCells(p, { renaming = false, showEdit = false, showAdd = false, che
   const name = renaming
     ? `<span class="namecell"><input value="${esc(p.name)}"></span>`
     : `<span class="namecell"><span class="n">${esc(p.name)}</span>${stem !== p.name ? `<span class="f">${esc(stem)}.als</span>` : ""}<span class="edit ${showEdit ? "show" : ""}" title="Rename (F2)">${icon("edit")}</span></span>`;
-  return `<td class="lead check" data-act="rowcheck">${cb(checked)}</td><td class="lead">${audio}</td><td>${name}</td><td>${p.tags.map(tagChip).join("")}</td>`;
+  const mark = archived ? `<span class="tag archived" title="Archived: hidden from Projects, kept in this collection">${icon("inventory_2")}Archived</span>` : "";
+  return `<td class="lead check" data-act="rowcheck">${cb(checked)}</td><td class="lead">${audio}</td><td>${name}</td><td>${mark}${p.tags.map(tagChip).join("")}</td>`;
+}
+
+/** The tracklist's leading cell: a drag handle while the list is in collection order,
+ *  then the project's place. */
+function positionCell(n, { drag = false } = {}) {
+  return `<td class="lead pos"><span class="posw">${drag ? `<span class="handle" title="Drag to reorder">${icon("drag_indicator")}</span>` : ""}<span class="n">${n}</span></span></td>`;
 }
 
 /**
  * st: { scope, query, sort, page, pageSize, selected: Set, columns: [id...], renaming, hot }
  * `columns` is the visible reorderable columns in order.
+ *
+ * A collection's tracklist (ADR-0044) is the same table with `opts`:
+ *   position: Map of id to place, which adds the leading # column, sorted on "position"
+ *   drag:     show the drag handles (only while the list is in collection order)
+ *   dragging: { id, to } a row being dragged, and the row it would drop above
+ *   archived: mark archived projects (the `all` scope, ADR-0043)
  */
-function projectTable(st, rows) {
+function projectTable(st, rows, opts = {}) {
   const cols = st.columns.map((id) => PROJECT_COLUMNS.find((c) => c.id === id));
   const page = pageOf(st, rows);
   const allOn = page.length && page.every((p) => st.selected.has(p.id));
@@ -116,17 +131,24 @@ function projectTable(st, rows) {
   const th = (id, label, w, cls = "") =>
     `<th class="${cls} ${st.sort && st.sort.col === id ? "sorted" : ""}" data-sort="${id}" style="width:calc(var(--u) * ${w})">${label}${sortIcon(id)}<span class="grip"></span></th>`;
 
-  const head = `<th class="lead check" style="width:calc(var(--u) * 11)" data-act="selectall" title="Select all on this page">${cb(allOn ? true : someOn ? "mixed" : false)}</th>`
+  const pos = opts.position
+    ? `<th class="lead pos ${st.sort && st.sort.col === "position" ? "sorted" : ""}" data-sort="position" style="width:calc(var(--u) * ${opts.drag ? 22 : 14})" title="Collection order">#</th>`
+    : "";
+  const head = pos + `<th class="lead check" style="width:calc(var(--u) * 11)" data-act="selectall" title="Select all on this page">${cb(allOn ? true : someOn ? "mixed" : false)}</th>`
     + `<th class="lead" style="width:calc(var(--u) * 10)" title="Audition audio"></th>`
     + th("name", "Name", 100) + th("tags", "Tags", 64)
     + cols.map((c) => th(c.id, c.label, c.w, (c.cls || "").includes("num") ? "num" : "")).join("");
 
-  const body = page.map((p) => `<tr data-id="${p.id}" class="${st.selected.has(p.id) ? "sel" : ""}">${
-    leadCells(p, { renaming: st.renaming === p.id, checked: st.selected.has(p.id) })}${
+  const dragging = opts.dragging || {};
+  const rowCls = (p) => [st.selected.has(p.id) && "sel", dragging.id === p.id && "dragging",
+    dragging.to === p.id && "drop-above", opts.archived && !p.is_active && "archived"].filter(Boolean).join(" ");
+  const body = page.map((p) => `<tr data-id="${p.id}" class="${rowCls(p)}">${
+    opts.position ? positionCell(opts.position.get(p.id), { drag: opts.drag }) : ""}${
+    leadCells(p, { renaming: st.renaming === p.id, checked: st.selected.has(p.id), archived: opts.archived && !p.is_active })}${
     cols.map((c) => `<td class="${c.cls || ""} ${st.hot && st.hot.id === p.id && st.hot.kind === c.hover ? "hot" : ""}" ${c.hover ? `data-hover="${c.hover}"` : ""}>${c.cell(p)}</td>`).join("")
-  }</tr>`).join("");
+  }</tr>`).join("") + (dragging.to === "end" ? `<tr class="drop-end"><td colspan="99"></td></tr>` : "");
 
-  return `<table class="grid fixed"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  return `<table class="grid fixed ${opts.position ? "tracks" : ""}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 // ------------------------------------------------------------------ view toolbar
@@ -191,8 +213,9 @@ function menu(items, { tauri = true } = {}) {
         i.kbd ? `<span class="kbd">${i.kbd}</span>` : ""}${i.sub ? icon("chevron_right", "sub") : ""}</div>`).join("")}</div>`;
 }
 
-/** The row context menu. `many` disables the single-item entries (ADR: frontend.md). */
-function projectContextMenu({ archived = false, many = false, tauri = true, hot = null } = {}) {
+/** The row context menu. `many` disables the single-item entries (ADR: frontend.md).
+ *  `inCollection`: a row in an opened collection, which can also be taken out of it. */
+function projectContextMenu({ archived = false, many = false, tauri = true, hot = null, inCollection = false } = {}) {
   if (archived) {
     return menu([
       { ic: "unarchive", label: many ? "Reactivate projects" : "Reactivate", act: "close" },
@@ -206,6 +229,7 @@ function projectContextMenu({ archived = false, many = false, tauri = true, hot 
     { sep: true },
     { ic: "sell", label: "Tags", sub: true, hot: hot === "tags", act: "sub-tags" },
     { ic: "album", label: "Add to collection", sub: true, act: "sub-collection" },
+    ...(inCollection ? [{ ic: "playlist_remove", label: "Remove from collection", act: "removetracks", hot: hot === "remove" }] : []),
     { sep: true },
     { ic: "edit", label: "Rename", kbd: "F2", off: many, act: "rename" },
     { ic: "music_note_add", label: "Add audition audio…", off: many },
@@ -359,11 +383,15 @@ function deletePermanentDialog(projects) {
     btn("Cancel") + btn(n === 1 ? "Delete project" : `Delete ${n} projects`, "danger"), { width: 160 });
 }
 
+/** From a selection in Projects, or empty from the collections view's toolbar. */
 function newCollectionDialog(projects) {
+  const note = projects.length
+    ? `${projects.length} selected projects will be added, in the order shown.`
+    : "Add projects from the Projects view: select them, then Collection ▾ › Add to collection.";
   return dialog("New collection", `
     <label>Name</label><label class="field focus"><span class="caret-blink"></span></label>
     <label>Description <span class="faint">(optional)</span></label><textarea class="notes" placeholder="What ties these together?"></textarea>
-    <p class="dim" style="margin-top:calc(var(--u) * 3)">${projects.length} selected projects will be added, in the order shown.</p>`,
+    <p class="dim" style="margin-top:calc(var(--u) * 3)">${note}</p>`,
     btn("Cancel") + btn("Create collection", "primary"), { width: 160 });
 }
 
@@ -404,8 +432,10 @@ function auditionSection(p, { playing = null } = {}) {
     <ul class="plain audios">${rows}</ul>${none}</div>`;
 }
 
-/** tasksSel: Set of selected task ids, for the bulk task actions. */
-function tasksSection(p, tasksSel = new Set()) {
+/** tasksSel: Set of selected task ids, for the bulk task actions. A collection's tasks
+ *  (`showProject`) name the project each belongs to, and have no add field: a new task
+ *  needs a project, so it is added from that project's inspector. */
+function tasksSection(p, tasksSel = new Set(), { showProject = false } = {}) {
   const done = p.tasks.filter((t) => t.completed).length;
   const any = tasksSel.size > 0;
   const all = p.tasks.length && p.tasks.every((t) => tasksSel.has(t.id));
@@ -415,10 +445,11 @@ function tasksSection(p, tasksSel = new Set()) {
       ${tbBtn("radio_button_unchecked", "", { title: "Mark not done", disabled: !any })}
       ${tbBtn("delete", "", { title: "Delete selected", disabled: !any })}</span>` : "";
   const rows = p.tasks.map((t) => `<li data-task="${t.id}" class="${t.completed ? "done" : ""} ${tasksSel.has(t.id) ? "sel" : ""}">${cb(tasksSel.has(t.id))}${
-    icon(t.completed ? "check_circle" : "radio_button_unchecked", `state ${t.completed ? "fill" : ""}`)}<span class="grow">${esc(t.description)}</span></li>`).join("");
+    icon(t.completed ? "check_circle" : "radio_button_unchecked", `state ${t.completed ? "fill" : ""}`)}<span class="grow">${esc(t.description)}</span>${
+    showProject ? `<span class="faint proj" title="${esc(t.project_name)}">${esc(t.project_name)}</span>` : ""}</li>`).join("");
   return `<div class="insp-sec"><h3>Tasks <span class="count">${p.tasks.length ? `${done}/${p.tasks.length}` : ""}</span>${acts}</h3>
-    ${p.tasks.length ? `<ul class="plain tasks">${rows}</ul>` : ""}
-    <label class="field add">${icon("add")}Add a task</label></div>`;
+    ${p.tasks.length ? `<ul class="plain tasks">${rows}</ul>` : showProject ? '<span class="faint">No project here has tasks</span>' : ""}
+    ${showProject ? "" : `<label class="field add">${icon("add")}Add a task</label>`}</div>`;
 }
 
 function projectInspector(p, { tasksSel, playing } = {}) {

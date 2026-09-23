@@ -1,0 +1,117 @@
+/* The collections view, on top of shell.css and components.css. Same rules: measures in
+ * --u, 1px hairlines only, colours from colors.css only.
+ */
+
+/* a collection with no cover: the album glyph on the tag tint, wherever a cover goes */
+.noart {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  background: var(--tag-bg); color: var(--text-3);
+}
+
+/* ------------------------------------------------------------------ grid */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, calc(var(--u) * 80));
+  gap: calc(var(--u) * 4);
+  padding: calc(var(--u) * 5);
+  align-content: start;
+}
+.card {
+  padding: calc(var(--u) * 2);
+  border: 1px solid transparent; border-radius: var(--radius);
+  cursor: default;
+}
+.card:hover { background: var(--hover); }
+.card.sel { background: var(--select); border-color: var(--select-border); }
+.card .art { aspect-ratio: 1; display: flex; }
+.card .art img, .card .art .noart { width: 100%; height: 100%; object-fit: cover; border: 1px solid var(--border-lo); }
+.card .art .noart .ms { font-size: calc(var(--u) * 24); width: calc(var(--u) * 24); height: calc(var(--u) * 24); }
+.card .cname, .card .cmeta {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-block: var(--u); margin-block: calc(var(--u) * -1);
+}
+.card .cname { margin-top: calc(var(--u) * 2); }
+.card .cmeta { color: var(--text-3); }
+.card.sel .cmeta { color: var(--text-2); }
+.card .namecell { margin-top: calc(var(--u) * 2); }
+
+/* ------------------------------------------------------------------ details table */
+
+table.grid.collections td .n { overflow: hidden; text-overflow: ellipsis; }
+table.grid.collections .thumb {
+  display: inline-flex; vertical-align: top;
+  width: var(--line); height: var(--line); object-fit: cover;
+}
+table.grid.collections .noart.thumb .ms { font-size: calc(var(--u) * 5); width: calc(var(--u) * 5); height: calc(var(--u) * 5); margin: auto; }
+
+/* ------------------------------------------------------------------ an opened collection */
+
+.viewbar .crumb { color: var(--text-2); line-height: var(--hdr); margin-left: var(--u); }
+.viewbar .crumb:hover { color: var(--text); text-decoration: underline; }
+.viewbar .crumbsep { color: var(--text-3); }
+.viewbar .crumbsep + h1 { margin-left: 0; }
+
+.colhead {
+  display: flex; gap: calc(var(--u) * 6); align-items: flex-start;
+  padding: calc(var(--u) * 5);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.colhead .big { width: calc(var(--u) * 44); height: calc(var(--u) * 44); object-fit: cover; border: 1px solid var(--border-lo); }
+.colhead .noart.big .ms { font-size: calc(var(--u) * 20); width: calc(var(--u) * 20); height: calc(var(--u) * 20); }
+.colhead .txt { min-width: 0; }
+.colhead h2 { font-size: var(--step-up); font-weight: 600; line-height: calc(var(--u) * 9); }
+.colhead .desc { color: var(--text-2); margin-top: var(--u); max-width: calc(var(--u) * 240); }
+.colhead .facts { display: flex; flex-wrap: wrap; margin-top: calc(var(--u) * 3); color: var(--text-2); }
+.colhead .facts span + span::before { content: "·"; margin: 0 calc(var(--u) * 2); color: var(--text-3); }
+
+/* the tracklist's place column: a drag handle while in collection order, then the number */
+table.grid.tracks th.pos { text-align: right; padding: 0 calc(var(--u) * 2); }
+table.grid.tracks td.pos { text-align: right; padding: 0 calc(var(--u) * 2); color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* a flex box with a minimum width, not a float: the table sizes its columns from their
+   content and squeezes the leading ones when a row is wide, and a float let this cell
+   shrink until the number was cut off */
+table.grid.tracks td.pos .posw { display: flex; align-items: flex-start; gap: var(--u); min-width: calc(var(--u) * 16); }
+table.grid.tracks td.pos .n { margin-left: auto; flex: none; }
+table.grid.tracks td.pos .handle { display: flex; flex: none; color: var(--text-3); cursor: grab; visibility: hidden; }
+table.grid.tracks tr:hover td.pos .handle, table.grid.tracks tr.sel td.pos .handle, table.grid.tracks tr.dragging td.pos .handle { visibility: visible; }
+
+/* a row being dragged, and the line it would drop on */
+table.grid.tracks tr.dragging td { color: var(--text-3); background: var(--select-inactive); }
+table.grid.tracks tr.drop-above td { box-shadow: inset 0 var(--u) 0 var(--accent); }
+table.grid.tracks tr.drop-end td { height: 0; padding: 0; box-shadow: inset 0 var(--u) 0 var(--accent); }
+
+/* an archived project in a tracklist, under the `all` scope (ADR-0043) */
+table.grid.tracks tr.archived td { color: var(--text-3); }
+/* an inset hairline, not a border, so the tag keeps the line box's height */
+.tag.archived { display: inline-flex; align-items: center; gap: var(--u); background: none; box-shadow: inset 0 0 0 1px var(--border); color: var(--text-2); }
+table.grid .tag.archived .ms { font-size: calc(var(--u) * 6); width: calc(var(--u) * 6); height: calc(var(--u) * 6); vertical-align: middle; }
+
+.tracks-empty { height: auto; padding-top: calc(var(--u) * 20); }
+
+/* ------------------------------------------------------------------ toolbar */
+
+.layoutswitch { display: inline-flex; gap: calc(var(--u) / 2); }
+
+/* ------------------------------------------------------------------ inspector */
+
+.insp-head .cover-lg { width: calc(var(--u) * 44); height: calc(var(--u) * 44); object-fit: cover; flex: none; border: 1px solid var(--border-lo); }
+.insp-head .noart.cover-lg .ms { font-size: calc(var(--u) * 20); width: calc(var(--u) * 20); height: calc(var(--u) * 20); }
+.insp-col .desc { color: var(--text-2); margin-top: var(--u); }
+
+ul.tracklist li .num { width: calc(var(--u) * 7); text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; flex: none; }
+ul.tracklist li.archived .grow { color: var(--text-3); }
+ul.tracklist li .ms { font-size: calc(var(--u) * 6); width: calc(var(--u) * 6); height: calc(var(--u) * 6); }
+
+/* a collection's task names its project */
+ul.tasks li .proj { flex: 0 1 auto; max-width: calc(var(--u) * 45); overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------------------------ dialogs */
+
+.dialog .coveredit { display: flex; gap: calc(var(--u) * 5); align-items: flex-start; }
+.dialog .coveredit .art { display: flex; flex: none; }
+.dialog .coveredit .art img, .dialog .coveredit .art .noart { width: calc(var(--u) * 36); height: calc(var(--u) * 36); object-fit: cover; border: 1px solid var(--border-lo); }
+.dialog .coveredit .art .noart .ms { font-size: calc(var(--u) * 16); width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+.dialog .coveredit .faint { margin-top: calc(var(--u) * 3); }
+.dialog .coveredit + label { margin-top: calc(var(--u) * 5); }
