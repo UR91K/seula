@@ -8,17 +8,24 @@ use axum::Json;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::dto::samples::{
     sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto,
-    SampleFormatDto, SampleFormatListResponse, SampleListResponse, SearchSamplesQuery,
+    SampleFormatDto, SampleFormatListResponse, SampleListResponse, ScopeQuery, SearchSamplesQuery,
 };
+use crate::database::ProjectScope;
+use crate::http::dto::parse_project_scope;
 use crate::models::{OTHER_SAMPLE_FORMAT, SAMPLE_FORMATS};
 use crate::models::Sample;
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 
-/// Attach each sample's project count with one query for the page (ADR-0034).
-async fn with_counts(state: &AppState, samples: Vec<Sample>) -> Result<Vec<SampleDto>, ApiError> {
+/// Attach each sample's project count with one query for the page (ADR-0034), counting
+/// the projects in `scope` (ADR-0040).
+async fn with_counts(
+    state: &AppState,
+    samples: Vec<Sample>,
+    scope: ProjectScope,
+) -> Result<Vec<SampleDto>, ApiError> {
     let ids: Vec<String> = samples.iter().map(|s| s.id.to_string()).collect();
-    let counts = state.services.samples.project_counts(&ids).await?;
+    let counts = state.services.samples.project_counts(&ids, scope).await?;
     Ok(samples
         .into_iter()
         .map(|s| {
@@ -32,6 +39,7 @@ pub async fn get_all_samples(
     State(state): State<AppState>,
     Query(query): Query<GetAllSamplesQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let (samples, total_count) = state
         .services
         .samples
@@ -45,11 +53,12 @@ pub async fn get_all_samples(
             query.format_filter,
             query.min_project_count,
             query.max_project_count,
+            scope,
         )
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: with_counts(&state, samples).await?,
+        samples: with_counts(&state, samples, scope).await?,
         total_count,
     }))
 }
@@ -57,7 +66,9 @@ pub async fn get_all_samples(
 pub async fn get_sample(
     State(state): State<AppState>,
     Path(sample_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let sample = state
         .services
         .samples
@@ -65,7 +76,7 @@ pub async fn get_sample(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Sample not found with ID: {}", sample_id)))?;
 
-    let mut dtos = with_counts(&state, vec![sample]).await?;
+    let mut dtos = with_counts(&state, vec![sample], scope).await?;
     Ok(Json(dtos.remove(0)))
 }
 
@@ -86,7 +97,7 @@ pub async fn get_samples_by_presence(
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: with_counts(&state, samples).await?,
+        samples: with_counts(&state, samples, ProjectScope::Active).await?,
         total_count,
     }))
 }
@@ -95,6 +106,7 @@ pub async fn search_samples(
     State(state): State<AppState>,
     Query(query): Query<SearchSamplesQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let (samples, total_count) = state
         .services
         .samples
@@ -102,7 +114,7 @@ pub async fn search_samples(
         .await?;
 
     Ok(Json(SampleListResponse {
-        samples: with_counts(&state, samples).await?,
+        samples: with_counts(&state, samples, scope).await?,
         total_count,
     }))
 }
@@ -127,7 +139,7 @@ pub async fn get_projects_by_sample(
     let (projects, total_count) = state
         .services
         .samples
-        .get_projects_by_sample(&sample_id, query.limit, query.offset)
+        .get_projects_by_sample(&sample_id, query.limit, query.offset, parse_project_scope(query.scope.as_deref())?)
         .await?;
 
     let db_arc = state.services.samples.db_handle();

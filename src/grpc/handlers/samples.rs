@@ -44,6 +44,7 @@ impl SamplesHandler {
                 req.extension_filter,
                 req.min_usage_count,
                 req.max_usage_count,
+                crate::database::ProjectScope::default(),
             )
             .await?;
 
@@ -159,7 +160,7 @@ impl SamplesHandler {
 
         let (projects, total_count) = self
             .service
-            .get_projects_by_sample(&req.sample_id, req.limit, req.offset)
+            .get_projects_by_sample(&req.sample_id, req.limit, req.offset, crate::database::ProjectScope::default())
             .await?;
 
         let db_arc = self.service.db_handle();

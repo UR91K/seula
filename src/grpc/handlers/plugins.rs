@@ -50,6 +50,7 @@ impl PluginsHandler {
                 req.format_filter,
                 &install_states(&req.install_states),
                 req.min_usage_count,
+                crate::database::ProjectScope::default(),
             )
             .await?;
 
@@ -181,7 +182,7 @@ impl PluginsHandler {
 
         let (vendors, total_count) = self
             .service
-            .get_plugin_vendors(req.limit, req.offset, req.sort_by, req.sort_desc)
+            .get_plugin_vendors(req.limit, req.offset, req.sort_by, req.sort_desc, crate::database::ProjectScope::default())
             .await?;
 
         let proto_vendors = vendors
@@ -213,7 +214,7 @@ impl PluginsHandler {
 
         let (formats, total_count) = self
             .service
-            .get_plugin_formats(req.limit, req.offset, req.sort_by, req.sort_desc)
+            .get_plugin_formats(req.limit, req.offset, req.sort_by, req.sort_desc, crate::database::ProjectScope::default())
             .await?;
 
         let proto_formats = formats
@@ -243,7 +244,7 @@ impl PluginsHandler {
         debug!("GetPlugin request: {:?}", request);
         let req = request.into_inner();
 
-        match self.service.get_plugin(&req.plugin_id).await? {
+        match self.service.get_plugin(&req.plugin_id, crate::database::ProjectScope::default()).await? {
             Some(grpc_plugin) => {
                 let proto_plugin = Plugin {
                     id: grpc_plugin.plugin.id.to_string(),
@@ -279,7 +280,7 @@ impl PluginsHandler {
 
         let (projects, total_count) = self
             .service
-            .get_projects_by_plugin(&req.plugin_id, req.limit, req.offset)
+            .get_projects_by_plugin(&req.plugin_id, req.limit, req.offset, crate::database::ProjectScope::default())
             .await?;
 
         let db_arc = self.service.db_handle();

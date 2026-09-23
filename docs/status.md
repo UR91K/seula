@@ -90,6 +90,14 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **The sample list failed on a project-count filter combined with any other filter**
+  (found 2026-09-23, fixed 2026-09-23). The count query referred to the table alias `s`
+  from outside the subquery that defined it, so SQLite answered "no such column:
+  s.is_present". Rewritten along with ADR-0040. Test:
+  `archived_projects_count_only_in_the_all_scope` (`tests/database/project_counts.rs`).
+- **A plugin's or sample's project count disagreed with its used-in list** (found
+  2026-09-23, fixed 2026-09-23). The count included archived projects; the list did not.
+  Both now take a `scope`, active by default (ADR-0040).
 - **A rescan could never mark a sample missing** (found 2026-09-23, fixed 2026-09-23). The
   batch insert preloaded every stored sample and merged a rescan's presence into it with
   OR, then wrote it back with `is_present = EXCLUDED.is_present OR samples.is_present`.

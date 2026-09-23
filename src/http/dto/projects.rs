@@ -102,6 +102,8 @@ pub struct TaskDto {
 #[derive(Serialize)]
 pub struct ProjectDto {
     pub id: String,
+    /// False for an archived project. A list with `scope=all` mixes both (ADR-0040).
+    pub is_active: bool,
     pub name: String,
     pub path: String,
     pub hash: String,
@@ -195,6 +197,7 @@ pub fn project_to_dto(
 
     Ok(ProjectDto {
         id: project_id,
+        is_active: live_set.is_active,
         name: live_set.name,
         path: live_set.file_path.to_string_lossy().to_string(),
         hash: live_set.file_hash,

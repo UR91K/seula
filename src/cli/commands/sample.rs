@@ -64,6 +64,7 @@ impl SampleCommands {
             None,
             None,
             None,
+            crate::database::ProjectScope::default(),
         ).await?;
 
         let displayed = samples

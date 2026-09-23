@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 use crate::database::samples::{
     ExtensionAnalytics, SampleAnalytics, SampleRefreshResult, SampleStats, SampleUsageInfo,
 };
-use crate::database::ProjectDatabase;
+use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
 use crate::models::Sample;
 use crate::project::Project;
@@ -27,8 +27,9 @@ impl SamplesService {
     pub async fn project_counts(
         &self,
         ids: &[String],
+        scope: ProjectScope,
     ) -> Result<std::collections::HashMap<String, i32>, DatabaseError> {
-        self.db.lock().await.sample_project_counts(ids)
+        self.db.lock().await.sample_project_counts(ids, scope)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -43,6 +44,7 @@ impl SamplesService {
         format_filter: Option<String>,
         min_usage_count: Option<i32>,
         max_usage_count: Option<i32>,
+        scope: ProjectScope,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
         let db = self.db.lock().await;
         db.get_all_samples(
@@ -55,6 +57,7 @@ impl SamplesService {
             format_filter,
             min_usage_count,
             max_usage_count,
+            scope,
         )
     }
 
@@ -102,9 +105,10 @@ impl SamplesService {
         sample_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
+        scope: ProjectScope,
     ) -> Result<(Vec<Project>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.get_projects_by_sample_id(sample_id, limit, offset)
+        db.get_projects_by_sample_id(sample_id, limit, offset, scope)
     }
 
     pub async fn refresh_sample_presence_status(&self) -> Result<SampleRefreshResult, DatabaseError> {

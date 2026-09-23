@@ -111,6 +111,7 @@ impl PluginCommands {
             format.as_ref().map(|s| s.clone()),
             &install_states(installed),
             None, // min_usage_count
+            crate::database::ProjectScope::default(),
         ).await?;
 
         let displayed = plugins
@@ -177,7 +178,7 @@ impl PluginCommands {
         plugins: &PluginsService,
         plugin_id: &str,
     ) -> Result<PluginDetails, CliError> {
-        let plugin = plugins.get_plugin(plugin_id).await?;
+        let plugin = plugins.get_plugin(plugin_id, crate::database::ProjectScope::default()).await?;
 
         match plugin {
             Some(grpc_plugin) => Ok(PluginDetails {
@@ -207,6 +208,7 @@ impl PluginCommands {
             Some(0),  // offset
             Some("vendor".to_string()), // sort_by
             Some(false), // sort_desc
+            crate::database::ProjectScope::default(),
         ).await?;
 
         Ok(PluginVendorsDisplay {
@@ -221,6 +223,7 @@ impl PluginCommands {
             Some(0),  // offset
             Some("format".to_string()), // sort_by
             Some(false), // sort_desc
+            crate::database::ProjectScope::default(),
         ).await?;
 
         Ok(PluginFormatsDisplay {

@@ -8,7 +8,7 @@ use crate::database::plugins::{
     FormatInfo, InstallState, PluginFilter, PluginRefreshResult, PluginStats, VendorInfo,
 };
 use crate::config::CONFIG;
-use crate::database::ProjectDatabase;
+use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
 use crate::models::GrpcPlugin;
 use crate::project::Project;
@@ -32,8 +32,9 @@ impl PluginsService {
     pub async fn project_counts(
         &self,
         ids: &[String],
+        scope: ProjectScope,
     ) -> Result<std::collections::HashMap<String, i32>, DatabaseError> {
-        self.db.lock().await.plugin_project_counts(ids)
+        self.db.lock().await.plugin_project_counts(ids, scope)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -47,6 +48,7 @@ impl PluginsService {
         format_filter: Option<String>,
         install_states: &[InstallState],
         min_usage_count: Option<i32>,
+        scope: ProjectScope,
     ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
         let db = self.db.lock().await;
         db.get_all_plugins(
@@ -58,6 +60,7 @@ impl PluginsService {
             format_filter,
             install_states,
             min_usage_count,
+            scope,
         )
     }
 
@@ -108,9 +111,10 @@ impl PluginsService {
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
+        scope: ProjectScope,
     ) -> Result<(Vec<VendorInfo>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.get_plugin_vendors(limit, offset, sort_by, sort_desc)
+        db.get_plugin_vendors(limit, offset, sort_by, sort_desc, scope)
     }
 
     pub async fn get_plugin_formats(
@@ -119,14 +123,15 @@ impl PluginsService {
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
+        scope: ProjectScope,
     ) -> Result<(Vec<FormatInfo>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.get_plugin_formats(limit, offset, sort_by, sort_desc)
+        db.get_plugin_formats(limit, offset, sort_by, sort_desc, scope)
     }
 
-    pub async fn get_plugin(&self, plugin_id: &str) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    pub async fn get_plugin(&self, plugin_id: &str, scope: ProjectScope) -> Result<Option<GrpcPlugin>, DatabaseError> {
         let db = self.db.lock().await;
-        db.get_plugin_by_id(plugin_id)
+        db.get_plugin_by_id(plugin_id, scope)
     }
 
     pub async fn get_projects_by_plugin(
@@ -134,9 +139,10 @@ impl PluginsService {
         plugin_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
+        scope: ProjectScope,
     ) -> Result<(Vec<Project>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.get_projects_by_plugin_id(plugin_id, limit, offset)
+        db.get_projects_by_plugin_id(plugin_id, limit, offset, scope)
     }
 
     /// Rescan the system's plugins and record the result. Returns when the scan is

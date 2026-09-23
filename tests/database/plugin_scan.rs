@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use rusqlite::Connection;
 use seula::database::plugin_scan::PLUGIN_SCAN_COMPLETED_KEY;
 use seula::database::SCHEMA_VERSION;
-use seula::database::ProjectDatabase;
+use seula::database::{ProjectDatabase, ProjectScope};
 use seula::models::PluginKey;
 use seula::scan::plugins::{PluginScanResult, ScanReport};
 use tempfile::TempDir;
@@ -621,7 +621,7 @@ fn vendor_and_format_plugin_count_does_not_inflate_with_project_usage() {
     // ...plus a second, unrelated plugin, used once, from the same vendor and format.
     link_plugin_to_project(&db, &project_a, &_rarely_used);
 
-    let (vendors, _) = db.get_plugin_vendors(None, None, None, None).unwrap();
+    let (vendors, _) = db.get_plugin_vendors(None, None, None, None, ProjectScope::All).unwrap();
     let acme = vendors.iter().find(|v| v.vendor == "Acme").unwrap();
     // Two distinct plugins exist for this vendor, regardless of how many projects use
     // either of them.
@@ -629,7 +629,7 @@ fn vendor_and_format_plugin_count_does_not_inflate_with_project_usage() {
     assert_eq!(acme.unique_projects_using, 3);
     assert_eq!(acme.total_usage_count, 4);
 
-    let (formats, _) = db.get_plugin_formats(None, None, None, None).unwrap();
+    let (formats, _) = db.get_plugin_formats(None, None, None, None, ProjectScope::All).unwrap();
     let audiofx = formats.iter().find(|f| f.format == "VST3 AudioFx").unwrap();
     assert_eq!(audiofx.plugin_count, 2);
     assert_eq!(audiofx.unique_projects_using, 3);
@@ -650,7 +650,7 @@ fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
     insert_plugin(&db, "NeverLookedFor", "Acme", "VST3 AudioFx", None);
     insert_plugin(&db, "OtherVendorUnscanned", "Bolt", "VST2 Instrument", None);
 
-    let (vendors, _) = db.get_plugin_vendors(None, None, None, None).unwrap();
+    let (vendors, _) = db.get_plugin_vendors(None, None, None, None, ProjectScope::All).unwrap();
     assert_eq!(vendors.len(), 2);
 
     for vendor in &vendors {
@@ -671,7 +671,7 @@ fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
     let bolt = vendors.iter().find(|v| v.vendor == "Bolt").unwrap();
     assert_eq!(bolt.unknown_plugins, 1);
 
-    let (formats, _) = db.get_plugin_formats(None, None, None, None).unwrap();
+    let (formats, _) = db.get_plugin_formats(None, None, None, None, ProjectScope::All).unwrap();
     assert_eq!(formats.len(), 2);
 
     for format in &formats {

@@ -56,6 +56,8 @@ pub struct GetAllSamplesQuery {
     pub format_filter: Option<String>,
     pub min_project_count: Option<i32>,
     pub max_project_count: Option<i32>,
+    /// `active` (default) or `all`; see `parse_project_scope`.
+    pub scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -74,6 +76,13 @@ pub struct SearchSamplesQuery {
     pub offset: Option<i32>,
     pub present_only: Option<bool>,
     pub format_filter: Option<String>,
+    pub scope: Option<String>,
+}
+
+/// Routes whose only option is the project scope.
+#[derive(Deserialize)]
+pub struct ScopeQuery {
+    pub scope: Option<String>,
 }
 
 /// One sample format and its counts (`GET /api/v1/samples/formats`). Every known
@@ -99,4 +108,6 @@ pub struct SampleFormatListResponse {
 pub struct ProjectsBySampleQuery {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+    /// `all` includes archived projects, each marked by its `is_active`.
+    pub scope: Option<String>,
 }

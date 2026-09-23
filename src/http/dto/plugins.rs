@@ -84,6 +84,8 @@ pub struct GetAllPluginsQuery {
     pub format_filter: Option<String>,
     pub install_states: Option<String>,
     pub min_project_count: Option<i32>,
+    /// `active` (default) or `all`; see `parse_project_scope`.
+    pub scope: Option<String>,
 }
 
 /// Maps the HTTP sort key onto the database layer's, which still calls it
@@ -99,6 +101,7 @@ pub struct ByInstalledStatusQuery {
     pub offset: Option<i32>,
     pub sort_by: Option<String>,
     pub sort_desc: Option<bool>,
+    pub scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -109,6 +112,7 @@ pub struct SearchPluginsQuery {
     pub install_states: Option<String>,
     pub vendor_filter: Option<String>,
     pub format_filter: Option<String>,
+    pub scope: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -123,6 +127,14 @@ pub struct PaginationQuery {
     pub offset: Option<i32>,
     pub sort_by: Option<String>,
     pub sort_desc: Option<bool>,
+    /// For the vendor and format rollups' projects-using counts.
+    pub scope: Option<String>,
+}
+
+/// Routes whose only option is the project scope.
+#[derive(Deserialize)]
+pub struct ScopeQuery {
+    pub scope: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -169,4 +181,6 @@ pub struct PluginScanEventDto {
 pub struct ProjectsByPluginQuery {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+    /// `all` includes archived projects, each marked by its `is_active`.
+    pub scope: Option<String>,
 }

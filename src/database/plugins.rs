@@ -2,6 +2,8 @@ use crate::error::DatabaseError;
 use crate::models::{Plugin, GrpcPlugin};
 use rusqlite::params;
 
+use super::project_counts::ProjectScope;
+
 use super::ProjectDatabase;
 
 /// Which of the three `plugins.installed` categories a query should return.
@@ -115,7 +117,9 @@ impl ProjectDatabase {
         format_filter: Option<String>,
         install_states: &[InstallState],
         min_usage_count: Option<i32>,
+        scope: ProjectScope,
     ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
+        let scope_join = scope.join("pp.project_id");
         let sort_column = match sort_by.as_deref() {
             Some("name") => "name",
             Some("vendor") => "vendor",
@@ -167,7 +171,7 @@ impl ProjectDatabase {
                     SELECT 
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count
-                    FROM project_plugins pp
+                    FROM project_plugins pp {scope_join}
                     GROUP BY pp.plugin_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 {} 
@@ -218,7 +222,7 @@ impl ProjectDatabase {
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         COUNT(DISTINCT pp.project_id) as project_count
-                    FROM project_plugins pp
+                    FROM project_plugins pp {scope_join}
                     GROUP BY pp.plugin_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 {} 
@@ -242,7 +246,7 @@ impl ProjectDatabase {
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         COUNT(DISTINCT pp.project_id) as project_count
-                    FROM project_plugins pp
+                    FROM project_plugins pp {scope_join}
                     GROUP BY pp.plugin_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 {}
@@ -512,7 +516,9 @@ impl ProjectDatabase {
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
+        scope: ProjectScope,
     ) -> Result<(Vec<VendorInfo>, i32), DatabaseError> {
+        let scope_join = scope.join("pp.project_id");
         let sort_column = match sort_by.as_deref() {
             Some("vendor") => "vendor",
             Some("plugin_count") => "plugin_count",
@@ -558,7 +564,7 @@ impl ProjectDatabase {
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         pp.project_id
-                    FROM project_plugins pp
+                    FROM project_plugins pp {scope_join}
                     GROUP BY pp.plugin_id, pp.project_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 WHERE p.vendor IS NOT NULL
@@ -622,7 +628,9 @@ impl ProjectDatabase {
         offset: Option<i32>,
         sort_by: Option<String>,
         sort_desc: Option<bool>,
+        scope: ProjectScope,
     ) -> Result<(Vec<FormatInfo>, i32), DatabaseError> {
+        let scope_join = scope.join("pp.project_id");
         let sort_column = match sort_by.as_deref() {
             Some("format") => "format",
             Some("plugin_count") => "plugin_count",
@@ -668,7 +676,7 @@ impl ProjectDatabase {
                         pp.plugin_id,
                         COUNT(pp.project_id) as usage_count,
                         pp.project_id
-                    FROM project_plugins pp
+                    FROM project_plugins pp {scope_join}
                     GROUP BY pp.plugin_id, pp.project_id
                 ) usage_stats ON usage_stats.plugin_id = p.id
                 GROUP BY p.format
@@ -725,7 +733,8 @@ impl ProjectDatabase {
     }
 
     /// Get a single plugin by ID with usage statistics
-    pub fn get_plugin_by_id(&self, plugin_id: &str) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    pub fn get_plugin_by_id(&self, plugin_id: &str, scope: ProjectScope) -> Result<Option<GrpcPlugin>, DatabaseError> {
+        let scope_join = scope.join("pp.project_id");
         // Parse the plugin ID as UUID
         let uuid = match uuid::Uuid::parse_str(plugin_id) {
             Ok(uuid) => uuid,
@@ -733,7 +742,7 @@ impl ProjectDatabase {
         };
 
         // Build query with usage data
-        let query = r#"
+        let query = format!(r#"
             SELECT 
                 p.*,
                 COALESCE(usage_stats.usage_count, 0) as usage_count,
@@ -744,13 +753,13 @@ impl ProjectDatabase {
                     pp.plugin_id,
                     COUNT(pp.project_id) as usage_count,
                     COUNT(DISTINCT pp.project_id) as project_count
-                FROM project_plugins pp
+                FROM project_plugins pp {scope_join}
                 GROUP BY pp.plugin_id
             ) usage_stats ON usage_stats.plugin_id = p.id
             WHERE p.id = ?
-        "#;
+        "#);
 
-        let mut stmt = self.conn.prepare(query)?;
+        let mut stmt = self.conn.prepare(&query)?;
         let result = stmt.query_row(params![uuid.to_string()], |row| {
             let plugin = crate::database::helpers::row_to_plugin(row)?;
             

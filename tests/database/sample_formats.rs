@@ -1,7 +1,7 @@
 //! Samples are filtered and counted by format, not extension: `.aif`, `.aiff` and
 //! `.aifc` are all AIFF.
 
-use seula::database::ProjectDatabase;
+use seula::database::{ProjectDatabase, ProjectScope};
 use seula::models::SampleFormat;
 use tempfile::TempDir;
 
@@ -21,7 +21,7 @@ fn db_with(paths: &[&str]) -> (TempDir, ProjectDatabase) {
 
 fn names(db: &ProjectDatabase, format: &str) -> Vec<String> {
     let (samples, total) = db
-        .get_all_samples(None, None, Some("name".into()), None, None, None, Some(format.into()), None, None)
+        .get_all_samples(None, None, Some("name".into()), None, None, None, Some(format.into()), None, None, ProjectScope::Active)
         .unwrap();
     assert_eq!(total as usize, samples.len());
     samples.into_iter().map(|s| s.name).collect()

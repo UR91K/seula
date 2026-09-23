@@ -900,28 +900,32 @@ impl ProjectDatabase {
         sample_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
+        scope: super::project_counts::ProjectScope,
     ) -> Result<(Vec<Project>, i32), DatabaseError> {
+        let in_scope = scope.and_projects();
         // Get total count first
         let total_count: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT p.id) FROM projects p 
-             JOIN project_samples ps ON ps.project_id = p.id 
-             WHERE ps.sample_id = ? AND p.is_active = true",
+            &format!(
+                "SELECT COUNT(DISTINCT p.id) FROM projects p
+                 JOIN project_samples ps ON ps.project_id = p.id
+                 WHERE ps.sample_id = ? {in_scope}"
+            ),
             params![sample_id],
             |row| row.get(0),
         )?;
 
         // Get the projects with pagination
-        let query = "
-            SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
-            FROM projects p
-            JOIN project_samples ps ON ps.project_id = p.id
-            JOIN project_ableton_metadata a ON a.project_id = p.id
-            WHERE ps.sample_id = ? AND p.is_active = true
-            ORDER BY p.name ASC
-            LIMIT ? OFFSET ?
-        ";
+        let query = format!(
+            "SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
+             FROM projects p
+             JOIN project_samples ps ON ps.project_id = p.id
+             JOIN project_ableton_metadata a ON a.project_id = p.id
+             WHERE ps.sample_id = ? {in_scope}
+             ORDER BY p.name ASC
+             LIMIT ? OFFSET ?"
+        );
 
-        let mut stmt = self.conn.prepare(query)?;
+        let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             params![sample_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
             |row| row_to_project(row),
@@ -986,28 +990,32 @@ impl ProjectDatabase {
         plugin_id: &str,
         limit: Option<i32>,
         offset: Option<i32>,
+        scope: super::project_counts::ProjectScope,
     ) -> Result<(Vec<Project>, i32), DatabaseError> {
+        let in_scope = scope.and_projects();
         // Get total count first
         let total_count: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT p.id) FROM projects p 
-             JOIN project_plugins pp ON pp.project_id = p.id 
-             WHERE pp.plugin_id = ? AND p.is_active = true",
+            &format!(
+                "SELECT COUNT(DISTINCT p.id) FROM projects p
+                 JOIN project_plugins pp ON pp.project_id = p.id
+                 WHERE pp.plugin_id = ? {in_scope}"
+            ),
             params![plugin_id],
             |row| row.get(0),
         )?;
 
         // Get the projects with pagination
-        let query = "
-            SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
-            FROM projects p
-            JOIN project_plugins pp ON pp.project_id = p.id
-            JOIN project_ableton_metadata a ON a.project_id = p.id
-            WHERE pp.plugin_id = ? AND p.is_active = true
-            ORDER BY p.name ASC
-            LIMIT ? OFFSET ?
-        ";
+        let query = format!(
+            "SELECT DISTINCT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta
+             FROM projects p
+             JOIN project_plugins pp ON pp.project_id = p.id
+             JOIN project_ableton_metadata a ON a.project_id = p.id
+             WHERE pp.plugin_id = ? {in_scope}
+             ORDER BY p.name ASC
+             LIMIT ? OFFSET ?"
+        );
 
-        let mut stmt = self.conn.prepare(query)?;
+        let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             params![plugin_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
             |row| row_to_project(row),

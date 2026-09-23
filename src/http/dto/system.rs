@@ -25,6 +25,9 @@ use crate::http::dto::tags::TagDto;
 fn proto_project_to_dto(p: ProtoProject) -> ProjectDto {
     ProjectDto {
         id: p.id,
+        // The proto Project has no active flag. The statistics these come from are
+        // computed over active projects only.
+        is_active: true,
         name: p.name,
         path: p.path,
         hash: p.hash,

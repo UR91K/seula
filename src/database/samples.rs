@@ -19,6 +19,7 @@ impl ProjectDatabase {
         format_filter: Option<String>,
         min_usage_count: Option<i32>,
         max_usage_count: Option<i32>,
+        scope: super::project_counts::ProjectScope,
     ) -> Result<(Vec<Sample>, i32), DatabaseError> {
         let sort_column = match sort_by.as_deref() {
             Some("name") => "s.name",
@@ -53,20 +54,23 @@ impl ProjectDatabase {
             conditions.push(SampleFormat::sql_filter(&format, "s.path").unwrap_or_else(|| "0".into()));
         }
 
-        // Determine if we need to join with project_samples for usage count
-        let needs_usage_join = min_usage_count.is_some() || max_usage_count.is_some() || sort_by.as_deref() == Some("usage_count");
-
-        // Usage count filters - only apply when we're using the join approach
-        if needs_usage_join && (min_usage_count.is_some() || max_usage_count.is_some()) {
-            if let Some(min_count) = min_usage_count {
-                conditions.push("COALESCE(usage_count, 0) >= ?".into());
-                params.push(Box::new(min_count));
-            }
-            
-            if let Some(max_count) = max_usage_count {
-                conditions.push("COALESCE(usage_count, 0) <= ?".into());
-                params.push(Box::new(max_count));
-            }
+        // Project counts, in scope (ADR-0040). Always joined: the list is sorted and
+        // filtered by it, and a page of samples is cheap to count.
+        let usage = format!(
+            "LEFT JOIN (
+                SELECT ps.sample_id, COUNT(*) AS usage_count
+                FROM project_samples ps {}
+                GROUP BY ps.sample_id
+            ) usage_stats ON s.id = usage_stats.sample_id",
+            scope.join("ps.project_id")
+        );
+        if let Some(min_count) = min_usage_count {
+            conditions.push("COALESCE(usage_stats.usage_count, 0) >= ?".into());
+            params.push(Box::new(min_count));
+        }
+        if let Some(max_count) = max_usage_count {
+            conditions.push("COALESCE(usage_stats.usage_count, 0) <= ?".into());
+            params.push(Box::new(max_count));
         }
 
         let where_clause = if conditions.is_empty() {
@@ -75,41 +79,16 @@ impl ProjectDatabase {
             format!("WHERE {}", conditions.join(" AND "))
         };
 
-        // Build the base query
-        let base_query = if needs_usage_join {
-            r#"
-            SELECT s.*, COALESCE(usage_stats.usage_count, 0) as usage_count
-            FROM samples s
-            LEFT JOIN (
-                SELECT sample_id, COUNT(*) as usage_count
-                FROM project_samples
-                GROUP BY sample_id
-            ) usage_stats ON s.id = usage_stats.sample_id
-            "#
-        } else {
-            "SELECT s.*, 0 as usage_count FROM samples s"
-        };
-
-        // Get total count with filters
-        let count_query = if needs_usage_join {
-            format!("SELECT COUNT(*) FROM ({}) {}", base_query, where_clause)
-        } else {
-            format!("SELECT COUNT(*) FROM samples s {}", where_clause)
-        };
+        let count_query = format!("SELECT COUNT(*) FROM samples s {} {}", usage, where_clause);
         let mut count_stmt = self.conn.prepare(&count_query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let total_count: i32 = count_stmt.query_row(param_refs.as_slice(), |row| row.get(0))?;
 
-        // Build main query with pagination
         let main_query = format!(
-            "{} {} ORDER BY {} {} LIMIT ? OFFSET ?",
-            base_query, where_clause, sort_column, sort_order
+            "SELECT s.*, COALESCE(usage_stats.usage_count, 0) AS usage_count FROM samples s {} {}
+             ORDER BY {} {}, s.name ASC LIMIT ? OFFSET ?",
+            usage, where_clause, sort_column, sort_order
         );
-
-        // Debug logging
-        if min_usage_count.is_some() || max_usage_count.is_some() {
-            tracing::debug!("SQL Query: {}", main_query);
-        }
 
         // Add pagination parameters
         params.push(Box::new(limit.unwrap_or(1000)));

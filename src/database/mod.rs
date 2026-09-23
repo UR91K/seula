@@ -4,7 +4,7 @@ mod core;
 mod helpers;
 mod media;
 mod models;
-mod project_counts;
+pub mod project_counts;
 pub mod notes;
 pub mod plugin_details;
 pub mod plugin_scan;
@@ -18,6 +18,7 @@ pub mod tasks;
 
 pub use batch::BatchInsertManager;
 pub use core::{ProjectDatabase, SCHEMA_VERSION};
+pub use project_counts::ProjectScope;
 pub use plugin_scan::PluginScanPersist;
 pub use plugins::{PluginFilter, PluginStats};
 pub use samples::{SampleStats, SampleUsageInfo};
