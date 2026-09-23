@@ -9,3 +9,9 @@ spec.md
 appdata_roaming_junction/
 test_data/
 *.db
+# mockup data generator output; mock-api.js stays tracked so the mockups open directly
+/mockup/data/media/
+/mockup/data/mock-config.toml
+/mockup/data/mock-api.json
+# full-size cover originals; the mockups and generator use images/thumbs/ only
+/mockup/images/cover-*

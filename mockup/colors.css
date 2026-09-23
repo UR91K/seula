@@ -1,0 +1,96 @@
+/* Seula colours. Hand-edited; nothing else in the mockups sets a colour.
+ *
+ * Dark is the default. Put data-theme="light" on any element to switch it and
+ * everything inside it, so two frames on one page can show both themes.
+ *
+ * Status colours follow the Okabe-Ito colour-blind-safe set, and installed/present
+ * vs missing never relies on hue alone: the mockups pair each with an icon.
+ * "Unknown" (a plugin no scan has looked at, ADR-0012) must stay visibly different
+ * from "missing".
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* surfaces, back to front */
+  --bg:              #1c1c1c;  /* window background, gaps between regions */
+  --bar:             #202020;  /* top bar and status bar */
+  --panel:           #202020;  /* sidebar and inspector */
+  --surface:         #191919;  /* table and main content */
+  --row-alt:         #1d1d1d;  /* zebra stripe; set equal to --surface to turn it off */
+  --header:          #232323;  /* table column headers */
+  --field:           #141414;  /* text inputs */
+
+  /* lines */
+  --border:          #3a3a3a;  /* region dividers, input borders */
+  --border-lo:       #2b2b2b;  /* column separators, row rules */
+
+  /* text */
+  --text:            #e4e4e4;
+  --text-2:          #a6a6a6;  /* secondary: file names, labels */
+  --text-3:          #717171;  /* tertiary: counts, disabled */
+
+  /* interaction */
+  --accent:          #4ca2e6;
+  --accent-text:     #ffffff;  /* text on an --accent fill */
+  --hover:           #2a2d30;
+  --select:          #1f3d5a;  /* selected row, focused list */
+  --select-border:   #2f5f8c;
+  --select-inactive: #333333;  /* selected row while its list is unfocused */
+  --focus:           #4ca2e6;
+
+  /* status */
+  --ok:              #2bb08a;  /* installed / present */
+  --missing:         #e5673a;  /* missing */
+  --unknown:         #8a8a8a;  /* never scanned */
+  --warning:         #e6a23c;
+  --danger:          #e5673a;
+  --progress:        #4ca2e6;
+
+  --tag-bg:          #2c2f33;
+  --tag-text:        #c8c8c8;
+
+  --close:           #c42b1c;  /* window close button hover, the Windows red */
+  --close-text:      #ffffff;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:              #f0f0f0;
+  --bar:             #f3f3f3;
+  --panel:           #f7f7f7;
+  --surface:         #ffffff;
+  --row-alt:         #f7f7f7;
+  --header:          #ffffff;
+  --field:           #ffffff;
+
+  --border:          #d0d0d0;
+  --border-lo:       #e6e6e6;
+
+  --text:            #1a1a1a;
+  --text-2:          #5c5c5c;
+  --text-3:          #8f8f8f;
+
+  --accent:          #0067c0;
+  --accent-text:     #ffffff;
+  --hover:           #e5f1fb;
+  --select:          #cce8ff;
+  --select-border:   #99d1ff;
+  --select-inactive: #d9d9d9;
+  --focus:           #0067c0;
+
+  --ok:              #007a5a;
+  --missing:         #c24e00;
+  --unknown:         #7a7a7a;
+  --warning:         #a86b00;
+  --danger:          #c24e00;
+  --progress:        #06b025;  /* the Windows progress-bar green */
+
+  --tag-bg:          #e8e8e8;
+  --tag-text:        #333333;
+
+  --close:           #c42b1c;
+  --close-text:      #ffffff;
+}

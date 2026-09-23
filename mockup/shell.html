@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula shell</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  /* Board chrome only: the page the frames sit on. Not part of the app. */
+  body { padding: calc(var(--u) * 16); }
+  .board-head { max-width: calc(var(--u) * 600); margin-bottom: calc(var(--u) * 12); }
+  .board-head h1 { font-size: var(--step-up); font-weight: 600; margin-bottom: calc(var(--u) * 3); }
+  .board-head p, .board-head li { color: var(--text-2); }
+  .board-head ul { margin: calc(var(--u) * 3) 0 0 calc(var(--u) * 8); }
+  .board-head code { color: var(--text); }
+  .scale { display: flex; align-items: center; gap: calc(var(--u) * 2); margin-top: calc(var(--u) * 6); color: var(--text-2); }
+  .scale button { height: var(--hdr); padding: 0 calc(var(--u) * 4); background: var(--field); border: 1px solid var(--border); border-radius: var(--radius); }
+  .scale button.on { border-color: var(--accent); color: var(--accent); }
+
+  .frame-wrap { margin-bottom: calc(var(--u) * 20); }
+  .frame-label { font-weight: 600; margin-bottom: calc(var(--u) * 3); }
+  .frame-label span { font-weight: normal; color: var(--text-2); }
+  .frame > .win { width: calc(var(--u) * 600); height: calc(var(--u) * 350); }
+</style>
+</head>
+<body>
+
+<div class="board-head">
+  <h1>Seula · shell</h1>
+  <p>The frame only, for review before any view is built (ADR-0032). One render function
+  draws every frame below; views will fill the three slots it leaves open and nothing
+  else. The table is a density sample: real rows from the mock API at the stated
+  metrics, not the projects view.</p>
+  <ul>
+    <li>Top bar and status bar span the full width; sidebar, main area and inspector sit between them.</li>
+    <li>Rows <code>1.5rem</code>, header <code>11/6rem</code>, cell padding <code>2/3rem</code> × <code>1/6rem</code>, one font at two sizes.</li>
+    <li>Everything is live: click the sidebar, the collapse and inspector buttons, and rows (Ctrl-click adds).</li>
+    <li>Colours are <code>colors.css</code> only. Dark is the default; frame 1b is the light set.</li>
+  </ul>
+  <div class="scale">Root font
+    <button data-pt="8">8pt</button><button data-pt="9" class="on">9pt</button><button data-pt="10">10pt</button><button data-pt="11">11pt</button>
+    <span>· everything scales from this one value; nothing should stay behind</span>
+  </div>
+</div>
+
+<div class="frame-wrap">
+  <div class="frame-label">1 · Projects, inspector open <span>— one row selected, Tauri target with window controls</span></div>
+  <div class="frame" id="f1"></div>
+</div>
+
+<div class="frame-wrap">
+  <div class="frame-label">1b · Same, light theme <span>— browser target, so no window controls</span></div>
+  <div class="frame" id="f1b" data-theme="light"></div>
+</div>
+
+<div class="frame-wrap">
+  <div class="frame-label">1c · Sidebar collapsed, inspector closed, scanning <span>— three rows selected; the sidebar keeps its icons, never zero width</span></div>
+  <div class="frame" id="f1c"></div>
+</div>
+
+<div class="frame-wrap">
+  <div class="frame-label">1d · Stats <span>— the one view with no inspector, so no toggle either</span></div>
+  <div class="frame" id="f1d"></div>
+</div>
+
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script>
+  // ---------------------------------------------------------------- density sample
+
+  const collectionsOf = (p) => data.collections.filter((c) => p.collection_ids.includes(c.id));
+  const byModified = [...data.projects].sort((a, b) => b.modified_at - a.modified_at);
+
+  // Default selection: a project that exercises the inspector -- one collection with
+  // cover art, tasks, and at least one missing plugin.
+  const showcase = byModified.find((p) =>
+    p.collection_ids.length === 1 && coverUrl(collectionsOf(p)[0]) &&
+    p.tasks.length >= 2 && p.plugins.some((x) => x.installed === false)) || byModified[0];
+
+  const COLS = [
+    ["", ""], ["Name", ""], ["Tags", ""], ["Date modified", "sorted"], ["Tempo", "num"],
+    ["Key", ""], ["Time", "num"], ["Length", "num"], ["Live", ""], ["Plugins", "num"], ["Samples", "num"],
+  ];
+
+  function projectRows(selected) {
+    return byModified.map((p) => {
+      const stem = fileStem(p.path);
+      const file = stem !== p.name ? ` <span class="faint">${esc(stem)}.als</span>` : "";
+      const audio = p.audio_file_id ? icon("play_arrow", "fill") : `<span class="faint">${icon("add")}</span>`;
+      return `<tr data-id="${p.id}" class="${selected.has(p.id) ? "sel" : ""}">
+        <td>${audio}</td>
+        <td>${esc(p.name)}${file}</td>
+        <td>${p.tags.map((t) => `<span class="tag">${esc(t.name)}</span>`).join("")}</td>
+        <td class="dim">${fmtDate(p.modified_at)}</td>
+        <td class="num">${fmtTempo(p.tempo)}</td>
+        <td>${fmtKey(p.key_signature)}</td>
+        <td class="num">${p.time_signature.numerator}/${p.time_signature.denominator}</td>
+        <td class="num">${fmtLength(p.duration_seconds)}</td>
+        <td class="dim">${fmtVersion(p.ableton_version)}</td>
+        <td class="num">${p.plugins.length || ""}</td>
+        <td class="num">${p.samples.length || ""}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function projectTable(selected) {
+    const head = COLS.map(([label, cls]) =>
+      `<th class="${cls}">${label}${cls === "sorted" ? icon("arrow_downward") : ""}</th>`).join("");
+    return `<table class="grid"><thead><tr>${head}</tr></thead><tbody>${projectRows(selected)}</tbody></table>`;
+  }
+
+  function projectInspector(p) {
+    if (!p) return `<div class="placeholder">Nothing selected</div>`;
+    const cols = collectionsOf(p);
+    const cover = cols.length === 1 && coverUrl(cols[0]);
+    const list = (items, render, max = 8) =>
+      `<ul class="plain">${items.slice(0, max).map(render).join("")}${items.length > max ? `<li class="faint">and ${items.length - max} more</li>` : ""}</ul>`;
+    return `
+      <div class="insp-head">
+        ${cover ? `<img src="${cover}" alt="">` : ""}
+        <div><h2>${esc(p.name)}</h2>${pathChip(p.path)}</div>
+      </div>
+      <div class="insp-sec"><h3>Project</h3>
+        <dl class="props">
+          <dt>Tempo</dt><dd>${fmtTempo(p.tempo)} BPM</dd>
+          <dt>Key</dt><dd>${fmtKey(p.key_signature) || '<span class="faint">none</span>'}</dd>
+          <dt>Time</dt><dd>${p.time_signature.numerator}/${p.time_signature.denominator}</dd>
+          <dt>Length</dt><dd>${fmtLength(p.duration_seconds)}</dd>
+          <dt>Live</dt><dd>${fmtVersion(p.ableton_version)}</dd>
+          <dt>Created</dt><dd>${fmtDate(p.created_at)}</dd>
+          <dt>Modified</dt><dd>${fmtDate(p.modified_at)}</dd>
+        </dl>
+      </div>
+      <div class="insp-sec"><h3>Tags</h3>${p.tags.map((t) => `<span class="tag">${esc(t.name)}</span>`).join("") || '<span class="faint">none</span>'}</div>
+      <div class="insp-sec"><h3>Collections <span class="count">${cols.length}</span></h3>
+        ${list(cols, (c) => `<li>${icon("album")}<span class="grow">${esc(c.name)}</span></li>`)}</div>
+      <div class="insp-sec"><h3>Tasks <span class="count">${p.tasks.filter((t) => t.completed).length}/${p.tasks.length}</span></h3>
+        ${list(p.tasks, (t) => `<li>${icon(t.completed ? "check_box" : "check_box_outline_blank", t.completed ? "fill" : "")}<span class="grow ${t.completed ? "faint" : ""}">${esc(t.description)}</span></li>`)}</div>
+      <div class="insp-sec"><h3>Plugins <span class="count">${p.plugins.length}</span></h3>
+        ${list(p.plugins, (x) => `<li>${pluginStatus(x.installed)}<span class="grow">${esc(x.name)}</span><span class="faint">${esc(x.vendor || "")}</span></li>`, 12)}</div>
+      <div class="insp-sec"><h3>Samples <span class="count">${p.samples.length}</span></h3>
+        ${list(p.samples, (x) => `<li>${sampleStatus(x.is_present)}<span class="grow">${esc(x.name)}</span></li>`)}</div>`;
+  }
+
+  // ---------------------------------------------------------------- frames
+
+  const VIEW_TITLES = { projects: "Projects", collections: "Collections", plugins: "Plugins", samples: "Samples", stats: "Stats" };
+
+  function viewbarFor(view) {
+    if (view !== "projects") return `<h1>${VIEW_TITLES[view]}</h1>`;
+    return `<h1>Projects</h1>
+      <span class="select"><span class="k">Show</span> Active ${icon("expand_more")}</span>
+      <span class="select"><span class="k">Tag</span> Any ${icon("expand_more")}</span>
+      <span class="sep"></span>
+      <button class="tb-btn" title="Add projects">${icon("add")}</button>
+      <button class="tb-btn" title="Columns">${icon("view_column")}</button>`;
+  }
+
+  function render(el, st) {
+    const selected = st.selected;
+    const isProjects = st.view === "projects";
+    const sel = [...selected].map((id) => data.projects.find((p) => p.id === id));
+    el.innerHTML = renderShell({
+      ...st,
+      viewbar: viewbarFor(st.view),
+      content: isProjects ? projectTable(selected) : `<div class="placeholder">${VIEW_TITLES[st.view]} view · built after the shell is approved</div>`,
+      inspector: isProjects ? (sel.length === 1 ? projectInspector(sel[0]) : `<div class="placeholder">${sel.length ? `${sel.length} projects selected` : "Nothing selected"}</div>`)
+                            : `<div class="placeholder">Selection details</div>`,
+      status: isProjects
+        ? [`${data.projects.length} projects`, ...(selected.size ? [`${selected.size} selected`] : [])]
+        : st.view === "stats" ? [`${data.projects.length} projects · ${data.plugins.length} plugins · ${data.samples.length} samples`]
+        : [`${VIEWS.find((v) => v.id === st.view).count()} items`],
+    });
+  }
+
+  function mount(id, st) {
+    const el = document.getElementById(id);
+    render(el, st);
+    const first = el.querySelector("tr.sel");
+    const box = el.querySelector(".content");
+    if (first && box) box.scrollTop = first.offsetTop - box.clientHeight / 3;
+    el.addEventListener("click", (e) => {
+      const nav = e.target.closest("[data-nav]");
+      const act = e.target.closest("[data-act]");
+      const row = e.target.closest("tr[data-id]");
+      if (nav) st.view = nav.dataset.nav;
+      else if (act?.dataset.act === "sidebar") st.sidebarCollapsed = !st.sidebarCollapsed;
+      else if (act?.dataset.act === "inspector") st.inspectorOpen = !st.inspectorOpen;
+      else if (row) {
+        const rid = row.dataset.id;
+        if (e.ctrlKey || e.metaKey) st.selected.has(rid) ? st.selected.delete(rid) : st.selected.add(rid);
+        else st.selected = new Set([rid]);
+      } else return;
+      const scroll = el.querySelector(".content")?.scrollTop;
+      render(el, st);
+      const c = el.querySelector(".content");
+      if (c && scroll) c.scrollTop = scroll;
+    });
+  }
+
+  mount("f1", { view: "projects", inspectorOpen: true, tauri: true, selected: new Set([showcase.id]) });
+  mount("f1b", { view: "projects", inspectorOpen: true, tauri: false, selected: new Set([showcase.id]) });
+  mount("f1c", {
+    view: "projects", sidebarCollapsed: true, inspectorOpen: false, tauri: true,
+    selected: new Set(byModified.slice(3, 6).map((p) => p.id)),
+    scan: { done: 112, total: 240, message: "C:\\Users\\producer\\Music\\Ableton\\Projects\\night groove Project\\night groove.als" },
+  });
+  mount("f1d", { view: "stats", inspectorOpen: true, tauri: true, selected: new Set() });
+
+  // ---------------------------------------------------------------- root font
+
+  document.querySelector(".scale").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-pt]");
+    if (!b) return;
+    document.documentElement.style.fontSize = `${b.dataset.pt}pt`;
+    document.querySelectorAll(".scale button").forEach((x) => x.classList.toggle("on", x === b));
+  });
+</script>
+</body>
+</html>
