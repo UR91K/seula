@@ -91,7 +91,7 @@ function pageOf(st, rows) {
   return rows.slice(start, start + st.pageSize);
 }
 
-function leadCells(p, { renaming = false, showEdit = false, showAdd = false } = {}) {
+function leadCells(p, { renaming = false, showEdit = false, showAdd = false, checked = false } = {}) {
   const cover = projectCover(p);
   const audio = p.audio_file_id
     ? `<span class="play ${cover ? "cover" : ""}" ${cover ? `style="background-image:url('${cover}')"` : ""} title="Play audition audio">${icon("play_arrow", "fill")}</span>`
@@ -100,7 +100,7 @@ function leadCells(p, { renaming = false, showEdit = false, showAdd = false } = 
   const name = renaming
     ? `<span class="namecell"><input value="${esc(p.name)}"></span>`
     : `<span class="namecell"><span class="n">${esc(p.name)}</span>${stem !== p.name ? `<span class="f">${esc(stem)}.als</span>` : ""}<span class="edit ${showEdit ? "show" : ""}" title="Rename (F2)">${icon("edit")}</span></span>`;
-  return `<td class="lead">${audio}</td><td>${name}</td><td>${p.tags.map(tagChip).join("")}</td>`;
+  return `<td class="lead check" data-act="rowcheck">${cb(checked)}</td><td class="lead">${audio}</td><td>${name}</td><td>${p.tags.map(tagChip).join("")}</td>`;
 }
 
 /**
@@ -116,12 +116,13 @@ function projectTable(st, rows) {
   const th = (id, label, w, cls = "") =>
     `<th class="${cls} ${st.sort && st.sort.col === id ? "sorted" : ""}" data-sort="${id}" style="width:calc(var(--u) * ${w})">${label}${sortIcon(id)}<span class="grip"></span></th>`;
 
-  const head = `<th class="lead" style="width:calc(var(--u) * 12)" data-act="selectall" title="Select all on this page">${cb(allOn ? true : someOn ? "mixed" : false)}</th>`
+  const head = `<th class="lead check" style="width:calc(var(--u) * 11)" data-act="selectall" title="Select all on this page">${cb(allOn ? true : someOn ? "mixed" : false)}</th>`
+    + `<th class="lead" style="width:calc(var(--u) * 10)" title="Audition audio"></th>`
     + th("name", "Name", 100) + th("tags", "Tags", 64)
     + cols.map((c) => th(c.id, c.label, c.w, (c.cls || "").includes("num") ? "num" : "")).join("");
 
   const body = page.map((p) => `<tr data-id="${p.id}" class="${st.selected.has(p.id) ? "sel" : ""}">${
-    leadCells(p, { renaming: st.renaming === p.id })}${
+    leadCells(p, { renaming: st.renaming === p.id, checked: st.selected.has(p.id) })}${
     cols.map((c) => `<td class="${c.cls || ""} ${st.hot && st.hot.id === p.id && st.hot.kind === c.hover ? "hot" : ""}" ${c.hover ? `data-hover="${c.hover}"` : ""}>${c.cell(p)}</td>`).join("")
   }</tr>`).join("");
 
@@ -335,7 +336,7 @@ function tagManager(mode = null) {
       <td style="text-align:right" class="faint">${icon("edit")} ${icon("delete")}</td></tr>`;
   }).join("");
   return dialog("Manage tags", `
-    <div style="display:flex;gap:calc(var(--u) * 3)"><label class="field" style="flex:1">${icon("sell")}<span style="color:var(--text-3)">New tag name</span></label>${btn("Create", "", "none")}</div>
+    <div class="row"><label class="field">${icon("sell")}<span style="color:var(--text-3)">New tag name</span></label>${btn("Create", "", "none")}</div>
     <div class="gridbox"><table class="grid"><thead><tr><th>Tag</th><th class="num" style="width:calc(var(--u) * 30)">Projects</th><th style="width:calc(var(--u) * 24)"></th></tr></thead><tbody>${rows}</tbody></table></div>
     ${mode && mode.rename ? `<p class="dim" style="margin-top:calc(var(--u) * 3)">Renaming applies to every project with this tag.</p>` : ""}`,
     btn("Close", "primary"), { width: 180 });

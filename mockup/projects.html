@@ -28,9 +28,11 @@
   // A project that exercises every inspector section, near the top so it is in view.
   // Searched across all projects: the first page rarely has one with every section filled.
   const showcase = [
+    // Most sections filled first; a detected key outranks tags and notes.
     (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 3 && p.notes && p.tags.length && missingPlugins(p),
     (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 2 && p.notes && p.tags.length,
-    (p) => p.audio_file_id && projectCover(p) && p.tasks.length >= 2 && p.notes && p.tags.length,
+    (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 2 && (p.notes || p.tags.length),
+    (p) => p.audio_file_id && projectCover(p) && p.key_signature && p.tasks.length >= 2,
     (p) => p.audio_file_id && projectCover(p) && p.tasks.length >= 2,
   ].map((f) => data.projects.find(f)).find(Boolean);
   const sparse = pick((p) => !p.tags.length && !p.tasks.length && !p.notes && !p.collection_ids.length && !p.audio_file_id);
@@ -69,10 +71,11 @@
       [renameMe, {}, "display name differs from the file name"],
       [renameMe, { showEdit: true }, "row hover: pencil renames (F2)"],
       [renameMe, { renaming: true }, "renaming inline: Enter saves, Esc cancels"],
+      [withCover, { checked: true }, "checked: selected; the header shows mixed"],
     ];
-    return `<table class="grid fixed" style="width:calc(var(--u) * 290)"><thead><tr>
-      <th class="lead" style="width:calc(var(--u) * 12)">${cb(false)}</th><th style="width:calc(var(--u) * 100)">Name</th><th style="width:calc(var(--u) * 64)">Tags</th><th>State</th></tr></thead>
-      <tbody>${rows.map(([p, o, what]) => `<tr>${leadCells(p, o)}<td class="faint">${what}</td></tr>`).join("")}</tbody></table>`;
+    return `<table class="grid fixed" style="width:calc(var(--u) * 300)"><thead><tr>
+      <th class="lead check" style="width:calc(var(--u) * 11)">${cb("mixed")}</th><th class="lead" style="width:calc(var(--u) * 10)"></th><th style="width:calc(var(--u) * 100)">Name</th><th style="width:calc(var(--u) * 64)">Tags</th><th>State</th></tr></thead>
+      <tbody>${rows.map(([p, o, what]) => `<tr class="${o.checked ? "sel" : ""}">${leadCells(p, o)}<td class="faint">${what}</td></tr>`).join("")}</tbody></table>`;
   }
 
   // ---------------------------------------------------------------- the board

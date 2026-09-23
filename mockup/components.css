@@ -130,8 +130,11 @@ textarea.notes::placeholder { color: var(--text-3); }
 .dialog .dh .x { width: calc(var(--u) * 20); align-self: stretch; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
 .dialog .dh .x:hover { background: var(--close); color: var(--close-text); }
 .dialog .db { padding: calc(var(--u) * 5); }
-.dialog .db p + p, .dialog .db p + .field, .dialog .db .field + .field, .dialog .db label + .field { margin-top: calc(var(--u) * 3); }
-.dialog .db label { display: block; margin-top: calc(var(--u) * 4); margin-bottom: var(--u); color: var(--text-2); }
+.dialog .db p + p { margin-top: calc(var(--u) * 3); }
+/* caption labels only: a .field is also a <label>, and must keep its flex layout */
+.dialog .db label:not(.field) { display: block; margin-top: calc(var(--u) * 4); margin-bottom: var(--u); color: var(--text-2); }
+.dialog .db .row { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.dialog .db .row .field { flex: 1; }
 .dialog .db .warn { display: flex; gap: calc(var(--u) * 3); }
 .dialog .db .warn > .ms { color: var(--warning); font-size: calc(var(--u) * 12); width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
 .dialog .db .dim { color: var(--text-2); }
@@ -158,6 +161,8 @@ table.grid th { position: sticky; }
 table.grid th .grip { position: absolute; top: 0; right: calc(var(--u) * -2); width: calc(var(--u) * 4); height: 100%; cursor: col-resize; z-index: 2; }
 table.grid th.lead { text-align: center; padding: 0; }
 table.grid td.lead { padding: 0; text-align: center; }
+/* the row checkbox sits in the line box so the row stays 1.5rem */
+table.grid td.check .cb, table.grid th.check .cb { vertical-align: top; margin-top: calc(var(--u) / 4); }
 
 /* audition cell: a 14px button; the collection cover sits behind the play glyph */
 .play {

@@ -85,7 +85,7 @@ function projectsScreen(st) {
       let { x, y } = st.menu;
       if (x == null && row) {
         // Fixed frames: open where a right-click on the name would.
-        const r = row.children[1].getBoundingClientRect(), w = win.getBoundingClientRect(), z = w.width / win.offsetWidth;
+        const r = row.querySelector(".namecell").getBoundingClientRect(), w = win.getBoundingClientRect(), z = w.width / win.offsetWidth;
         x = (r.left - w.left) / z + 40; y = (r.top - w.top) / z + 9;
       }
       const m = place(win, ctx, { x, y });
@@ -158,6 +158,13 @@ function projectsScreen(st) {
         return redraw();
       }
       if (act === "close") { closeAll(); return redraw(); }
+      if (act === "rowcheck") {
+        // A row checkbox toggles that row alone, like Ctrl-click.
+        const id = row.dataset.id;
+        st.selected.has(id) ? st.selected.delete(id) : st.selected.add(id);
+        st.anchor = id; st.tasksSel = new Set(); closeAll();
+        return redraw();
+      }
       if (inPop || e.target.closest(".scrim")) return;
 
       if (task) {
