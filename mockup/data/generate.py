@@ -30,6 +30,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -44,10 +45,17 @@ MEDIA_DIR = HERE / "media"
 CONFIG = HERE / "mock-config.toml"
 OUT_JSON = HERE / "mock-api.json"
 OUT_JS = HERE / "mock-api.js"
+# For the snapshot of a real plugin scan: empty files named like plugins, scanned by a
+# second server over a throwaway copy of the database.
+FAKE_PLUGINS = HERE / "fake-plugins"
+SCAN_DB = HERE / "seula-scan.db"
+SCAN_CONFIG = HERE / "mock-scan-config.toml"
 
 # Off the defaults (50051/50052) so a running real daemon does not collide.
 GRPC_PORT = 50151
 HTTP_PORT = 50152
+SCAN_GRPC_PORT = 50153
+SCAN_HTTP_PORT = 50154
 
 rng = random.Random(20260923)
 
@@ -145,6 +153,32 @@ PLUGINS = [
     ("Uhbik-T", "u-he", "VST2", False, True), ("Unknown Plugin", None, "VST2", False, None),
 ]
 
+# What a scan reports as the category, by plugin. VST3 subcategory strings; vst-meta
+# maps VST2's category enum onto the same shape.
+CATEGORIES = {
+    "Pro-Q 3": "Fx|EQ", "Pro-C 2": "Fx|Dynamics", "Pro-L 2": "Fx|Dynamics",
+    "Saturn 2": "Fx|Distortion", "Pro-R 2": "Fx|Reverb", "OTT": "Fx",
+    "ValhallaVintageVerb": "Fx|Reverb", "ValhallaSupermassive": "Fx|Reverb|Delay",
+    "ValhallaDelay": "Fx", "Decapitator": "Fx|Distortion", "EchoBoy": "Fx|Delay",
+    "Little AlterBoy": "Fx|Pitch Shift", "soothe2": "Fx|EQ", "RC-20 Retro Color": "Fx",
+    "Ozone 11 Maximizer": "Fx|Mastering", "Neutron 4": "Fx|Mastering",
+    "RX 10 De-click": "Fx|Restoration", "ShaperBox 3": "Fx|Modulation",
+    "PhaseMistress": "Fx", "Kickstart 2": "Fx|Dynamics", "LFOTool": "Fx",
+    "Portal": "Fx|Delay", "Sausage Fattener": "Fx", "CamelCrusher": "Fx",
+    "Tube Screamer": "Fx", "Youlean Loudness Meter 2": "Fx|Analyzer",
+    "SPAN": "Fx|Analyzer", "Sonible smart:EQ 4": "Fx|EQ",
+    "Kilohearts Disperser": "Fx|Filter", "Raum": "Fx|Reverb", "Uhbik-T": "Fx",
+    "Kontakt 7": "Instrument|Sampler", "TAL-Sampler": "Instrument",
+    "Addictive Drums 2": "Instrument", "Arcade": "Instrument|Sampler",
+}
+# Vendors whose plugins report a URL; the rest report none, as many real ones do.
+VENDOR_URLS = {
+    "FabFilter": "https://www.fabfilter.com", "u-he": "https://u-he.com",
+    "Valhalla DSP": "https://valhalladsp.com", "Native Instruments": "https://www.native-instruments.com",
+    "Arturia": "https://www.arturia.com", "iZotope": "https://www.izotope.com",
+    "Kilohearts": "https://kilohearts.com", "Soundtoys": "https://www.soundtoys.com",
+}
+
 SAMPLE_DIRS = [
     r"C:\Users\producer\Splice\sounds\packs\{pack}",
     r"C:\Users\producer\Music\Samples\{pack}",
@@ -175,6 +209,77 @@ def project_names(n: int) -> list[str]:
             seen.add(name)
             out.append(name)
     return out
+
+
+def seed_scan_details(conn, pid, name, vendor, kind, instr, installed, uid_hex, folder, ext, now):
+    """The rest of what a scan records: buses, MIDI, latency, format extras, VST3 classes.
+
+    From a per-plugin stream, so the main rng -- and so every other row -- is the same
+    as before this existed. A sweep keeps the scanner columns of a plugin it no longer
+    finds (``sweep_unseen`` only clears ``installed``), so some missing plugins carry an
+    old scan record: they were installed once, and have been removed since.
+    """
+    prng = random.Random(pid)
+    was_found = installed is True or (installed is False and prng.random() < 0.6)
+    if not was_found:
+        return
+    category = CATEGORIES.get(name, "Instrument|Synth" if instr else "Fx")
+    if kind == "VST2" and category.startswith("Instrument"):
+        category = "Instrument"
+    sidechain = not instr and prng.random() < 0.4
+    extra_outs = instr and prng.random() < 0.3
+    fields = dict(
+        path=f"{folder}\\{name}.{ext}",
+        category=category,
+        is_instrument=int(instr),
+        audio_in_channels=4 if sidechain else (0 if instr else 2),
+        audio_out_channels=16 if extra_outs else 2,
+        has_midi_input=int(instr or prng.random() < 0.15),
+        has_midi_output=int(prng.random() < 0.08),
+        latency_samples=0 if instr else prng.choice([0, 0, 0, 0, 64, 256, 1024, 4096]),
+        has_gui=1,
+        vendor_url=VENDOR_URLS.get(vendor),
+        is_shell=0,
+    )
+    if installed is False:
+        # The scan that stopped finding it.
+        fields["last_scanned_at"] = now - 86400 * 2
+    if kind == "VST3":
+        fields["audio_in_buses"] = 0 if instr else (2 if sidechain else 1)
+        fields["audio_out_buses"] = 8 if extra_outs else 1
+        fields["factory_flags"] = prng.choice([16, 16, 17, 24])
+    else:
+        fields.update(
+            fourcc="".join(prng.choice("ABCDEFGHKLMNPRSTVXZabcdefghklmnprstuvxz0123456789") for _ in range(4)),
+            preset_chunks=int(prng.random() < 0.8),
+            f64_precision=int(prng.random() < 0.3),
+            silent_when_stopped=int(prng.random() < 0.2),
+            midi_in_channels=16 if instr else 0,
+            midi_out_channels=0,
+        )
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    conn.execute(f"UPDATE plugins SET {sets} WHERE id = ?", (*fields.values(), pid))
+
+    if kind != "VST3":
+        return
+    version = f"{prng.randint(1, 4)}.{prng.randint(0, 12)}.{prng.randint(0, 9)}"
+    controller = f"{prng.getrandbits(128):032x}"
+    conn.execute("INSERT INTO plugin_classes VALUES (?,?,?,?,?,?)",
+                 (pid, name, "Audio Module Class", uid_hex, 2147483647, version))
+    conn.execute("INSERT INTO plugin_classes VALUES (?,?,?,?,?,?)",
+                 (pid, f"{name} Controller", "Component Controller Class", controller, 2147483647, version))
+    buses = []
+    if not instr:
+        buses.append(("input", "audio", "Stereo In", 2, 0, 1))
+        if sidechain:
+            buses.append(("input", "audio", "Sidechain", 2, 1, 0))
+    buses.append(("output", "audio", "Stereo Out", 2, 0, 1))
+    if extra_outs:
+        buses += [("output", "audio", f"Out {n}-{n + 1}", 2, 1, 0) for n in range(3, 17, 2)]
+    if fields["has_midi_input"]:
+        buses.append(("input", "event", "MIDI In", 16, 0, 1))
+    for b in buses:
+        conn.execute("INSERT INTO plugin_buses VALUES (?,?,?,?,?,?,?)", (pid, *b))
 
 
 def seed() -> None:
@@ -250,6 +355,7 @@ def seed() -> None:
         conn.execute("INSERT INTO plugin_refs VALUES (?,?,?,?,?,?)",
                      (dev, pid, name, "instr" if instr else "audiofx",
                       "uid" if scanned else "created", rand_time(t0, now)))
+        seed_scan_details(conn, pid, name, vendor, kind, instr, installed, uid_hex, folder, ext, now)
         plugins.append((pid, instr))
     instr_ids = [p for p, i in plugins if i]
     fx_ids = [p for p, i in plugins if not i]
@@ -373,39 +479,98 @@ def seed() -> None:
 
 # --------------------------------------------------------------------------- snapshot
 
-def get(path: str):
-    with urllib.request.urlopen(f"http://127.0.0.1:{HTTP_PORT}{path}", timeout=30) as r:
+def get(path: str, port: int = HTTP_PORT):
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=30) as r:
         return json.loads(r.read())
+
+
+def q(value: str) -> str:
+    return urllib.parse.quote(value, safe="")
+
+
+def write_config(path: Path, db: Path, grpc_port: int, http_port: int, vst_paths: list) -> None:
+    toml_path = lambda p: str(p).replace("\\", "/")
+    path.write_text(
+        "paths = []\n"
+        f"database_path = '{toml_path(db)}'\n"
+        f"media_storage_dir = '{toml_path(MEDIA_DIR)}'\n"
+        f"grpc_port = {grpc_port}\nhttp_port = {http_port}\n"
+        "log_level = 'error'\n"
+        f"vst_search_paths = [{', '.join(repr(toml_path(v)) for v in vst_paths)}]\n", "utf-8")
+
+
+def start_server(config: Path, port: int):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SEULA_")}
+    exe = REPO / "target" / "debug" / ("seula.exe" if os.name == "nt" else "seula")
+    server = subprocess.Popen([str(exe), "--config", str(config), "--server"], cwd=REPO, env=env)
+    for _ in range(100):
+        try:
+            get("/health", port)
+            return server
+        except OSError:
+            if server.poll() is not None:
+                sys.exit(f"seula --server exited with {server.returncode}")
+            time.sleep(0.2)
+    server.terminate()
+    sys.exit("server did not come up")
+
+
+def scan_events() -> list:
+    """The event stream of a real ``POST /api/v1/plugins/scan`` (ADR-0038).
+
+    The seeded plugins do not exist on disk, so this scans a folder of empty files named
+    like some of them. Every one fails to load, which a real scan reports the same way.
+    The scan writes its result, so it runs against a copy of the database.
+    """
+    shutil.rmtree(FAKE_PLUGINS, ignore_errors=True)
+    FAKE_PLUGINS.mkdir()
+    for name, _, kind, _, _ in PLUGINS[:14]:
+        (FAKE_PLUGINS / f"{name}.{'vst3' if kind == 'VST3' else 'dll'}").write_bytes(b"")
+    shutil.copyfile(DB, SCAN_DB)
+    write_config(SCAN_CONFIG, SCAN_DB, SCAN_GRPC_PORT, SCAN_HTTP_PORT, [FAKE_PLUGINS])
+    server = start_server(SCAN_CONFIG, SCAN_HTTP_PORT)
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{SCAN_HTTP_PORT}/api/v1/plugins/scan", method="POST")
+        with urllib.request.urlopen(req, timeout=120) as r:
+            events = [json.loads(line[5:]) for line in r.read().decode().splitlines() if line.startswith("data:")]
+    finally:
+        server.terminate()
+        server.wait(timeout=10)
+        shutil.rmtree(FAKE_PLUGINS, ignore_errors=True)
+        for suffix in ("", "-wal", "-shm"):
+            Path(str(SCAN_DB) + suffix).unlink(missing_ok=True)
+        SCAN_CONFIG.unlink(missing_ok=True)
+    return events
+
+
+def dedupe_projects(api: dict) -> None:
+    """Store a plugin's "used in" list as project ids.
+
+    It holds the same project DTOs as ``/api/v1/projects``, and written out in full for
+    every plugin they would be most of the file. Each is checked equal to the main list's
+    copy before it is replaced, and the mockup puts them back (``apiGet`` in shell.js).
+    Equal up to the order of a project's plugins and samples, which the API does not
+    define and which differs between the two routes.
+    """
+    def canonical(p):
+        return {**p, **{k: sorted(p[k], key=lambda x: x["id"]) for k in ("plugins", "samples")}}
+
+    by_id = {p["id"]: canonical(p) for p in api["/api/v1/projects?limit=10000"]["projects"]}
+    for path, body in api.items():
+        if not path.startswith("/api/v1/plugins/") or not isinstance(body, dict) or "projects" not in body:
+            continue
+        if all(by_id.get(p["id"]) == canonical(p) for p in body["projects"]):
+            body["project_ids"] = [p["id"] for p in body.pop("projects")]
 
 
 def snapshot() -> None:
     if not DB.exists():
         sys.exit("no database; run `seed` first")
     MEDIA_DIR.mkdir(exist_ok=True)
-    toml_path = lambda p: str(p).replace("\\", "/")
-    CONFIG.write_text(
-        "paths = []\n"
-        f"database_path = '{toml_path(DB)}'\n"
-        f"media_storage_dir = '{toml_path(MEDIA_DIR)}'\n"
-        f"grpc_port = {GRPC_PORT}\nhttp_port = {HTTP_PORT}\n"
-        "log_level = 'error'\nvst_search_paths = []\n", "utf-8")
-
-    env = {k: v for k, v in os.environ.items() if not k.startswith("SEULA_")}
+    write_config(CONFIG, DB, GRPC_PORT, HTTP_PORT, [])
     subprocess.run(["cargo", "build", "--quiet"], cwd=REPO, check=True)
-    exe = REPO / "target" / "debug" / ("seula.exe" if os.name == "nt" else "seula")
-    server = subprocess.Popen([str(exe), "--config", str(CONFIG), "--server"], cwd=REPO, env=env)
+    server = start_server(CONFIG, HTTP_PORT)
     try:
-        for _ in range(100):
-            try:
-                get("/health")
-                break
-            except OSError:
-                if server.poll() is not None:
-                    sys.exit(f"seula --server exited with {server.returncode}")
-                time.sleep(0.2)
-        else:
-            sys.exit("server did not come up")
-
         big = "limit=10000"
         api = {}
         for path in [
@@ -426,6 +591,21 @@ def snapshot() -> None:
         ]:
             api[path] = get(path)
 
+        plugins = api[f"/api/v1/plugins?{big}"]["plugins"]
+        for pl in plugins:
+            api[f"/api/v1/plugins/{pl['id']}"] = get(f"/api/v1/plugins/{pl['id']}")
+            api[f"/api/v1/plugins/{pl['id']}/projects?{big}"] = get(f"/api/v1/plugins/{pl['id']}/projects?{big}")
+        # The status bar's counts under each single filter the toolbar can set, and the
+        # combinations the board's frames use.
+        stats_queries = [f"vendor_filter={q(v['vendor'])}" for v in api[f"/api/v1/plugins/vendors?{big}"]["vendors"]]
+        stats_queries += [f"format_filter={q(f['format'])}" for f in api["/api/v1/plugins/formats"]["formats"]]
+        stats_queries += [f"install_states={st}" for st in
+                          ("installed", "absent", "unscanned", "installed,absent", "installed,unscanned", "absent,unscanned")]
+        stats_queries += ["query=pro", "format_filter=VST3%20Effect&install_states=absent,unscanned"]
+        for sq in stats_queries:
+            api[f"/api/v1/plugins/stats?{sq}"] = get(f"/api/v1/plugins/stats?{sq}")
+        api[f"/api/v1/plugins/search?query=pro&{big}"] = get(f"/api/v1/plugins/search?query=pro&{big}")
+
         cols = api[f"/api/v1/collections?{big}"]
         cols = cols.get("collections", cols) if isinstance(cols, dict) else cols
         for c in cols:
@@ -435,6 +615,9 @@ def snapshot() -> None:
     finally:
         server.terminate()
         server.wait(timeout=10)
+
+    api["POST /api/v1/plugins/scan"] = scan_events()
+    dedupe_projects(api)
 
     OUT_JSON.write_text(json.dumps(api, indent=1), "utf-8")
     OUT_JS.write_text(

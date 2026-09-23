@@ -20,6 +20,17 @@ const data = {
   config: API["/api/v1/config/status"],
 };
 
+/** One snapshotted response. A plugin's "used in" list is stored as project ids to
+ *  keep the file small (the generator checks each equals the main list's copy), and is
+ *  put back here, so callers get the response as the server sent it. */
+function apiGet(path) {
+  const body = API[path];
+  if (!body || !body.project_ids) return body;
+  const byId = apiGet.byId || (apiGet.byId = new Map(data.projects.map((p) => [p.id, p])));
+  const { project_ids, ...rest } = body;
+  return { ...rest, projects: project_ids.map((id) => byId.get(id)) };
+}
+
 // ------------------------------------------------------------------ formatting
 
 const pad2 = (n) => String(n).padStart(2, "0");

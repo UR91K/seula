@@ -12,6 +12,8 @@ test_data/
 # mockup data generator output; mock-api.js stays tracked so the mockups open directly
 /mockup/data/media/
 /mockup/data/mock-config.toml
+/mockup/data/mock-scan-config.toml
+/mockup/data/fake-plugins/
 /mockup/data/mock-api.json
 # full-size cover originals; the mockups and generator use images/thumbs/ only
 /mockup/images/cover-*
