@@ -153,17 +153,41 @@ watched paths, via `/api/v1/projects/add`. See the native-only note.
 
 ### Collections
 
-A grid of cards, like a media library, with alternative list layouts available. Each
-card: cover art (`/api/v1/collections/:id/cover-art`), name, project count, estimated
-duration, created date. Counts and duration come from
-`/api/v1/collections/:id/statistics`.
+A grid of cover cards, like a media library, or a details table, switched from the view
+toolbar and remembered with the preferences (ADR-0044). A card: cover art
+(`cover_art_id`, served by ADR-0033's media route), name, project count and length. The
+table adds the description, created and modified. Both come from `/api/v1/collections`,
+which returns each collection with its count and length; the grid sorts from a Sort
+dropdown and the table from its headers, both on the server (`sort_by`: name,
+`project_count`, `total_duration`, `created_at`, `modified_at`). The top-bar search goes
+to `/api/v1/collections/search` (name, description and notes). "New collection" in the
+toolbar opens the same dialog as the projects view's create-from-selection, empty. The
+status bar shows the number of collections.
 
-Selecting a card fills the inspector: the card's data plus description, a
-drag-to-reorder tracklist (`/api/v1/collections/:id/reorder`) with remove-selected, and
-a consolidated task list across all contained projects (`/api/v1/collections/:id/tasks`)
-with the same operations as the project inspector. Whether opening a card *also*
-navigates to a full-width detail view, or whether the inspector is the whole of it, is
-the one shell question ADR-0032 leaves to the mockup.
+**Selecting a card** fills the inspector: cover, name and description, the facts from
+`/api/v1/collections/:id/statistics` (projects, length, average tempo, most common key
+and time signature, distinct plugins, samples and tags, both dates), a short numbered
+tracklist, and the consolidated tasks from `/api/v1/collections/:id/tasks`, each naming
+its project, with the same bulk operations as the project inspector.
+
+**Opening a card** (double-click or Enter) replaces the grid with the collection
+(ADR-0044). The toolbar leads with a back button and `Collections › name`. A header band
+shows the cover, name, description and the facts in one line. Below it, the projects
+(`/api/v1/collections/:id/projects`) in the projects table, with a leading `#` column,
+in collection order. Dragging a row's handle reorders (`/api/v1/collections/:id/reorder`).
+Sorting by another header reorders the view only, and hides the handles until `#` is
+clicked again. Selected rows can be removed from the collection
+(`/api/v1/collections/:id/batch-remove`). The inspector shows the selected project, or
+the collection when nothing is selected. The row context menu is the project one, plus
+Remove from collection.
+
+**Card context menu:** Open, Show in Projects (the projects view searching
+`collection:"name"`), Rename, Edit details (name, description, cover art), Duplicate,
+Delete. Delete confirms, and says the projects themselves are untouched.
+
+Counts, lengths, statistics, tasks and tracklists take the project scope (ADR-0043),
+the same preference as plugins and samples. Under `all`, archived projects in a
+tracklist are marked.
 
 ### Plugins
 
