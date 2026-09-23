@@ -158,10 +158,25 @@ const LOGO = `<svg class="logo" viewBox="0 0 216.54 406" role="img" aria-label="
  *   view, sidebarCollapsed, inspectorOpen, tauri,
  *   viewbar: html, content: html, inspector: html,
  *   status: [html, ...]   left-hand status segments
- *   scan: null | { done, total, message }
+ *   scan: null | { done, total, message }   a scan's progress event; the message is
+ *                                           the server's own and carries its count
  *   overlay: html          menus, popovers and dialogs, positioned against the window
+ *   counts: { view: n }    sidebar counts for a state the snapshot does not hold (a fresh install)
  * }
  */
+/** The status bar alone: the view's segments, a running scan, the watcher, ♯/♭. */
+function statusBar(s) {
+  const scan = s.scan
+    ? `<span class="grow"><span class="progress"><i style="width:${(100 * (s.scan.total ? s.scan.done / s.scan.total : 0)).toFixed(1)}%"></i></span>${esc(s.scan.message)}</span>`
+    : `<span class="grow"></span>`;
+  return `<footer class="statusbar">
+      ${(s.status || []).map((x) => `<span>${x}</span>`).join("")}
+      ${scan}
+      <span>${watcherStatus()}</span>
+      <span class="ks">${keySwitch()}</span>
+    </footer>`;
+}
+
 function renderShell(s) {
   const hasInspector = s.view !== "stats";
   const inspectorShown = hasInspector && s.inspectorOpen;
@@ -170,12 +185,8 @@ function renderShell(s) {
 
   const nav = VIEWS.map((v) => `
     <div class="nav-item ${v.id === s.view ? "active" : ""}" data-nav="${v.id}" title="${v.label}">
-      ${icon(v.icon, v.id === s.view ? "fill" : "")}<span class="label">${v.label}</span><span class="count">${v.count()}</span>
+      ${icon(v.icon, v.id === s.view ? "fill" : "")}<span class="label">${v.label}</span><span class="count">${s.counts && v.id in s.counts ? s.counts[v.id] : v.count()}</span>
     </div>`).join("");
-
-  const scan = s.scan
-    ? `<span class="grow"><span class="progress"><i style="width:${(100 * s.scan.done / s.scan.total).toFixed(1)}%"></i></span>Scanning ${s.scan.done} of ${s.scan.total} · ${esc(s.scan.message)}</span>`
-    : `<span class="grow"></span>`;
 
   return `
   <div class="${cls}">
@@ -208,12 +219,7 @@ function renderShell(s) {
       ${inspectorShown ? `<aside class="inspector">${s.inspector}</aside>` : ""}
     </div>
 
-    <footer class="statusbar">
-      ${(s.status || []).map((x) => `<span>${x}</span>`).join("")}
-      ${scan}
-      <span>${watcherStatus()}</span>
-      <span class="ks">${keySwitch()}</span>
-    </footer>
+    ${statusBar(s)}
     ${s.overlay || ""}
   </div>`;
 }

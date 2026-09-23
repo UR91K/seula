@@ -29,7 +29,7 @@ Last reviewed: 2026-09-23.
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
 | `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
-| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029, OS bridge ADR-0030, preferences ADR-0031, shell and density ADR-0032. Static mockups come before any React. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round: the shell alone (`mockup/shell.html`), awaiting review before any view is built |
+| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029, OS bridge ADR-0030, preferences ADR-0031, shell and density ADR-0032. Static mockups come before any React. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round, as review boards (ADR-0036): shell and projects approved; plugins (`mockup/plugins.html`) awaiting review; samples, collections and stats to come |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 

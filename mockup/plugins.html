@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula plugins board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="plugins.css">
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script src="components.js"></script>
+<script src="screens.js"></script>
+<script src="plugins.js"></script>
+<script src="board.js"></script>
+<script>
+  // This page only chooses frames and their starting states (ADR-0036). Every frame,
+  // screen or component, is drawn by the shared renderers.
+
+  // ---------------------------------------------------------------- picking real rows
+
+  const byUse = [...data.plugins].sort((a, b) => b.project_count - a.project_count);
+  const find = (pred) => byUse.find(pred);
+  const det = (p) => pluginDetails(p.id);
+
+  const vst3Fx = find((p) => p.installed === true && p.format === "VST3 Effect" && det(p).buses.length >= 3);
+  const vst3Outs = find((p) => p.installed === true && p.format === "VST3 Instrument" && det(p).buses.length >= 5);
+  const vst2 = find((p) => p.installed === true && p.format.startsWith("VST2"));
+  const missingOld = find((p) => p.installed === false && det(p).path);
+  const missingNever = find((p) => p.installed === false && !det(p).path);
+  const unscanned = find((p) => p.installed == null && p.vendor);
+  const unused = find((p) => p.project_count === 0);
+  const scanEvents = PLUGIN_API.scanEvents;
+  const midScan = scanEvents.findIndex((e) => e.status === "scanning_plugins" && e.completed === 5);
+  const scanEnd = scanEvents[scanEvents.length - 1];
+
+  // ---------------------------------------------------------------- frame helpers
+
+  const screen = (id, label, note, overrides) =>
+    ({ id, label, note, kind: "screen", live: true, render: pluginsScreen(pluginsState(overrides)) });
+  const comp = (id, label, note, html) => ({ id, label, note, render: (el) => { el.innerHTML = typeof html === "function" ? html() : html; } });
+  const inspector = (p, h = 300) => () =>
+    `<div class="inspector" style="width:calc(var(--u) * 150);height:calc(var(--u) * ${h});overflow:auto">${pluginInspector(p)}</div>`;
+  const toolbar = (overrides) => () => {
+    const st = pluginsState(overrides);
+    return `<div class="viewbar" style="width:calc(var(--u) * 526)">${pluginsViewbar(st, pluginRows(st).length)}<button class="tb-btn on">${icon("right_panel_close")}</button></div>`;
+  };
+  const statusStrip = (overrides) => () => {
+    const st = pluginsState(overrides);
+    const ev = st.scanStep != null ? scanEvents[st.scanStep] : null;
+    return `<div style="width:calc(var(--u) * 526)">${statusBar({ status: pluginStatusSegments(st), scan: ev && { done: ev.completed, total: ev.total, message: ev.message } })}</div>`;
+  };
+
+  function stateCells() {
+    const rows = INSTALL_STATES.map((s) => {
+      return `<tr><td>${pluginStateCell(s.value)}</td><td class="faint">${{
+        installed: "the last scan found it",
+        absent: "a scan looked, and it was not there",
+        unscanned: "no scan has looked yet; not the same as missing",
+      }[s.id]}</td></tr>`;
+    }).join("");
+    return `<table class="grid fixed plugins" style="width:calc(var(--u) * 200)"><thead><tr><th style="width:calc(var(--u) * 50)">Status</th><th>Meaning</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  function groupHeaders() {
+    const vendorSt = pluginsState({ group: "vendor" });
+    const formatSt = pluginsState({ group: "format", collapsed: new Set(["VST2 Effect"]) });
+    const count = (g, key) => data.plugins.filter((p) => GROUPS[g].key(p) === key).length;
+    const withMissing = PLUGIN_API.vendors.find((v) => v.missing_plugins && v.installed_plugins);
+    const rows = [
+      [vendorSt, "FabFilter", count("vendor", "FabFilter"), "a vendor, from /api/v1/plugins/vendors"],
+      [vendorSt, withMissing.vendor, count("vendor", withMissing.vendor), "a vendor with a missing plugin"],
+      [vendorSt, null, count("vendor", null), "no vendor: the rollup leaves these out, so only the count shown"],
+      [pluginsState({ group: "vendor", states: ["installed"] }), withMissing.vendor, withMissing.installed_plugins, "filtered: how many of the group are shown"],
+      [formatSt, "VST3 Effect", count("format", "VST3 Effect"), "a format, from /api/v1/plugins/formats"],
+      [formatSt, "VST2 Effect", count("format", "VST2 Effect"), "folded shut"],
+    ];
+    return `<table class="grid fixed plugins" style="width:calc(var(--u) * 330)"><tbody>${
+      rows.map(([st, key, shown, what]) => groupHeader(st, key, shown, 1).replace("</td></tr>", `</td></tr><tr><td class="faint" style="padding-left:calc(var(--u) * 14)">${what}</td></tr>`)).join("")}</tbody></table>`;
+  }
+
+  // ---------------------------------------------------------------- the board
+
+  board({
+    title: "Seula · Plugins",
+    intro: `<p>The plugins view (ADR-0036). <b>Screen</b> frames are live: select a row, right-click for
+      the menu, sort by a header, open the Format, Vendor, Status and Group dropdowns, fold a group,
+      and press <b>Scan plugins</b> to replay a real scan's progress.</p>
+      <p>All data is the real API over the seeded database: the list, each plugin's scan details and
+      used-in list (<code>GET /api/v1/plugins/:id</code>, <code>/projects</code>), the vendor and format
+      rollups, the status-bar counts under each filter, and the event stream of a real
+      <code>POST /api/v1/plugins/scan</code> (ADR-0038). That scan ran over 14 empty files named like
+      plugins, so every one failed to load, which is why its final message reads as it does.</p>
+      ${unused ? "" : "<p>Not shown: a plugin used by no project. The seeded library has none, and a frame would have to invent one.</p>"}`,
+    columns: [
+      { title: "Screen", frames: [
+        screen("1", "Default", "most-used first; inspector open with nothing selected", {}),
+        screen("1b", "An installed plugin selected", "state, the projects using it, the scan's record, VST3 classes and buses, identity",
+          { selected: vst3Fx.id }),
+        screen("1c", "Grouped by vendor", "each header carries the vendor's totals from /api/v1/plugins/vendors",
+          { group: "vendor", sort: { col: "name", desc: false } }),
+        screen("1d", "Grouped by format, one folded", "click a header to fold it",
+          { group: "format", collapsed: new Set(["VST3 Effect"]) }),
+        screen("1e", "Filtered", "VST3 effects that are missing or not scanned; the status bar counts only these",
+          { format: "VST3 Effect", states: ["absent", "unscanned"] }),
+        screen("1f", "Search", "the top-bar search, on /api/v1/plugins/search: name, vendor or format",
+          { query: "pro", sort: null }),
+        screen("1g", "A missing plugin", "a scan found it once and has not since; where it was, and what uses it",
+          { selected: missingOld.id }),
+        screen("1h", "A plugin no scan has looked for", "not missing: unknown, with a way to find out",
+          { selected: unscanned.id }),
+        screen("1i", "Context menu", "Show in Explorer is native-only (ADR-0030)",
+          { selected: vst3Fx.id, menu: { id: vst3Fx.id } }),
+        screen("1j", "Vendor dropdown", "type to narrow; counts from the rollup",
+          { popover: "vendor" }),
+        screen("1k", "Status dropdown", "any of the three states (ADR-0025)",
+          { popover: "states", states: ["absent"] }),
+        screen("1l", "Scanning", "a real event from the stream; the button is off while any scan runs",
+          { scanStep: midScan, selected: missingOld.id }),
+        screen("1m", "Browser target", "no window controls, and no Show in Explorer",
+          { tauri: false, selected: vst3Fx.id, menu: { id: vst3Fx.id } }),
+        screen("1n", "Nothing matches", "", { vendor: "FabFilter", states: ["unscanned"] }),
+        screen("1o", "No plugins yet", "a fresh install: nothing scanned yet, of either kind",
+          { empty: true, inspectorOpen: false }),
+      ]},
+      { title: "Inspector", frames: [
+        comp("2a", "Installed VST3 effect", "sidechain input as an aux bus", inspector(vst3Fx)),
+        comp("2b", "Installed VST3 instrument, extra outputs", "", inspector(vst3Outs)),
+        comp("2c", "Installed VST2", "the VST2 fields in place of classes and buses", inspector(vst2)),
+        comp("2d", "Missing, with an old record", "the scan keeps what it last found (it only clears installed)", inspector(missingOld)),
+        comp("2e", "Missing, never found here", "known only from the projects that use it", inspector(missingNever, 200)),
+        comp("2f", "Not scanned", "", inspector(unscanned, 200)),
+        ...(unused ? [comp("2h", "Used by no project", "", inspector(unused, 200))] : []),
+        comp("2g", "Nothing selected", "", () => `<div class="inspector" style="width:calc(var(--u) * 150);height:calc(var(--u) * 120)">${pluginInspectorEmpty()}</div>`),
+      ]},
+      { title: "Context menu", frames: [
+        comp("3a", "An installed plugin", "Tauri target", () => pluginContextMenu(vst3Fx, { hot: "explorer" })),
+        comp("3b", "A missing plugin", "not installed, so there is nothing to show in Explorer", () => pluginContextMenu(missingOld, { hot: "projects" })),
+        comp("3c", "Browser target", "the native-only entry is gone, not disabled", () => pluginContextMenu(vst3Fx, { tauri: false })),
+      ]},
+      { title: "View toolbar", frames: [
+        comp("4a", "Default", "", toolbar({})),
+        comp("4b", "Filters set", "each set filter shows its value and a clear button", toolbar({ format: "VST3 Effect", states: ["absent", "unscanned"], group: "vendor" })),
+        comp("4c", "Scanning", "", toolbar({ scanStep: midScan })),
+        comp("4d", "Format ▾", "", () => formatMenu("VST3 Effect")),
+        comp("4e", "Vendor ▾", "", () => vendorPicker(null)),
+        comp("4f", "Vendor ▾, typing", "", () => vendorPicker(null, "so")),
+        comp("4g", "Status ▾", "", () => statesMenu(["absent", "unscanned"])),
+        comp("4h", "Group ▾", "", () => groupMenu("vendor")),
+      ]},
+      { title: "Table parts", frames: [
+        comp("5a", "Status cell", "icon, colour and word", stateCells),
+        comp("5b", "Group headers", "", groupHeaders),
+      ]},
+      { title: "Status bar", frames: [
+        comp("6a", "The whole library", "/api/v1/plugins/stats", statusStrip({})),
+        comp("6b", "Filtered", "the same route, passed the list's filters", statusStrip({ format: "VST3 Effect", states: ["absent", "unscanned"] })),
+        comp("6c", "Scanning", "the stream's message, as the server words it", statusStrip({ scanStep: midScan })),
+        comp("6d", "Scan finished", "the stream's last event; the list and counts are fetched again", statusStrip({ scanDone: scanEnd })),
+      ]},
+    ],
+  });
+</script>
+</body>
+</html>

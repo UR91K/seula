@@ -1,0 +1,87 @@
+/* The plugins view, on top of shell.css and components.css. Same rules: measures in
+ * --u, 1px hairlines only, colours from colors.css only.
+ */
+
+/* the three install states (ADR-0012): icon, colour and word together */
+.is-installed { color: var(--ok); }
+.is-absent { color: var(--missing); }
+.is-unscanned { color: var(--unknown); }
+
+.pstate { display: inline-flex; align-items: center; gap: calc(var(--u) * 2); }
+.pstate.is-installed { color: var(--text-2); }
+.pstate.is-installed .status-dot { color: var(--ok); }
+table.grid tbody tr.sel .pstate { color: var(--text); }
+
+/* ------------------------------------------------------------------ toolbar */
+
+/* a filter that is set: accent border, and its clear button in place of the caret */
+.select.set { border-color: var(--select-border); background: var(--select); }
+.select.open { border-color: var(--focus); }
+.select .x { display: inline-flex; color: var(--text-2); border-radius: var(--radius); }
+.select .x:hover { color: var(--text); background: var(--hover); }
+
+/* dropdowns that are lists to pick from, not searches */
+.pickmenu .it .ms.blank { visibility: hidden; }
+.pickmenu .it .status-dot .ms { width: calc(var(--u) * 7); height: calc(var(--u) * 7); font-size: calc(var(--u) * 7); }
+.pickmenu .it .cb { margin-right: var(--u); }
+.pickmenu .hint { max-width: calc(var(--u) * 110); white-space: normal; }
+
+/* ------------------------------------------------------------------ table */
+
+table.grid.plugins td .n { overflow: hidden; text-overflow: ellipsis; }
+
+/* a group's header row: caret, name, and the group's totals from its rollup */
+table.grid tbody tr.group td {
+  background: var(--header);
+  border-top: 1px solid var(--border-lo);
+  border-bottom: 1px solid var(--border-lo);
+  color: var(--text);
+}
+table.grid tbody tr.group:hover td { background: var(--hover); }
+table.grid tbody tr.group td .caret { color: var(--text-3); margin-right: var(--u); }
+table.grid tbody tr.group .gname { font-weight: 600; margin-right: calc(var(--u) * 4); }
+table.grid tbody tr.group .shown { color: var(--accent); margin-right: calc(var(--u) * 4); }
+table.grid tbody tr.group .gstats { color: var(--text-3); }
+table.grid tbody tr.group .gstats .is-absent { color: var(--missing); }
+
+/* ------------------------------------------------------------------ inspector */
+
+.insp-head .glyph {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: calc(var(--u) * 20); height: calc(var(--u) * 20);
+  background: var(--tag-bg); color: var(--text-2);
+  border-radius: var(--radius);
+}
+.insp-head .glyph .ms { font-size: calc(var(--u) * 12); width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
+
+.state-line { display: flex; align-items: center; gap: calc(var(--u) * 2); line-height: var(--row); }
+.state-line b { font-weight: 600; }
+.state-line .faint { margin-left: var(--u); }
+.insp-sec .state-line + p { margin-top: var(--u); }
+.insp-sec .btn { margin-top: calc(var(--u) * 3); }
+
+.insp-sec code, dl.props code { font-family: Consolas, "Cascadia Mono", monospace; }
+code.uid {
+  display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top;
+  padding: 0 calc(var(--u) * 2);
+  background: var(--field); color: var(--text-2);
+  border: 1px solid var(--border-lo); border-radius: var(--radius);
+  cursor: copy;
+}
+code.uid:hover { border-color: var(--border); color: var(--text); }
+code.uid.copied { border-color: var(--ok); }
+
+a.link { color: var(--accent); text-decoration: none; }
+a.link:hover { text-decoration: underline; }
+
+.linkbtn {
+  display: inline-flex; align-items: center; gap: var(--u);
+  margin-top: var(--u);
+  background: none; border: 0; color: var(--accent); cursor: default;
+}
+.linkbtn:hover { text-decoration: underline; }
+.linkbtn .ms { font-size: calc(var(--u) * 6); width: calc(var(--u) * 6); height: calc(var(--u) * 6); }
+
+/* status bar: the state icons at text size */
+.statusbar .status-dot .ms { vertical-align: middle; }
+.statusbar .is-installed .ms, .statusbar .is-absent .ms { font-size: calc(var(--u) * 7); width: calc(var(--u) * 7); height: calc(var(--u) * 7); vertical-align: middle; }

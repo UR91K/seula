@@ -32,7 +32,7 @@
           render: projectsScreen(projectsState({ selected: new Set([data.projects[8].id]) })) },
         { id: "1b", label: "Sidebar collapsed, inspector closed, scanning", note: "the sidebar keeps its icons, never zero width", kind: "screen", live: true,
           render: projectsScreen(projectsState({ sidebarCollapsed: true, inspectorOpen: false, selected: new Set(data.projects.slice(3, 6).map((p) => p.id)),
-            scan: { done: 112, total: data.projects.length, message: scanning.path } })) },
+            scan: { done: 112, total: data.projects.length, message: `Parsed ${fileStem(scanning.path)}.als (112/${data.projects.length})` } })) },
         { id: "1c", label: "Stats", note: "the one view with no inspector, so no toggle either", kind: "screen",
           render: (el) => { el.innerHTML = renderShell({ view: "stats", tauri: true, viewbar: "<h1>Stats</h1>",
             content: `<div class="placeholder">Stats view · built after the other four</div>`,
