@@ -3,6 +3,9 @@
  * measures in --u, 1px hairlines only, colours from colors.css only.
  */
 
+/* secondary text anywhere, not only in tables and lists */
+.faint { color: var(--text-3); }
+
 /* ------------------------------------------------------------------ controls */
 
 .btn {
@@ -200,12 +203,22 @@ table.grid tbody tr.sel td.count .miss { color: var(--text); }
 .insp-sec .tags { display: flex; flex-wrap: wrap; gap: var(--u) 0; }
 
 .audition { display: flex; align-items: center; gap: calc(var(--u) * 3); }
-.audition .big { width: var(--hdr); height: var(--hdr); flex: none; border-radius: 50%; background: var(--accent); color: var(--accent-text); display: flex; align-items: center; justify-content: center; }
-.audition .track { flex: 1; min-width: 0; }
-.audition .bar { height: calc(var(--u) * 2); background: var(--border-lo); margin: var(--u) 0; }
-.audition .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
-.audition .meta { display: flex; justify-content: space-between; color: var(--text-3); white-space: nowrap; }
-.audition .meta .fn { overflow: hidden; text-overflow: ellipsis; }
+
+/* the audition list (ADR-0037): play, name, size, the row radio, remove */
+ul.audios li .pl {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: calc(var(--u) * 8); height: calc(var(--u) * 8); border-radius: 50%;
+  background: var(--tag-bg); color: var(--text);
+}
+ul.audios li .pl .ms { font-size: calc(var(--u) * 6); width: calc(var(--u) * 6); height: calc(var(--u) * 6); }
+ul.audios li.playing .pl { background: var(--accent); color: var(--accent-text); }
+ul.audios li .row { color: var(--text-3); display: inline-flex; }
+ul.audios li .row.on { color: var(--accent); }
+ul.audios li .rm { color: var(--text-3); visibility: hidden; display: inline-flex; }
+ul.audios li:hover .rm { visibility: visible; }
+ul.audios li.scrub { gap: calc(var(--u) * 3); padding-left: calc(var(--u) * 10); }
+ul.audios li.scrub .bar { flex: 1; height: calc(var(--u) * 2); background: var(--border-lo); }
+ul.audios li.scrub .bar i { display: block; height: 100%; background: var(--accent); }
 
 ul.tasks li .cb { margin-right: var(--u); }
 ul.tasks li.done .grow { color: var(--text-3); text-decoration: line-through; }

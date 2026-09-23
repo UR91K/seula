@@ -123,10 +123,17 @@ already archived (`/api/v1/projects/batch-delete`); add tags with an autocomplet
 collections; create collection from selection.
 
 **Inspector.** The shared right-hand panel, toggled from the view toolbar. For a project
-it shows everything the row shows plus notes (`/api/v1/projects/:id/notes`), the
-collections the project is in, and its tasks with per-task checkboxes, select-all, mark
-complete/incomplete (`/api/v1/tasks/batch-update-status`) and delete selected
+it shows everything the row shows plus its audition audios, notes
+(`/api/v1/projects/:id/notes`), the collections the project is in, and its tasks with
+per-task checkboxes, select-all, mark complete/incomplete
+(`/api/v1/tasks/batch-update-status`) and delete selected
 (`/api/v1/tasks/batch-delete`).
+
+**Audition audios** (ADR-0037). A project can hold several, listed in the inspector in
+the order added (`/api/v1/projects/:id/audio-files`), each with a play button, and a
+radio for the one the row's play button plays (`PUT /api/v1/projects/:id/audio-file`).
+Removing one from the list (`DELETE /api/v1/projects/:id/audio-files/:media_file_id`)
+hands the row to the next. The row shows the add button when nothing is set to play.
 
 **Context menu** on a row: add tag (existing tags, new tag, manage tags); open in
 Ableton; show in Explorer; rename; add audio demo; add to collection; archive, or

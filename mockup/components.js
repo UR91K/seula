@@ -367,15 +367,26 @@ function inspectorList(items, render, max = 8) {
     items.length > max ? `<li class="faint">and ${items.length - max} more</li>` : ""}</ul>`;
 }
 
-function auditionSection(p) {
-  if (!p.audio_file_id) {
-    return `<div class="insp-sec"><h3>Audition</h3><div class="audition"><span class="faint" style="flex:1">No audition audio</span><button class="btn">${icon("music_note_add")}Add audio…</button></div></div>`;
+/**
+ * Every audition audio (ADR-0037). The radio marks the primary, the one the row's play
+ * button plays; `playing` is the id whose scrub bar is showing, if any.
+ */
+function auditionSection(p, { playing = null } = {}) {
+  const list = p.audio_files || [];
+  const add = `<span class="acts">${tbBtn("add", "", { title: "Add audio…" })}</span>`;
+  if (!list.length) {
+    return `<div class="insp-sec"><h3>Audition${add}</h3><div class="audition"><span class="faint" style="flex:1">No audition audio</span><button class="btn">${icon("music_note_add")}Add audio…</button></div></div>`;
   }
-  const m = mediaById.get(p.audio_file_id);
-  return `<div class="insp-sec"><h3>Audition</h3><div class="audition">
-    <span class="big">${icon("play_arrow", "fill")}</span>
-    <div class="track"><div class="bar"><i></i></div>
-    <div class="meta"><span class="fn">${esc(m ? m.original_filename : "")}</span><span>${m ? fmtBytes(m.file_size_bytes) : ""}</span></div></div></div></div>`;
+  const rows = list.map((a) => `<li class="${a.id === playing ? "playing" : ""}">
+      <span class="pl" title="${a.id === playing ? "Pause" : "Play"}">${icon(a.id === playing ? "pause" : "play_arrow", "fill")}</span>
+      <span class="grow" title="${esc(a.original_filename)}">${esc(a.original_filename)}</span>
+      <span class="faint">${fmtBytes(a.file_size_bytes)}</span>
+      <span class="row ${a.primary ? "on" : ""}" title="${a.primary ? "Plays in the row" : "Play this one in the row"}">${icon(a.primary ? "radio_button_checked" : "radio_button_unchecked", a.primary ? "fill" : "")}</span>
+      <span class="rm" title="Remove from this project">${icon("close")}</span>
+    </li>${a.id === playing ? `<li class="scrub"><div class="bar"><i style="width:38%"></i></div><span class="faint">1:31</span></li>` : ""}`).join("");
+  const none = p.audio_file_id ? "" : `<p class="faint">Nothing plays in the row.</p>`;
+  return `<div class="insp-sec"><h3>Audition <span class="count">${list.length > 1 ? list.length : ""}</span>${add}</h3>
+    <ul class="plain audios">${rows}</ul>${none}</div>`;
 }
 
 /** tasksSel: Set of selected task ids, for the bulk task actions. */
@@ -395,7 +406,7 @@ function tasksSection(p, tasksSel = new Set()) {
     <label class="field add">${icon("add")}Add a task</label></div>`;
 }
 
-function projectInspector(p, { tasksSel } = {}) {
+function projectInspector(p, { tasksSel, playing } = {}) {
   const cols = collectionsOf(p);
   const cover = projectCover(p);
   const pm = missingPlugins(p), sm = missingSamples(p);
@@ -404,7 +415,7 @@ function projectInspector(p, { tasksSel } = {}) {
       ${cover ? `<img src="${cover}" alt="">` : ""}
       <div><h2>${esc(p.name)}</h2>${pathChip(p.path)}</div>
     </div>
-    ${auditionSection(p)}
+    ${auditionSection(p, { playing })}
     <div class="insp-sec"><h3>Project</h3>
       <dl class="props">
         <dt>Tempo</dt><dd>${fmtTempo(p.tempo)} BPM</dd>

@@ -317,6 +317,27 @@ def seed() -> None:
              rng.choice(TONICS) if key else None, rng.choice(SCALES) if key else None,
              duration, bar, "Ableton Live",
              f"{major}.{minor}.{patch}" + (" beta" if beta else ""), audio))
+        if audio:
+            # ADR-0037: a list of audios, one of them primary. Extras come from their
+            # own per-project stream so the main rng, and so the rest of the data, is
+            # unchanged by them.
+            arng = random.Random(pid)
+            listed = [audio]
+            for suffix in arng.choices([[], [" (master)"], [" (master)", " alt mix"]], weights=[55, 30, 15])[0]:
+                extra = str(uuid.UUID(int=arng.getrandbits(128), version=4))
+                conn.execute("INSERT INTO media_files VALUES (?,?,?,?,?,?,?,?)",
+                             (extra, f"{file_name}{suffix}.wav", "wav", "audio_file",
+                              arng.randint(8, 70) * 1_000_000, "audio/wav", modified,
+                              hashlib.sha256((pid + suffix).encode()).hexdigest()))
+                listed.append(extra)
+            for pos, mid in enumerate(listed):
+                conn.execute("INSERT INTO project_audio_files VALUES (?,?,?,?)", (pid, mid, pos, modified))
+            if len(listed) > 1 and arng.random() < 0.5:
+                # Sometimes the master, not the first bounce, is what the row plays.
+                conn.execute("UPDATE projects SET audio_file_id = ? WHERE id = ?", (listed[1], pid))
+            if len(listed) > 1 and arng.random() < 0.12:
+                # Primary cleared: audios listed, nothing plays in the row (ADR-0037).
+                conn.execute("UPDATE projects SET audio_file_id = NULL WHERE id = ?", (pid,))
         conn.execute("INSERT INTO project_ableton_metadata VALUES (?,?,?,?,?)",
                      (pid, major, minor, patch, int(beta)))
 

@@ -41,6 +41,9 @@
   const renameMe = pick((p) => fileStem(p.path) !== p.name && p.tags.length);
   const hoverMe = pick((p) => missingPlugins(p) && p.plugins.some((x) => x.installed == null)) || pick((p) => missingPlugins(p));
   const hoverSamples = pick((p) => missingSamples(p) >= 2);
+  const threeAudios = pick((p) => p.audio_files.length === 3 && p.audio_file_id && p.audio_files[0].id !== p.audio_file_id)
+    || pick((p) => p.audio_files.length === 3);
+  const noRowAudio = pick((p) => p.audio_files.length && !p.audio_file_id);
 
   // Three projects that share a tag, for "remove a tag" and the shared inspector.
   const sharedTag = [...data.tags].sort((a, b) => b.project_count - a.project_count)[0];
@@ -130,6 +133,12 @@
         comp("2d", "The most missing", "missing plugins and samples counted in the section headers", panel("inspector", 150, 300, () => projectInspector(heavy))),
         comp("2e", "Three selected, sharing a tag", "what they have in common, not three inspectors", panel("inspector", 150, 300, () => multiInspector(tagged3))),
         comp("2f", "Nothing selected", "", panel("inspector", 150, 120, inspectorEmpty)),
+        comp("2g", "Several audition audios", "the radio picks which one the row plays; here the master, not the first bounce (ADR-0037)",
+          () => `<div class="inspector" style="width:calc(var(--u) * 150)">${auditionSection(threeAudios)}</div>`),
+        comp("2h", "Playing one", "its scrub bar opens under it; the row radio is unaffected",
+          () => `<div class="inspector" style="width:calc(var(--u) * 150)">${auditionSection(threeAudios, { playing: threeAudios.audio_files[0].id })}</div>`),
+        ...(noRowAudio ? [comp("2i", "Audios, but none in the row", "the row shows + instead of ▶",
+          () => `<div class="inspector" style="width:calc(var(--u) * 150)">${auditionSection(noRowAudio)}</div>`)] : []),
       ]},
       { title: "Context menu", frames: [
         comp("3a", "One project", "Tauri target", () => projectContextMenu({ hot: "open" })),
