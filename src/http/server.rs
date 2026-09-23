@@ -224,6 +224,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/plugins/refresh-installation-status",
             post(plugin_handlers::refresh_plugin_installation_status),
         )
+        .route("/api/v1/plugins/scan", post(plugin_handlers::scan_plugins))
         .route(
             "/api/v1/plugins/:plugin_id",
             get(plugin_handlers::get_plugin),

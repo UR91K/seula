@@ -156,6 +156,15 @@ pub struct PluginStatsQuery {
     pub install_states: Option<String>,
 }
 
+/// One event of the plugin scan stream (ADR-0038): the same progress fields as a
+/// project scan, and on the final `completed` event, what the scan changed.
+#[derive(Serialize)]
+pub struct PluginScanEventDto {
+    #[serde(flatten)]
+    pub progress: crate::http::dto::system::ScanProgressDto,
+    pub result: Option<crate::database::plugins::PluginRefreshResult>,
+}
+
 #[derive(Deserialize)]
 pub struct ProjectsByPluginQuery {
     pub limit: Option<i32>,

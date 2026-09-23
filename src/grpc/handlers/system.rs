@@ -31,13 +31,17 @@ impl SystemHandler {
         let (tx, rx) = mpsc::channel(100);
         let tx_for_callback = tx.clone();
 
-        self.service
+        let started = self
+            .service
             .start_scan(move |response| {
                 if let Err(e) = tx_for_callback.try_send(Ok(response)) {
                     error!("Failed to send progress update: {:?}", e);
                 }
             })
             .await;
+        if !started {
+            return Err(Status::failed_precondition("A scan is already running"));
+        }
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }

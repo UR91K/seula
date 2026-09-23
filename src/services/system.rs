@@ -5,6 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::config::CONFIG;
 use crate::database::batch::BatchInsertManager;
+use crate::database::plugins::PluginRefreshResult;
 use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use crate::grpc::common::{ScanStatus, WatcherEventType};
@@ -87,15 +88,38 @@ impl SystemService {
         (status, progress)
     }
 
+    /// Claims the scan status for a new scan, or returns false when one is already
+    /// running. A project scan and a plugin scan share the status, so one can be
+    /// running at a time (ADR-0038).
+    async fn begin_scan(&self, status: ScanStatus) -> bool {
+        let mut current = self.scan_status.lock().await;
+        let running = matches!(
+            *current,
+            ScanStatus::ScanStarting
+                | ScanStatus::ScanScanningPlugins
+                | ScanStatus::ScanDiscovering
+                | ScanStatus::ScanParsing
+                | ScanStatus::ScanInserting
+        );
+        if running {
+            return false;
+        }
+        *current = status;
+        *self.scan_progress.lock().await = None;
+        true
+    }
+
     /// Resets scan status/progress and starts the scan in the background,
     /// invoking `on_progress` with every update (including the final
     /// success/error one) so the caller can forward it to its own transport.
-    pub async fn start_scan<F>(&self, on_progress: F)
+    /// Returns false, and starts nothing, when a scan is already running.
+    pub async fn start_scan<F>(&self, on_progress: F) -> bool
     where
         F: Fn(ScanProgressResponse) + Send + Sync + 'static,
     {
-        *self.scan_status.lock().await = ScanStatus::ScanStarting;
-        *self.scan_progress.lock().await = None;
+        if !self.begin_scan(ScanStatus::ScanStarting).await {
+            return false;
+        }
 
         let scan_status = Arc::clone(&self.scan_status);
         let scan_progress = Arc::clone(&self.scan_progress);
@@ -165,6 +189,80 @@ impl SystemService {
                 }
             }
         });
+        true
+    }
+
+    /// Rescans the system's plugins in the background (ADR-0038), reporting through
+    /// the same status and progress as a project scan: `scanning_plugins` with one
+    /// update per plugin binary, then `completed` or `error`. The final update also
+    /// carries what the scan changed.
+    ///
+    /// The scan runs on a blocking thread without the database, which is locked only to
+    /// write the result. Returns false, and starts nothing, when a scan is already
+    /// running.
+    pub async fn start_plugin_scan<F>(&self, on_progress: F) -> bool
+    where
+        F: Fn(ScanProgressResponse, Option<PluginRefreshResult>) + Send + Sync + 'static,
+    {
+        if !self.begin_scan(ScanStatus::ScanScanningPlugins).await {
+            return false;
+        }
+
+        let db = Arc::clone(&self.db);
+        let scan_status = Arc::clone(&self.scan_status);
+        let scan_progress = Arc::clone(&self.scan_progress);
+
+        tokio::task::spawn_blocking(move || {
+            // blocking_lock is right here: this is a blocking thread, not a task.
+            let report = |completed: u32, total: u32, message: String, status: ScanStatus| {
+                let response = ScanProgressResponse {
+                    completed,
+                    total,
+                    progress: if total == 0 { 0.0 } else { completed as f32 / total as f32 },
+                    message,
+                    status: status as i32,
+                };
+                *scan_status.blocking_lock() = status;
+                *scan_progress.blocking_lock() = Some(response.clone());
+                response
+            };
+
+            on_progress(
+                report(0, 0, "Finding plugins...".to_string(), ScanStatus::ScanScanningPlugins),
+                None,
+            );
+
+            let mut on_plugin = |index: usize, total: usize, path: &Path| {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("plugin");
+                on_progress(
+                    report(
+                        index as u32,
+                        total as u32,
+                        format!("Scanning {}", name),
+                        ScanStatus::ScanScanningPlugins,
+                    ),
+                    None,
+                );
+            };
+            let outcome = crate::services::plugins::scan_configured_plugins(&mut on_plugin)
+                .and_then(|scan| db.blocking_lock().record_plugin_refresh(&scan));
+
+            match outcome {
+                Ok(result) => {
+                    let message = format!(
+                        "Plugin scan completed: {} installed, {} missing, {} failed to load",
+                        result.plugins_installed, result.plugins_missing, result.scan_failures
+                    );
+                    let total = result.candidates_scanned.max(0) as u32;
+                    on_progress(report(total, total, message, ScanStatus::ScanCompleted), Some(result));
+                }
+                Err(e) => {
+                    let message = format!("Plugin scan failed: {}", e);
+                    on_progress(report(0, 1, message, ScanStatus::ScanError), None);
+                }
+            }
+        });
+        true
     }
 
     /// Validates, parses, and inserts a single project via BatchInsertManager,

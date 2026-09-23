@@ -37,8 +37,9 @@ Last reviewed: 2026-09-23.
 
 ADR-0024's HTTP router landed in full (2026-09-16): skeleton, then every domain in the
 `Services` aggregator plus `system` (scan status, project add, watcher control, the two
-SSE streaming endpoints, statistics with CSV export). Each domain has its own hand-written
-DTOs in `src/http/dto/`, independent of the generated proto types, per the ADR.
+SSE streaming endpoints, statistics with CSV export). Each domain has its own
+hand-written DTOs in `src/http/dto/`, independent of the generated proto types, per the
+ADR.
 
 ADR-0028 records a tentative maintainer direction to retire the CLI and gRPC server
 entirely once this surface is proven out, leaving a pure Axum API for a web frontend
@@ -51,9 +52,9 @@ retiring the Ableton database.
 Plugin metadata now comes entirely from Seula's own scanner. `seula plugin refresh`
 scans the system and persists into `plugins` / `plugin_classes` / `plugin_buses`, sweeps
 what it no longer finds, and merges phantom rows into the bundle that owns their class.
-`seula scan` runs that scan automatically when one has never completed. Parsing a project
-records references in `plugin_refs` and resolves them by `(plugin_kind, uid)`, falling
-back to `plugin_classes.class_id`.
+`seula scan` runs that scan automatically when one has never completed. Parsing a
+project records references in `plugin_refs` and resolves them by `(plugin_kind, uid)`,
+falling back to `plugin_classes.class_id`.
 
 Nothing in the plugin path reads Ableton's database any more, and `live_database_dir` is
 gone from the configuration.
@@ -64,9 +65,9 @@ Worth picking up next, in no particular order:
   `vst_search_paths` at an empty directory (ADR-0013).
 - **`plugin_paths`**, if duplicate install locations ever need surfacing (ADR-0010).
 
-A full plugin scan is **2m19s for 276 candidates** (debug build, 2026-09-15). The cost is
-plugin load time, not ours, so a release build will not change it much — which is why it
-runs once on first use and thereafter only on demand (ADR-0013).
+A full plugin scan is **2m19s for 276 candidates** (debug build, 2026-09-15). The cost
+is plugin load time, not ours, so a release build will not change it much — which is why
+it runs once on first use and thereafter only on demand (ADR-0013).
 
 **Schema versioning:** `SCHEMA_VERSION` (now 3) is bumped only for changes to *existing*
 tables. Adding a table needs no bump, because `initialize()` creates missing ones on
@@ -75,9 +76,9 @@ every open — and a bump discards the user's database (ADR-0011).
 ## Known issues
 
 Five tests are `#[ignore]`d as of 2026-09-16 — three scan the real configured project
-folders, two are hardcoded to paths on the maintainer's machine. `cargo test --workspace`
-no longer runs them; use `cargo test --workspace --tests -- --ignored` for the heavy
-pass. See CLAUDE.md.
+folders, two are hardcoded to paths on the maintainer's machine.
+`cargo test --workspace` no longer runs them; use
+`cargo test --workspace --tests -- --ignored` for the heavy pass. See CLAUDE.md.
 
 | Issue | Where | Severity |
 |---|---|---|
@@ -85,46 +86,56 @@ pass. See CLAUDE.md.
 | `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. Both are now `#[ignore]`d (2026-09-16, CLAUDE.md) so this only surfaces under `cargo test --tests -- --ignored`. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
+| The project scan runs its blocking work (parsing, the first-run plugin scan) inside an async task, not on a blocking thread, so it occupies a runtime worker for the whole scan. The plugin scan uses `spawn_blocking` (ADR-0038). | `src/services/system.rs` (`start_scan`) | Low |
 
 Resolved:
 
+- **A plugin refresh over the API froze every other request for minutes** (found
+  2026-09-23, fixed 2026-09-23). `refresh_plugin_installation_status` ran the whole system
+  scan (2m19s on the maintainer's library) inside a database method, while the service
+  held the database mutex that every service shares. The scan now runs without the
+  database, which is locked only to write the result, and the plugins view gets a
+  background scan with progress, `POST /api/v1/plugins/scan` (ADR-0038). At the same time,
+  a second scan no longer starts while one runs; before, a second project scan reset the
+  first one's status. Regression test: `no_scan_starts_while_one_is_running`
+  (`tests/grpc/server_setup.rs`).
 - **Uploading a second audition audio lost the first** (found 2026-09-23, fixed
   2026-09-23). `store_audio_file` pointed `projects.audio_file_id` at the new upload,
-  leaving the previous file referenced by nothing, so the next orphan cleanup deleted
-  it. Uploads now join the project's audio list and become the primary only if there
-  was none (ADR-0037). Tests: `tests/database/audio_files.rs`.
+  leaving the previous file referenced by nothing, so the next orphan cleanup deleted it.
+  Uploads now join the project's audio list and become the primary only if there was none
+  (ADR-0037). Tests: `tests/database/audio_files.rs`.
 - **Every scale except Major and Minor was stored as `Empty`** (found 2026-09-23, fixed
-  2026-09-23). `src/scan/parser.rs` mapped only those two of Ableton's scale names;
-  the rest fell to `Scale::Empty` behind an "add other scale mappings as needed"
-  comment. In the maintainer's files that was 1,048 key-detected clips, including 510
-  Mixolydian. Fixed by mapping through a full table of Ableton's names, with
-  `Scale::Other` keeping any name the table lacks (ADR-0035). Regression tests:
-  `models::key_name_tests`. **Projects parsed before the fix keep `Empty` until a forced
-  rescan**, because the scanner re-parses only changed files.
+  2026-09-23). `src/scan/parser.rs` mapped only those two of Ableton's scale names; the
+  rest fell to `Scale::Empty` behind an "add other scale mappings as needed" comment. In
+  the maintainer's files that was 1,048 key-detected clips, including 510 Mixolydian.
+  Fixed by mapping through a full table of Ableton's names, with `Scale::Other` keeping
+  any name the table lacks (ADR-0035). Regression tests: `models::key_name_tests`.
+  **Projects parsed before the fix keep `Empty` until a forced rescan**, because the
+  scanner re-parses only changed files.
 - **`--config <path>` was accepted and ignored** (found 2026-09-23, fixed 2026-09-23).
   `Cli` declared the flag but nothing read it: `CONFIG` is a lazy static that loaded
   before `Cli::parse()` ran, from `SEULA_CONFIG` or the default locations. Fixed in
-  `src/main.rs` by parsing first and exporting the flag as `SEULA_CONFIG` before
-  `CONFIG` is touched. A missing path now exits with an error rather than falling
-  through to another config, which the env var still does. Checked by running the mock
-  data generator, which now passes `--config` and gets its own port.
+  `src/main.rs` by parsing first and exporting the flag as `SEULA_CONFIG` before `CONFIG`
+  is touched. A missing path now exits with an error rather than falling through to
+  another config, which the env var still does. Checked by running the mock data
+  generator, which now passes `--config` and gets its own port.
 - **`seula --server` was unreachable** (found 2026-09-23, fixed 2026-09-23). Server-only
-  mode (2025-08-14) checked for `--server` by scanning raw argv, but a week later the
-  clap CLI put `Cli::parse()` in front of that check, and clap rejects any flag it does
-  not declare. So the mode could not be started for over a year. Found when the mockup
-  data generator needed a headless server. Fixed by declaring `--server`/`-s` on `Cli`
-  and branching on the parsed flag. Regression test: `server_flag_parses`
-  (`src/cli/mod.rs`).
+  mode (2025-08-14) checked for `--server` by scanning raw argv, but a week later the clap
+  CLI put `Cli::parse()` in front of that check, and clap rejects any flag it does not
+  declare. So the mode could not be started for over a year. Found when the mockup data
+  generator needed a headless server. Fixed by declaring `--server`/`-s` on `Cli` and
+  branching on the parsed flag. Regression test: `server_flag_parses` (`src/cli/mod.rs`).
 
 - **`plugin_count` inflation in the `plugin vendors` / `plugin formats` aggregates**
   (found 2026-09-16, fixed 2026-09-16). The `usage_stats` subquery has one row per
   `(plugin_id, project_id)` pair; the outer `LEFT JOIN` fanned each plugin row out once
-  per project it's used in, so `COUNT(*)` and the installed/missing/unknown `SUM(CASE
-  ...)`s counted that plugin once per project instead of once. `total_usage_count` and
-  `unique_projects_using` were unaffected — they already summed/`COUNT(DISTINCT)`ed
-  correctly over the fanned rows. Fixed by switching `plugin_count` and the three status
-  counts to `COUNT(DISTINCT p.id)` / `COUNT(DISTINCT CASE WHEN ... THEN p.id END)`,
-  which collapse back to one count per plugin regardless of the fan-out. Regression test:
+  per project it's used in, so `COUNT(*)` and the installed/missing/unknown
+  `SUM(CASE ...)`s counted that plugin once per project instead of once.
+  `total_usage_count` and `unique_projects_using` were unaffected — they already
+  summed/`COUNT(DISTINCT)`ed correctly over the fanned rows. Fixed by switching
+  `plugin_count` and the three status counts to `COUNT(DISTINCT p.id)` /
+  `COUNT(DISTINCT CASE WHEN ... THEN p.id END)`, which collapse back to one count per
+  plugin regardless of the fan-out. Regression test:
   `vendor_and_format_plugin_count_does_not_inflate_with_project_usage`
   (`tests/database/plugin_scan.rs`) — a plugin used in three projects must still count
   once. `src/database/plugins.rs` (`vendor_stats`/`format_stats` CTEs). ADR-0026.
@@ -134,18 +145,18 @@ Resolved:
 Resolved:
 
 - **`.kiro/`** — moved into `docs/archive/.kiro/` (2026-09-16). Superseded by
-  `crates/vst-meta` and `CLAUDE.md`/`architecture/`; kept for history rather than
-  deleted, same treatment as the rest of `docs/archive/`.
+  `crates/vst-meta` and `CLAUDE.md`/`architecture/`; kept for history rather than deleted,
+  same treatment as the rest of `docs/archive/`.
 
 Undecided, needs a call from the maintainer:
 
 - **`FRONTEND_SPEC.md`, `REQUIRED_FEATURES.md`, `TUI_ARCHITECTURE_ANALYSIS.md`,
-  `TUI_PROJECT_PLAN.md`** — root-level planning docs. No corresponding code found for
-  the TUI ones; `src/cli/interactive.rs` is a rustyline prompt, not a TUI. Aspirational,
+  `TUI_PROJECT_PLAN.md`** — root-level planning docs. No corresponding code found for the
+  TUI ones; `src/cli/interactive.rs` is a rustyline prompt, not a TUI. Aspirational,
   abandoned, or active?
 - **`docs/archive/`** — two AI chat transcripts and an empty file, archived rather than
-  deleted. `plugin_scanner_plan.md` proposes a C++ binary and is actively misleading.
-  Git history preserves them; deleting is safe.
+  deleted. `plugin_scanner_plan.md` proposes a C++ binary and is actively misleading. Git
+  history preserves them; deleting is safe.
 
 ## Decisions not yet recorded
 

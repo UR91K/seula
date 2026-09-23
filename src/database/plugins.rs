@@ -278,8 +278,11 @@ impl ProjectDatabase {
         Ok((grpc_plugins?, total_count))
     }
 
-    /// Refresh plugin installation status by checking against Ableton's database
-    /// Rescan the plugins installed on this system and write the results.
+    /// Write a full rescan of the system's plugins and summarise what changed.
+    ///
+    /// The scan itself happens before this, without the database: it takes minutes on a
+    /// real library, and holding the database for that long stalled every other request
+    /// (ADR-0038). This only persists the report, in one transaction.
     ///
     /// This replaces an earlier implementation that asked Ableton's database whether
     /// each plugin existed. That version tested `get_plugin_by_dev_identifier(..).is_ok()`,
@@ -288,24 +291,10 @@ impl ProjectDatabase {
     ///
     /// Re-resolving references is part of the job: a plugin installed since the last
     /// scan is picked up here without reparsing any project file (ADR-0009).
-    pub fn refresh_plugin_installation_status(
+    pub fn record_plugin_refresh(
         &mut self,
+        report: &crate::scan::plugins::ScanReport,
     ) -> Result<PluginRefreshResult, DatabaseError> {
-        use crate::config::CONFIG;
-        use crate::scan::plugins::scan_system;
-        use std::path::PathBuf;
-        use std::time::Duration;
-
-        let config = CONFIG
-            .as_ref()
-            .map_err(|e| DatabaseError::ConfigError(e.clone()))?;
-
-        let roots: Vec<PathBuf> = config.vst_search_paths.iter().map(PathBuf::from).collect();
-        let timeout = Duration::from_secs(config.vst_scan_timeout_secs);
-
-        let report = scan_system(&roots, timeout)
-            .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
-
         // Only a scan that covered every configured search path may declare anything
         // missing. A truncated one reports what it saw and leaves the rest alone.
         let full_scan = !report.budget_exhausted;
@@ -313,7 +302,7 @@ impl ProjectDatabase {
         let candidates_scanned = report.results.len() as i32;
         let scan_failures = report.failed() as i32;
 
-        let persisted = self.persist_plugin_scan(&report, full_scan)?;
+        let persisted = self.persist_plugin_scan(report, full_scan)?;
 
         Ok(PluginRefreshResult {
             candidates_scanned,

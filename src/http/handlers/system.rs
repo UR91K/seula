@@ -47,12 +47,13 @@ pub async fn get_scan_status(State(state): State<AppState>) -> impl IntoResponse
     })
 }
 
+/// 409 when a scan, of projects or plugins, is already running (ADR-0038).
 pub async fn scan_directories(
     State(state): State<AppState>,
-) -> Sse<ReceiverStream<Result<Event, Infallible>>> {
+) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
     let (tx, rx) = tokio::sync::mpsc::channel(100);
 
-    state
+    let started = state
         .system
         .start_scan(move |response| {
             let dto = ScanProgressDto::from(response);
@@ -61,8 +62,11 @@ pub async fn scan_directories(
             }
         })
         .await;
+    if !started {
+        return Err(ApiError::Conflict("A scan is already running".to_string()));
+    }
 
-    Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default())
+    Ok(Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()))
 }
 
 pub async fn add_single_project(

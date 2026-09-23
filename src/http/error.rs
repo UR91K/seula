@@ -18,6 +18,8 @@ use crate::media::MediaError;
 pub enum ApiError {
     NotFound(String),
     InvalidRequest(String),
+    /// The request is valid but clashes with work in progress, such as a second scan.
+    Conflict(String),
     Internal(String),
 }
 
@@ -54,6 +56,7 @@ impl IntoResponse for ApiError {
         let (status, message) = match self {
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             ApiError::InvalidRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
             ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 

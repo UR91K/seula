@@ -191,4 +191,20 @@ mod tests {
         assert_eq!(current_progress.progress, 0.5);
         assert_eq!(current_progress.message, "Test progress");
     }
+
+    /// A project scan and a plugin scan share the status; neither starts while the
+    /// other runs (ADR-0038).
+    #[tokio::test]
+    async fn no_scan_starts_while_one_is_running() {
+        let server = create_test_server().await;
+        let system = &server.system_handler.service;
+        *system.scan_status_handle().lock().await = ScanStatus::ScanParsing;
+
+        assert!(!system.start_plugin_scan(|_, _| {}).await);
+        assert!(!system.start_scan(|_| {}).await);
+        assert_eq!(*system.scan_status_handle().lock().await, ScanStatus::ScanParsing);
+
+        *system.scan_status_handle().lock().await = ScanStatus::ScanScanningPlugins;
+        assert!(!system.start_scan(|_| {}).await);
+    }
 }

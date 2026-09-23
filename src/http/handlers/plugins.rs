@@ -1,14 +1,18 @@
 //! Plugins domain HTTP handlers (ADR-0024). Thin over `PluginsService`,
 //! mirroring `src/grpc/handlers/plugins.rs`.
 
+use std::convert::Infallible;
+
 use axum::extract::{Path, Query, State};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::Json;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::http::dto::plugins::{
     parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FormatListResponse,
     GetAllPluginsQuery, GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse,
-    PluginStatsQuery, ProjectsByPluginQuery, SearchPluginsQuery, VendorListResponse,
+    PluginScanEventDto, PluginStatsQuery, ProjectsByPluginQuery, SearchPluginsQuery, VendorListResponse,
 };
 use crate::database::plugins::PluginFilter;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
@@ -184,6 +188,36 @@ pub async fn get_projects_by_plugin(
     Ok(Json(ProjectListResponse { projects, total_count }))
 }
 
+/// Rescan the system's plugins in the background, streaming progress as Server-Sent
+/// Events like `POST /api/v1/system/scan` (ADR-0038). The progress also shows at
+/// `GET /api/v1/system/scan-status`, so a client that did not start the scan can follow
+/// it. 409 when a scan is already running.
+pub async fn scan_plugins(
+    State(state): State<AppState>,
+) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
+
+    let started = state
+        .system
+        .start_plugin_scan(move |response, result| {
+            let dto = PluginScanEventDto {
+                progress: response.into(),
+                result,
+            };
+            if let Ok(json) = serde_json::to_string(&dto) {
+                let _ = tx.try_send(Ok(Event::default().data(json)));
+            }
+        })
+        .await;
+    if !started {
+        return Err(ApiError::Conflict("A scan is already running".to_string()));
+    }
+
+    Ok(Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()))
+}
+
+/// The same rescan, answered only when it is finished (minutes on a real library).
+/// Kept for scripts; the plugins view uses `scan_plugins`.
 pub async fn refresh_plugin_installation_status(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
