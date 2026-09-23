@@ -163,7 +163,7 @@ impl ProjectDatabase {
                 let name: String = row.get(1)?;
                 debug!("Found sample: {}", name);
                 Ok(Sample {
-                    id: Uuid::new_v4(),
+                    id: crate::database::helpers::row_uuid(row, 0)?,
                     name,
                     path: PathBuf::from(row.get::<_, String>(2)?),
                     is_present: row.get(3)?,
@@ -335,7 +335,7 @@ impl ProjectDatabase {
                 let name: String = row.get(1)?;
                 debug!("Found sample: {}", name);
                 Ok(Sample {
-                    id: Uuid::new_v4(),
+                    id: crate::database::helpers::row_uuid(row, 0)?,
                     name,
                     path: PathBuf::from(row.get::<_, String>(2)?),
                     is_present: row.get(3)?,
@@ -502,7 +502,7 @@ impl ProjectDatabase {
                 let name: String = row.get(1)?;
                 debug!("Found sample: {}", name);
                 Ok(Sample {
-                    id: Uuid::new_v4(),
+                    id: crate::database::helpers::row_uuid(row, 0)?,
                     name,
                     path: PathBuf::from(row.get::<_, String>(2)?),
                     is_present: row.get(3)?,
@@ -756,7 +756,7 @@ impl ProjectDatabase {
                 live_set.samples = sample_stmt
                     .query_map([&project_id_str], |row| {
                         Ok(Sample {
-                            id: Uuid::new_v4(),
+                            id: crate::database::helpers::row_uuid(row, 0)?,
                             name: row.get(1)?,
                             path: PathBuf::from(row.get::<_, String>(2)?),
                             is_present: row.get(3)?,
@@ -953,7 +953,7 @@ impl ProjectDatabase {
                 project.samples = sample_stmt
                     .query_map([&project_id_str], |row| {
                         Ok(Sample {
-                            id: Uuid::new_v4(),
+                            id: crate::database::helpers::row_uuid(row, 0)?,
                             name: row.get(1)?,
                             path: PathBuf::from(row.get::<_, String>(2)?),
                             is_present: row.get(3)?,
@@ -1039,7 +1039,7 @@ impl ProjectDatabase {
                 project.samples = sample_stmt
                     .query_map([&project_id_str], |row| {
                         Ok(Sample {
-                            id: Uuid::new_v4(),
+                            id: crate::database::helpers::row_uuid(row, 0)?,
                             name: row.get(1)?,
                             path: PathBuf::from(row.get::<_, String>(2)?),
                             is_present: row.get(3)?,
@@ -1252,7 +1252,7 @@ impl ProjectDatabase {
                 project.samples = sample_stmt
                     .query_map([&project_id_str], |row| {
                         Ok(Sample {
-                            id: Uuid::new_v4(),
+                            id: crate::database::helpers::row_uuid(row, 0)?,
                             name: row.get(1)?,
                             path: PathBuf::from(row.get::<_, String>(2)?),
                             is_present: row.get(3)?,

@@ -109,6 +109,12 @@ pub fn insert_plugin(tx: &Transaction, plugin: &Plugin) -> Result<Option<String>
 /// Reads by column name rather than position: the table's column order is not a
 /// contract, and every schema change used to silently reassign the indices that ten
 /// separate copies of this code depended on.
+/// The UUID stored in column `idx`. A malformed one becomes a fresh UUID, as in
+/// `row_to_plugin`, rather than failing the whole read.
+pub fn row_uuid(row: &Row, idx: usize) -> rusqlite::Result<Uuid> {
+    Ok(Uuid::parse_str(&row.get::<_, String>(idx)?).unwrap_or_else(|_| Uuid::new_v4()))
+}
+
 pub fn row_to_plugin(row: &Row) -> rusqlite::Result<Plugin> {
     Ok(Plugin {
         id: Uuid::parse_str(&row.get::<_, String>("id")?).unwrap_or_else(|_| Uuid::new_v4()),

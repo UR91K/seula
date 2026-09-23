@@ -10,6 +10,7 @@ pub mod media;
 pub mod plugin_details;
 pub mod plugin_scan;
 pub mod project_counts;
+pub mod sample_ids;
 pub mod search;
 pub mod tags;
 

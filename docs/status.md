@@ -90,6 +90,14 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **A project's samples got a new random id on every read** (found 2026-09-23, fixed
+  2026-09-23). The eight queries that load a project's samples (in
+  `src/database/projects.rs` and `src/database/collections.rs`) built each `Sample` with
+  `Uuid::new_v4()` instead of reading the stored id, so the same sample had a different id
+  in every response and could not be matched to `/api/v1/samples` or to itself in another
+  project. Found when the mockup generator compared two responses that embed the same
+  projects. Regression test: `a_projects_samples_keep_their_stored_ids_across_reads`
+  (`tests/database/sample_ids.rs`).
 - **A plugin refresh over the API froze every other request for minutes** (found
   2026-09-23, fixed 2026-09-23). `refresh_plugin_installation_status` ran the whole system
   scan (2m19s on the maintainer's library) inside a database method, while the service
