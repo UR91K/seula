@@ -103,6 +103,9 @@ fn proto_project_to_dto(p: ProtoProject) -> ProjectDto {
             .collect(),
         collection_ids: p.collection_ids,
         audio_file_id: p.audio_file_id,
+        // The proto Project carries only the primary (gRPC is not extended, ADR-0028/0037),
+        // so the system statistics' embedded projects have no audio list.
+        audio_files: Vec::new(),
     }
 }
 

@@ -88,6 +88,11 @@ pass. See CLAUDE.md.
 
 Resolved:
 
+- **Uploading a second audition audio lost the first** (found 2026-09-23, fixed
+  2026-09-23). `store_audio_file` pointed `projects.audio_file_id` at the new upload,
+  leaving the previous file referenced by nothing, so the next orphan cleanup deleted
+  it. Uploads now join the project's audio list and become the primary only if there
+  was none (ADR-0037). Tests: `tests/database/audio_files.rs`.
 - **Every scale except Major and Minor was stored as `Empty`** (found 2026-09-23, fixed
   2026-09-23). `src/scan/parser.rs` mapped only those two of Ableton's scale names;
   the rest fell to `Scale::Empty` behind an "add other scale mappings as needed"

@@ -1184,9 +1184,10 @@ impl ProjectDatabase {
 
         if let Some(has_audio) = has_audio_file {
             if has_audio {
-                conditions.push("audio_file_id IS NOT NULL");
+                // ADR-0037: any listed audio, not just a primary.
+                conditions.push("EXISTS (SELECT 1 FROM project_audio_files pa WHERE pa.project_id = projects.id)");
             } else {
-                conditions.push("audio_file_id IS NULL");
+                conditions.push("NOT EXISTS (SELECT 1 FROM project_audio_files pa WHERE pa.project_id = projects.id)");
             }
         }
 

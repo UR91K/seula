@@ -217,6 +217,29 @@ CREATE TABLE IF NOT EXISTS collection_projects (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- Every audition audio a project has, in the order added (ADR-0037).
+-- projects.audio_file_id stays as the primary: the one the row plays, always one of
+-- these. Additive, so no SCHEMA_VERSION bump.
+CREATE TABLE IF NOT EXISTS project_audio_files (
+    project_id TEXT NOT NULL,
+    media_file_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    added_at DATETIME NOT NULL,
+    PRIMARY KEY (project_id, media_file_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (media_file_id) REFERENCES media_files(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_project_audio_files_media ON project_audio_files(media_file_id);
+
+-- A database from before the list existed has at most one audio per project, in
+-- projects.audio_file_id. List it. Idempotent, so it runs on every open; the IN guard
+-- skips a dangling id, which would otherwise fail the foreign key and the whole batch.
+INSERT OR IGNORE INTO project_audio_files (project_id, media_file_id, position, added_at)
+SELECT id, audio_file_id, 0, CAST(strftime('%s', 'now') AS INTEGER)
+FROM projects
+WHERE audio_file_id IS NOT NULL
+  AND audio_file_id IN (SELECT id FROM media_files);
+
 -- State belonging to the application rather than to any entity.
 --
 -- Additive: `CREATE TABLE IF NOT EXISTS` means an existing database gains

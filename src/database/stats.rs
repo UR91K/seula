@@ -601,9 +601,10 @@ impl ProjectDatabase {
 
         if let Some(has_audio) = has_audio_file {
             if has_audio {
-                conditions.push("audio_file_id IS NOT NULL");
+                // ADR-0037: any listed audio, not just a primary.
+                conditions.push("EXISTS (SELECT 1 FROM project_audio_files pa WHERE pa.project_id = projects.id)");
             } else {
-                conditions.push("audio_file_id IS NULL");
+                conditions.push("NOT EXISTS (SELECT 1 FROM project_audio_files pa WHERE pa.project_id = projects.id)");
             }
         }
 
@@ -621,7 +622,7 @@ impl ProjectDatabase {
         )?;
 
         let projects_with_audio_files: i32 = self.conn.query_row(
-            &format!("SELECT COUNT(*) FROM projects {} AND audio_file_id IS NOT NULL", where_clause),
+            &format!("SELECT COUNT(*) FROM projects {} AND EXISTS (SELECT 1 FROM project_audio_files pa WHERE pa.project_id = projects.id)", where_clause),
             rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
             |row| row.get(0),
         )?;

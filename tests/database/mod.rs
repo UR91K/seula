@@ -2,6 +2,7 @@
 //!
 //! This module contains all database-related tests
 
+pub mod audio_files;
 pub mod batch;
 pub mod collections;
 pub mod core;

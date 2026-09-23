@@ -6,7 +6,7 @@
 
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -335,6 +335,14 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/projects/:project_id/audio-file",
             put(media_handlers::set_project_audio_file)
                 .delete(media_handlers::remove_project_audio_file),
+        )
+        .route(
+            "/api/v1/projects/:project_id/audio-files",
+            get(media_handlers::list_project_audio_files).post(media_handlers::add_project_audio_file),
+        )
+        .route(
+            "/api/v1/projects/:project_id/audio-files/:media_file_id",
+            delete(media_handlers::remove_project_audio_file_from_list),
         )
         .route(
             "/api/v1/system/info",

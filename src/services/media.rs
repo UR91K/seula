@@ -63,8 +63,16 @@ impl MediaService {
             return Err(e.into());
         }
 
-        if let Err(e) = db.update_project_audio_file(project_id, Some(&media_file.id)) {
-            tracing::warn!("Failed to set project audio file: {:?}", e);
+        // Added to the list; primary only if the project had none. Uploading used to
+        // replace the audio outright (ADR-0037).
+        let has_primary = db.get_project_audio_file(project_id).ok().flatten().is_some();
+        let attached = if has_primary {
+            db.add_project_audio_file(project_id, &media_file.id)
+        } else {
+            db.update_project_audio_file(project_id, Some(&media_file.id))
+        };
+        if let Err(e) = attached {
+            tracing::warn!("Failed to attach project audio file: {:?}", e);
         }
 
         Ok(media_file)
@@ -119,6 +127,30 @@ impl MediaService {
     pub async fn remove_project_audio_file(&self, project_id: &str) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
         Ok(db.update_project_audio_file(project_id, None)?)
+    }
+
+    /// A project's audition audios, each with whether it is the primary (ADR-0037).
+    pub async fn project_audio_files(&self, project_id: &str) -> Result<Vec<(MediaFile, bool)>, MediaError> {
+        let db = self.db.lock().await;
+        Ok(db.get_project_audio_files(project_id)?)
+    }
+
+    /// Attach an already-stored audio to a project's list, without making it primary.
+    pub async fn add_project_audio_file(&self, project_id: &str, media_file_id: &str) -> Result<(), MediaError> {
+        let mut db = self.db.lock().await;
+        let media = db
+            .get_media_file(media_file_id)?
+            .ok_or_else(|| MediaError::FileNotFound(media_file_id.to_string()))?;
+        if media.media_type != MediaType::AudioFile {
+            return Err(MediaError::InvalidMediaType(format!("{} is not an audio file", media_file_id)));
+        }
+        Ok(db.add_project_audio_file(project_id, media_file_id)?)
+    }
+
+    /// Take an audio off a project's list; returns false if it was not listed.
+    pub async fn remove_project_audio_file_from_list(&self, project_id: &str, media_file_id: &str) -> Result<bool, MediaError> {
+        let mut db = self.db.lock().await;
+        Ok(db.remove_project_audio_file_from_list(project_id, media_file_id)?)
     }
 
     pub async fn list_media_files(

@@ -3,6 +3,9 @@
 //! empty upload or a missing required field is a real rejection (400), but a
 //! storage/database failure during store/delete/set is a normal 200 with
 //! `success: false`, matching the gRPC handler exactly.
+//!
+//! The project audio-list routes (ADR-0037) have no gRPC counterpart to mirror, so they
+//! use ordinary HTTP errors (404, 400) and return the resulting list on success.
 
 use axum::body::{boxed, Body, Bytes};
 use axum::extract::{Path, Query, State};
@@ -17,6 +20,7 @@ use crate::http::dto::media::{
     MediaStatisticsResponse, MutationResponse, PaginationQuery, SetAudioFileRequest,
     SetCoverArtRequest, UploadAudioFileQuery, UploadCoverArtQuery, UploadResponse,
 };
+use crate::http::dto::projects::{AudioFileDto, AudioFileListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 
@@ -307,4 +311,51 @@ pub async fn cleanup_orphaned_media(
         success: true,
         error_message: None,
     }))
+}
+
+/// A project's audition audios, in list order (ADR-0037).
+pub async fn list_project_audio_files(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+) -> Result<Json<AudioFileListResponse>, ApiError> {
+    let audio_files = state
+        .services
+        .media
+        .project_audio_files(&project_id)
+        .await?
+        .into_iter()
+        .map(|(media, primary)| AudioFileDto::new(media, primary))
+        .collect();
+    Ok(Json(AudioFileListResponse { audio_files }))
+}
+
+/// Attach an already-uploaded audio to a project's list. It does not become the
+/// primary; that is `PUT /api/v1/projects/:id/audio-file`. Returns the new list.
+pub async fn add_project_audio_file(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+    Json(req): Json<SetAudioFileRequest>,
+) -> Result<Json<AudioFileListResponse>, ApiError> {
+    state.services.media.add_project_audio_file(&project_id, &req.media_file_id).await?;
+    list_project_audio_files(State(state), Path(project_id)).await
+}
+
+/// Take an audio off a project's list; the next one becomes primary if it was.
+/// Returns the new list, or 404 when the audio was not on it.
+pub async fn remove_project_audio_file_from_list(
+    State(state): State<AppState>,
+    Path((project_id, media_file_id)): Path<(String, String)>,
+) -> Result<Json<AudioFileListResponse>, ApiError> {
+    let removed = state
+        .services
+        .media
+        .remove_project_audio_file_from_list(&project_id, &media_file_id)
+        .await?;
+    if !removed {
+        return Err(ApiError::NotFound(format!(
+            "Audio {} is not on project {}",
+            media_file_id, project_id
+        )));
+    }
+    list_project_audio_files(State(state), Path(project_id)).await
 }

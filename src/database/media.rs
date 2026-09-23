@@ -125,6 +125,13 @@ impl ProjectDatabase {
             params![audio_file_id, project_id],
         )?;
 
+        // The primary is always one of the project's listed audios (ADR-0037).
+        if rows_affected > 0 {
+            if let Some(media_file_id) = audio_file_id {
+                self.add_project_audio_file(project_id, media_file_id)?;
+            }
+        }
+
         if rows_affected > 0 {
             info!("Successfully updated project audio file: {}", project_id);
         } else {
@@ -205,6 +212,8 @@ impl ProjectDatabase {
             WHERE id NOT IN (
                 SELECT DISTINCT audio_file_id FROM projects WHERE audio_file_id IS NOT NULL
                 UNION
+                SELECT media_file_id FROM project_audio_files
+                UNION
                 SELECT DISTINCT cover_art_id FROM collections WHERE cover_art_id IS NOT NULL
             )
             ORDER BY uploaded_at DESC
@@ -258,6 +267,8 @@ impl ProjectDatabase {
             WHERE id NOT IN (
                 SELECT DISTINCT audio_file_id FROM projects WHERE audio_file_id IS NOT NULL
                 UNION
+                SELECT media_file_id FROM project_audio_files
+                UNION
                 SELECT DISTINCT cover_art_id FROM collections WHERE cover_art_id IS NOT NULL
             )
         "#,
@@ -299,6 +310,8 @@ impl ProjectDatabase {
             FROM media_files 
             WHERE id NOT IN (
                 SELECT DISTINCT audio_file_id FROM projects WHERE audio_file_id IS NOT NULL
+                UNION
+                SELECT media_file_id FROM project_audio_files
                 UNION
                 SELECT DISTINCT cover_art_id FROM collections WHERE cover_art_id IS NOT NULL
             )
@@ -367,6 +380,71 @@ impl ProjectDatabase {
     }
 
     /// Convert a database row to a MediaFile
+    /// A project's audition audios in list order, each with whether it is the
+    /// primary, the one the row plays (ADR-0037).
+    pub fn get_project_audio_files(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<(MediaFile, bool)>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT m.id, m.original_filename, m.file_extension, m.media_type, m.file_size_bytes,
+                    m.mime_type, m.uploaded_at, m.checksum,
+                    COALESCE(p.audio_file_id = m.id, 0) AS is_primary
+             FROM project_audio_files pa
+             JOIN media_files m ON m.id = pa.media_file_id
+             JOIN projects p ON p.id = pa.project_id
+             WHERE pa.project_id = ?
+             ORDER BY pa.position, pa.added_at",
+        )?;
+        let rows = stmt.query_map(params![project_id], |row| {
+            Ok((self.row_to_media_file(row)?, row.get::<_, bool>("is_primary")?))
+        })?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Add an audio to the end of a project's list. Already listed is not an error.
+    pub fn add_project_audio_file(
+        &mut self,
+        project_id: &str,
+        media_file_id: &str,
+    ) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO project_audio_files (project_id, media_file_id, position, added_at)
+             SELECT ?1, ?2,
+                    COALESCE((SELECT MAX(position) + 1 FROM project_audio_files WHERE project_id = ?1), 0),
+                    ?3",
+            params![project_id, media_file_id, chrono::Utc::now().timestamp()],
+        )?;
+        Ok(())
+    }
+
+    /// Take an audio off a project's list. When it was the primary, the next audio in
+    /// list order becomes the primary, or none if the list is now empty. Returns false
+    /// when the audio was not on the list. The media file itself is left for the orphan
+    /// cleanup, as cover art is.
+    pub fn remove_project_audio_file_from_list(
+        &mut self,
+        project_id: &str,
+        media_file_id: &str,
+    ) -> Result<bool, DatabaseError> {
+        let tx = self.conn.transaction()?;
+        let removed = tx.execute(
+            "DELETE FROM project_audio_files WHERE project_id = ? AND media_file_id = ?",
+            params![project_id, media_file_id],
+        )?;
+        if removed > 0 {
+            tx.execute(
+                "UPDATE projects
+                 SET audio_file_id = (SELECT media_file_id FROM project_audio_files
+                                      WHERE project_id = ?1 ORDER BY position, added_at LIMIT 1)
+                 WHERE id = ?1 AND audio_file_id = ?2",
+                params![project_id, media_file_id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(removed > 0)
+    }
+
     fn row_to_media_file(&self, row: &Row) -> Result<MediaFile, rusqlite::Error> {
         let media_type_str: String = row.get("media_type")?;
         let media_type = MediaType::from_str(&media_type_str)

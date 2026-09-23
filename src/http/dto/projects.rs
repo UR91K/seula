@@ -123,7 +123,41 @@ pub struct ProjectDto {
     pub tags: Vec<TagDto>,
     pub tasks: Vec<TaskDto>,
     pub collection_ids: Vec<String>,
+    /// The primary audition audio, the one the row plays (ADR-0037).
     pub audio_file_id: Option<String>,
+    /// Every audition audio, in list order; exactly one is `primary` when
+    /// `audio_file_id` is set.
+    pub audio_files: Vec<AudioFileDto>,
+}
+
+/// One of a project's audition audios (ADR-0037). The bytes are at
+/// `GET /api/v1/media/:id`.
+#[derive(Serialize)]
+pub struct AudioFileDto {
+    pub id: String,
+    pub original_filename: String,
+    pub file_size_bytes: i64,
+    pub mime_type: String,
+    pub uploaded_at: i64,
+    pub primary: bool,
+}
+
+impl AudioFileDto {
+    pub fn new(media: crate::media::MediaFile, primary: bool) -> Self {
+        Self {
+            id: media.id,
+            original_filename: media.original_filename,
+            file_size_bytes: media.file_size_bytes as i64,
+            mime_type: media.mime_type,
+            uploaded_at: media.uploaded_at.timestamp(),
+            primary,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct AudioFileListResponse {
+    pub audio_files: Vec<AudioFileDto>,
 }
 
 /// Mirrors `src/grpc/handlers/utils.rs::convert_live_set_to_proto`, but builds
@@ -138,9 +172,12 @@ pub fn project_to_dto(
     let project_id = live_set.id.to_string();
 
     let notes = db.get_project_notes(&project_id)?.unwrap_or_default();
-    let audio_file_id = db
-        .get_project_audio_file(&project_id)?
-        .map(|media_file| media_file.id);
+    let audio_files: Vec<AudioFileDto> = db
+        .get_project_audio_files(&project_id)?
+        .into_iter()
+        .map(|(media, primary)| AudioFileDto::new(media, primary))
+        .collect();
+    let audio_file_id = audio_files.iter().find(|a| a.primary).map(|a| a.id.clone());
     let collection_ids = db.get_collections_for_project(&project_id)?;
     let tag_data = db.get_project_tag_data(&project_id)?;
     let tasks = db
@@ -211,6 +248,7 @@ pub fn project_to_dto(
         tasks,
         collection_ids,
         audio_file_id,
+        audio_files,
     })
 }
 
