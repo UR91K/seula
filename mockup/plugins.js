@@ -158,12 +158,6 @@ function pluginTable(st, rows) {
 
 // ------------------------------------------------------------------ toolbar
 
-/** A filter dropdown's face: the value when set, with a clear button. */
-function filterSelect(act, k, value, open) {
-  return `<span class="select ${value ? "set" : ""} ${open ? "open" : ""}" data-act="${act}"><span class="k">${k}</span> ${
-    value ? esc(value) : "All"} ${value ? `<span class="x" data-act="clear-${act}" title="Clear">${icon("close")}</span>` : icon("expand_more")}</span>`;
-}
-
 function pluginsViewbar(st, total) {
   if (st.empty) return `<h1>Plugins</h1>${scanButton(st)}`;
   const states = st.states.length ? INSTALL_STATES.filter((s) => st.states.includes(s.id)).map((s) => s.label).join(", ") : null;
@@ -236,13 +230,6 @@ function pluginContextMenu(p, { tauri = true, hot = null } = {}) {
 // ------------------------------------------------------------------ inspector
 
 const yesNo = (b) => b == null ? null : b ? "Yes" : "No";
-const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** A property sheet from [label, value] pairs, leaving out what the scan did not report. */
-function props(pairs) {
-  const rows = pairs.filter(([, v]) => v != null && v !== "");
-  return rows.length ? `<dl class="props">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>` : "";
-}
 
 /** What the installed flag means for this plugin, and when a scan last said so. */
 function pluginStateSection(p, d) {

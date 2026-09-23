@@ -157,6 +157,18 @@ textarea.notes::placeholder { color: var(--text-3); }
 .viewbar .count-sel { font-weight: 600; margin-right: calc(var(--u) * 2); }
 .viewbar .muted { color: var(--text-3); }
 
+/* a filter that is set: accent border, and its clear button in place of the caret */
+.select.set { border-color: var(--select-border); background: var(--select); }
+.select.open { border-color: var(--focus); }
+.select .x { display: inline-flex; color: var(--text-2); border-radius: var(--radius); }
+.select .x:hover { color: var(--text); background: var(--hover); }
+
+/* dropdowns that are lists to pick from, not searches */
+.pickmenu .it .ms.blank { visibility: hidden; }
+.pickmenu .it .status-dot .ms { width: calc(var(--u) * 7); height: calc(var(--u) * 7); font-size: calc(var(--u) * 7); }
+.pickmenu .it .cb { margin-right: var(--u); }
+.pickmenu .hint { max-width: calc(var(--u) * 110); white-space: normal; }
+
 /* ------------------------------------------------------------------ projects table */
 
 table.grid.fixed { table-layout: fixed; width: auto; min-width: 0; }
@@ -228,6 +240,44 @@ ul.tasks li.sel { background: var(--select); margin: 0 calc(var(--u) * -4); padd
 .insp-sec .field.add { margin-top: var(--u); height: var(--row); color: var(--text-3); }
 
 .insp-multi .big-n { font-size: var(--step-up); font-weight: 600; }
+
+/* ------------------------------------------------------------------ item states */
+
+/* a plugin's or sample's state: icon, colour and word together (ADR-0012) */
+.is-installed { color: var(--ok); }
+.is-absent { color: var(--missing); }
+.is-unscanned { color: var(--unknown); }
+
+.pstate { display: inline-flex; align-items: center; gap: calc(var(--u) * 2); }
+.pstate.is-installed { color: var(--text-2); }
+.pstate.is-installed .status-dot { color: var(--ok); }
+table.grid tbody tr.sel .pstate { color: var(--text); }
+
+/* the state icons at text size in the status bar */
+.statusbar .status-dot .ms { vertical-align: middle; }
+.statusbar .is-installed .ms, .statusbar .is-absent .ms, .statusbar .ms.sb { font-size: calc(var(--u) * 7); width: calc(var(--u) * 7); height: calc(var(--u) * 7); vertical-align: middle; }
+
+/* a plugin's or sample's inspector: a glyph in place of cover art, a state line */
+.insp-head .glyph {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: calc(var(--u) * 20); height: calc(var(--u) * 20);
+  background: var(--tag-bg); color: var(--text-2);
+  border-radius: var(--radius);
+}
+.insp-head .glyph .ms { font-size: calc(var(--u) * 12); width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
+
+.state-line { display: flex; align-items: center; gap: calc(var(--u) * 2); line-height: var(--row); }
+.state-line b { font-weight: 600; }
+.insp-sec .state-line + p { margin-top: var(--u); }
+.insp-sec .btn { margin-top: calc(var(--u) * 3); }
+
+.linkbtn {
+  display: inline-flex; align-items: center; gap: var(--u);
+  margin-top: var(--u);
+  background: none; border: 0; color: var(--accent); cursor: default;
+}
+.linkbtn:hover { text-decoration: underline; }
+.linkbtn .ms { font-size: calc(var(--u) * 6); width: calc(var(--u) * 6); height: calc(var(--u) * 6); }
 
 /* ------------------------------------------------------------------ empty states */
 

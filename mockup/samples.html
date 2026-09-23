@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula samples board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="samples.css">
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script src="components.js"></script>
+<script src="screens.js"></script>
+<script src="samples.js"></script>
+<script src="board.js"></script>
+<script>
+  // This page only chooses frames and their starting states (ADR-0036). Every frame,
+  // screen or component, is drawn by the shared renderers.
+
+  // ---------------------------------------------------------------- picking real rows
+
+  const byUse = [...data.samples].sort((a, b) => b.project_count - a.project_count);
+  const find = (pred) => byUse.find(pred);
+  const file = (s) => sampleDetail(s.id).file;
+
+  const present = find((s) => s.is_present && file(s) && s.project_count >= 3);
+  const recording = find((s) => s.is_present && s.name.startsWith("Audio"));
+  const missingSized = find((s) => !s.is_present && file(s));
+  const missingNever = find((s) => !s.is_present && !file(s));
+  const checkEvents = SAMPLE_API.checkEvents;
+  const midCheck = Math.floor(checkEvents.length / 2);
+  const checkEnd = checkEvents[checkEvents.length - 1];
+
+  // ---------------------------------------------------------------- frame helpers
+
+  const screen = (id, label, note, overrides) =>
+    ({ id, label, note, kind: "screen", live: true, render: samplesScreen(samplesState(overrides)) });
+  const comp = (id, label, note, html) => ({ id, label, note, render: (el) => { el.innerHTML = typeof html === "function" ? html() : html; } });
+  const inspector = (s, h = 260, opts = {}) => () =>
+    `<div class="inspector" style="width:calc(var(--u) * 150);height:calc(var(--u) * ${h});overflow:auto">${sampleInspector(s, opts)}</div>`;
+  const toolbar = (overrides) => () => {
+    const st = samplesState(overrides);
+    return `<div class="viewbar" style="width:calc(var(--u) * 526)">${samplesViewbar(st, sampleRows(st).length)}<button class="tb-btn on">${icon("right_panel_close")}</button></div>`;
+  };
+  const statusStrip = (overrides) => () => {
+    const st = samplesState(overrides);
+    const ev = st.checkStep != null ? checkEvents[st.checkStep] : null;
+    return `<div style="width:calc(var(--u) * 526)">${statusBar({ status: sampleStatusSegments(st), scan: ev && { done: ev.completed, total: ev.total, message: ev.message } })}</div>`;
+  };
+
+  function cells() {
+    const rows = [
+      [present, "present, measured"],
+      [missingSized, "missing: its last size, dimmed"],
+      [missingNever, "missing, never found by a check: no size"],
+    ];
+    return `<table class="grid fixed samples" style="width:calc(var(--u) * 330)"><thead><tr>
+      <th style="width:calc(var(--u) * 40)">Status</th><th style="width:calc(var(--u) * 150)">Folder</th><th class="num" style="width:calc(var(--u) * 32)">Size</th><th>State</th></tr></thead>
+      <tbody>${rows.map(([s, what]) => `<tr><td>${sampleStateCell(s.is_present)}</td><td>${folderCell(s.path)}</td><td class="num">${sizeCell(s)}</td><td class="faint">${what}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // ---------------------------------------------------------------- the board
+
+  board({
+    title: "Seula · Samples",
+    intro: `<p>The samples view (ADR-0036). <b>Screen</b> frames are live: select a row, right-click for
+      the menu, sort by a header, open the Format and Status dropdowns, and press <b>Check samples</b>
+      to replay a real check's progress.</p>
+      <p>All data is the real API over the seeded database: the list with measured sizes, each
+      sample's file record and used-in list, the format list (ADR-0039), the status-bar counts under
+      each filter, and the event stream of a real <code>POST /api/v1/samples/check</code> (ADR-0041).
+      The seeded paths do not exist on this machine, so that check found every sample missing, which
+      is why its final message reads as it does. Counts are active projects only (ADR-0040).</p>`,
+    columns: [
+      { title: "Screen", frames: [
+        screen("1", "Default", "most-used first; inspector open with nothing selected", {}),
+        screen("1b", "A present sample selected", "state, the projects using it, the file as the check measured it",
+          { selected: present.id }),
+        screen("1c", "A missing sample", "not there now; the size and date it had when a check last found it",
+          { selected: missingSized.id }),
+        screen("1d", "Filtered", "missing AIFF samples (.aif, .aiff and .aifc); the status bar counts only these",
+          { format: "aiff", presence: "missing" }),
+        screen("1e", "Search", "the top-bar search, on /api/v1/samples/search: name and path",
+          { query: "kick" }),
+        screen("1f", "Sorted by size", "largest first; a missing sample sorts by its last size",
+          { sort: { col: "size", desc: true }, selected: recording.id }),
+        screen("1g", "Context menu", "Play and Show in Explorer are native-only (ADR-0030)",
+          { selected: present.id, menu: { id: present.id } }),
+        screen("1h", "Format dropdown", "every format Live loads, empty ones greyed",
+          { popover: "format" }),
+        screen("1i", "Status dropdown", "",
+          { popover: "presence", presence: "missing" }),
+        screen("1j", "Checking", "a real event from the stream; the button is off while any scan runs",
+          { checkStep: midCheck, selected: present.id }),
+        screen("1k", "Browser target", "no window controls, no Play, no Show in Explorer",
+          { tauri: false, selected: present.id, menu: { id: present.id } }),
+        screen("1l", "Nothing matches", "", { query: "field recording" }),
+        screen("1m", "No samples yet", "a fresh install", { empty: true, inspectorOpen: false }),
+      ]},
+      { title: "Inspector", frames: [
+        comp("2a", "Present", "", inspector(present)),
+        comp("2b", "Present, a long recording", "", inspector(recording)),
+        comp("2c", "Missing, with its last size", "", inspector(missingSized)),
+        ...(missingNever ? [comp("2d", "Missing, never found by a check", "", inspector(missingNever, 200))] : []),
+        comp("2e", "Browser target", "no Play button", inspector(present, 150, { tauri: false })),
+        comp("2f", "Nothing selected", "", () => `<div class="inspector" style="width:calc(var(--u) * 150);height:calc(var(--u) * 120)">${sampleInspectorEmpty()}</div>`),
+      ]},
+      { title: "Context menu", frames: [
+        comp("3a", "A present sample", "Tauri target", () => sampleContextMenu(present, { hot: "play" })),
+        comp("3b", "A missing sample", "nothing on disk to play or show", () => sampleContextMenu(missingSized, { hot: "projects" })),
+        comp("3c", "Browser target", "the native-only entries are gone, not disabled", () => sampleContextMenu(present, { tauri: false })),
+      ]},
+      { title: "View toolbar", frames: [
+        comp("4a", "Default", "", toolbar({})),
+        comp("4b", "Filters set", "", toolbar({ format: "aiff", presence: "missing" })),
+        comp("4c", "Checking", "", toolbar({ checkStep: midCheck })),
+        comp("4d", "Format ▾", "hover a format for its extensions", () => sampleFormatMenu("aiff")),
+        comp("4e", "Status ▾", "", () => presenceMenu("missing")),
+      ]},
+      { title: "Table parts", frames: [
+        comp("5a", "Status, folder and size cells", "", cells),
+      ]},
+      { title: "Status bar", frames: [
+        comp("6a", "The whole library", "/api/v1/samples/stats; size measured by the last check", statusStrip({})),
+        comp("6b", "Filtered", "the same route, passed the list's filters", statusStrip({ format: "aiff", presence: "missing" })),
+        comp("6c", "Checking", "the stream's message, as the server words it", statusStrip({ checkStep: midCheck })),
+        comp("6d", "Check finished", "the stream's last event; the list and counts are fetched again", statusStrip({ checkDone: checkEnd })),
+      ]},
+    ],
+  });
+</script>
+</body>
+</html>

@@ -131,6 +131,13 @@ function projectTable(st, rows) {
 
 // ------------------------------------------------------------------ view toolbar
 
+/** A filter dropdown's face: the value when set, with a clear button in place of the
+ *  caret. `act` opens it; `clear-<act>` clears it. */
+function filterSelect(act, k, value, open) {
+  return `<span class="select ${value ? "set" : ""} ${open ? "open" : ""}" data-act="${act}"><span class="k">${k}</span> ${
+    value ? esc(value) : "All"} ${value ? `<span class="x" data-act="clear-${act}" title="Clear">${icon("close")}</span>` : icon("expand_more")}</span>`;
+}
+
 function pager(st, total) {
   const from = total ? st.page * st.pageSize + 1 : 0;
   const to = Math.min(total, (st.page + 1) * st.pageSize);
@@ -361,6 +368,14 @@ function newCollectionDialog(projects) {
 }
 
 // ------------------------------------------------------------------ inspector
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** A property sheet from [label, value] pairs, leaving out values that are absent. */
+function props(pairs) {
+  const rows = pairs.filter(([, v]) => v != null && v !== "");
+  return rows.length ? `<dl class="props">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>` : "";
+}
 
 function inspectorList(items, render, max = 8) {
   return `<ul class="plain">${items.slice(0, max).map(render).join("")}${

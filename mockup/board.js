@@ -28,7 +28,7 @@ function board({ title, intro, columns }) {
   document.body.innerHTML = `
     <div class="board-bar">
       <h1>${title}</h1>
-      <a href="shell.html">shell</a><a href="projects.html">projects</a><a href="plugins.html">plugins</a>
+      <a href="shell.html">shell</a><a href="projects.html">projects</a><a href="plugins.html">plugins</a><a href="samples.html">samples</a>
       <span class="grow"></span>
       <span class="ctl">Theme ${seg("theme", [["dark", "Dark"], ["light", "Light"]], boardPrefs.get("theme"))}</span>
       <span class="ctl">Root font ${seg("pt", [[8, "8pt"], [9, "9pt"], [10, "10pt"], [11, "11pt"]], boardPrefs.get("pt"))}</span>
