@@ -167,9 +167,8 @@ const LOGO = `<svg class="logo" viewBox="0 0 216.54 406" role="img" aria-label="
  *   counts: { view: n }    sidebar counts for a state the snapshot does not hold (a fresh install)
  * }
  */
-/** The views whose screens show keys, and so carry the ♯/♭ switch. Stats shows keys too
- *  (frontend.md) and joins this list when it is mocked up. */
-const KEY_VIEWS = ["projects", "collections"];
+/** The views whose screens show keys, and so carry the ♯/♭ switch. */
+const KEY_VIEWS = ["projects", "collections", "stats"];
 
 /** The status bar alone: the view's segments, a running scan, the watcher, and ♯/♭ on a
  *  view that shows keys. */

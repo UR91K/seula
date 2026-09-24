@@ -630,7 +630,9 @@ def snapshot() -> None:
             f"/api/v1/samples?{big}", "/api/v1/samples/stats", "/api/v1/samples/analytics",
             "/api/v1/samples/formats",
             f"/api/v1/media?{big}", "/api/v1/tasks/statistics",
-            "/api/v1/system/info", "/api/v1/system/statistics", "/api/v1/system/scan-status",
+            "/api/v1/system/info", "/api/v1/system/scan-status",
+            # The stats view, in both project scopes (ADR-0045).
+            "/api/v1/system/statistics", "/api/v1/system/statistics?scope=all",
             "/api/v1/config/status",
             # A plain term and one of the search operators, for the projects board's
             # search frames.

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seula stats board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="colors.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="samples.css">
+<link rel="stylesheet" href="stats.css">
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<script src="data/mock-api.js"></script>
+<script src="shell.js"></script>
+<script src="components.js"></script>
+<script src="screens.js"></script>
+<script src="samples.js"></script>
+<script src="stats.js"></script>
+<script src="board.js"></script>
+<script>
+  // This page only chooses frames and their starting states (ADR-0036). Every frame,
+  // screen or component, is drawn by the shared renderers.
+
+  const active = statsFor("active");
+  const all = statsFor("all");
+  // The quietest of the last twelve months, for the hover frame: an empty month is a
+  // gap now, not a missing column (docs/status.md).
+  const quiet = [...active.projects_per_month].sort((a, b) => a.count - b.count)[0];
+
+  // ---------------------------------------------------------------- frame helpers
+
+  const screen = (id, label, note, overrides) =>
+    ({ id, label, note, kind: "screen", live: true, render: statsScreen(statsState(overrides)) });
+  const comp = (id, label, note, html) => ({ id, label, note, render: (el) => { el.innerHTML = typeof html === "function" ? html() : html; } });
+  // A panel at the width it has in the screen's six-column grid (664 units wide).
+  const span = (n) => 107 * n + 4 * (n - 1);
+  const inPanel = (n, title, body, opts = {}) => () => `<div style="width:calc(var(--u) * ${span(n)})">${statPanel(title, body(), opts)}</div>`;
+  const wide = (inner) => () => `<div style="width:calc(var(--u) * 676)">${inner()}</div>`;
+  const bar = (st) => () => `<div class="viewbar" style="width:calc(var(--u) * 676)">${statsViewbar(st)}<span class="grow"></span></div>`;
+  const statusStrip = (st) => wide(() => statusBar({ view: "stats", status: statsStatusSegments(st) }));
+
+  // ---------------------------------------------------------------- the board
+
+  board({
+    title: "Seula · Stats",
+    intro: `<p>The stats view (ADR-0036, ADR-0045). <b>Screen</b> frames are live: scroll the page, hover
+      any bar, column or part of a count for its value, and change what is counted from <b>Counting ▾</b>.
+      There is no inspector.</p>
+      <p>All data is <code>/api/v1/system/statistics</code> over the seeded database, in both project scopes.
+      Each count at the top is split into its states, and the total is their sum. Every figure except the
+      project split counts the projects in scope and what they use, and the averages include projects with
+      none. Series are oldest first with empty periods as zero, so a quiet month, a missing tempo range or
+      a day with nothing done shows as a gap. The <b>♯/♭</b> switch re-spells the keys.</p>`,
+    columns: [
+      { title: "Screen", frames: [
+        screen("1", "Default", "counting active projects: the overview, then Music", {}),
+        screen("1b", "Plugins and samples", "scrolled: the most used plugins, vendors and samples, and the averages",
+          { band: "plugins" }),
+        screen("1c", "Activity", "scrolled: twelve calendar months with their average, every year, and the last thirty days",
+          { band: "activity" }),
+        screen("1d", "Library", "scrolled: the most complex projects, versions, tags, collections and tasks",
+          { band: "library" }),
+        screen("1e", "Counting ▾", "the scope preference, shared with Plugins, Samples and Collections",
+          { popover: "scope" }),
+        screen("1f", "Counting archived projects", "scope=all: every figure moves except the project split",
+          { scope: "all" }),
+        screen("1g", "Counting archived, Library", "an archived project among the most complex is marked",
+          { scope: "all", band: "library" }),
+        screen("1h", "Hovering a tempo bar", "every mark says its value on hover; only the tallest is labelled",
+          { hover: "tempo:120" }),
+        screen("1i", "Hovering an empty month", "a month with nothing created is a zero, not a missing column",
+          { band: "activity", hover: `month:${quiet.year}-${quiet.month}` }),
+        screen("1j", "Hovering a count's part", "the part's bar and its line say the same thing",
+          { hover: "Plugins:missing" }),
+        screen("1k", "Sidebar collapsed", "the six columns widen; nothing reflows",
+          { sidebarCollapsed: true }),
+        screen("1l", "Nothing scanned yet", "a fresh install",
+          { empty: true }),
+      ]},
+      { title: "Overview", frames: [
+        comp("2a", "Counting active projects", "archived projects are shown and marked not counted", wide(() => overviewTiles(active, "active"))),
+        comp("2b", "Counting all projects", "plugins, samples and tasks grow with the archived projects' own", wide(() => overviewTiles(all, "all"))),
+      ]},
+      { title: "Music", frames: [
+        comp("3a", "Tempo", "10 BPM bins from the slowest tempo used to the fastest, empty ones kept", inPanel(4, "Tempo", () => tempoChart(active), { count: "BPM, 10 per bar" })),
+        comp("3b", "Keys", "the twelve most common, then No key; spelled by the ♯/♭ switch", inPanel(3, "Keys", () => keyList(active), { count: active.key_distribution.filter((k) => k.key).length })),
+        comp("3c", "Time signatures", "", inPanel(3, "Time signatures", () => timeSignatureList(active), { count: active.time_signature_distribution.length })),
+        comp("3d", "Length", "the longest project is loaded whether archived or not", inPanel(2, "Length", () => lengthFacts(active))),
+      ]},
+      { title: "Plugins and samples", frames: [
+        comp("4a", "Most used plugins", "projects using each", inPanel(3, "Most used plugins", () => topPluginsTable(active))),
+        comp("4b", "Top vendors", "distinct plugins, and uses across projects", inPanel(3, "Top vendors", () => topVendorsTable(active))),
+        comp("4c", "Most used samples", "the folder truncated in the middle, as in Samples", inPanel(4, "Most used samples", () => topSamplesTable(active))),
+        comp("4d", "Averages", "over every project counted", inPanel(2, "Averages", () => perProjectFacts(active))),
+        comp("4e", "Averages, all projects", "", inPanel(2, "Averages", () => perProjectFacts(all))),
+      ]},
+      { title: "Activity", frames: [
+        comp("5a", "Created per month", "the average is over all twelve months", inPanel(4, "Created per month", () => monthChart(active), { count: "last 12 months" })),
+        comp("5b", "Created per year", "every year from the first project's", inPanel(2, "Created per year", () => yearChart(active))),
+        comp("5c", "Last 30 days", "two strips on one day axis, so no legend", inPanel(6, "Last 30 days", () => activityStrips(active))),
+      ]},
+      { title: "Library", frames: [
+        comp("6a", "Most complex projects", "", inPanel(3, "Most complex projects", () => complexTable(active), { count: "plugins + samples" })),
+        comp("6b", "Most complex, all projects", "the archived one marked", inPanel(3, "Most complex projects", () => complexTable(all), { count: "plugins + samples" })),
+        comp("6c", "Ableton versions", "", inPanel(3, "Ableton versions", () => versionList(active), { count: active.ableton_versions.length })),
+        comp("6d", "Top tags", "", inPanel(2, "Top tags", () => tagList(active))),
+        comp("6e", "Collections", "", inPanel(2, "Collections", () => statsCollectionFacts(active))),
+        comp("6f", "Tasks per month", "completed and pending, by the month a task was created", inPanel(2, "Tasks per month", () => taskChart(active), { count: "by month created" })),
+      ]},
+      { title: "Toolbar and status bar", frames: [
+        comp("7a", "View toolbar", "Counting ▾ and Export CSV; no inspector toggle", bar(statsState())),
+        comp("7b", "Counting all projects", "", bar(statsState({ scope: "all" }))),
+        comp("7c", "Counting ▾", "", () => scopeMenu("active")),
+        comp("7d", "Nothing scanned yet", "nothing to count or export", bar(statsState({ empty: true }))),
+        comp("7e", "Tooltip", "", () => `<div class="pop tip" style="position:relative">${esc(`${MONTHS_LONG[quiet.month - 1]} ${quiet.year} · ${plural(quiet.count, "project")} created`)}</div>`),
+        comp("7f", "Status bar", "", statusStrip(statsState())),
+        comp("7g", "Status bar, counting all", "", statusStrip(statsState({ scope: "all" }))),
+      ]},
+    ],
+  });
+</script>
+</body>
+</html>

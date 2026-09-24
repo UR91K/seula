@@ -1,0 +1,130 @@
+/* The stats view, on top of shell.css and components.css. Same rules: measures in
+ * --u, 1px hairlines only, colours from colors.css only.
+ *
+ * Marks follow the dataviz rules at the app's density: bars at most 12 units thick
+ * with a rounded data end and a square baseline, a 1 unit surface gap between
+ * touching parts, hairline axes, and text in text colours, never the mark's.
+ */
+
+.st-page { padding: calc(var(--u) * 6) calc(var(--u) * 6) calc(var(--u) * 12); }
+
+/* the two colours that are not states: a count's main part, and its quiet rest */
+.is-accent { color: var(--accent); }
+.is-quiet { color: var(--unknown); }
+
+/* ------------------------------------------------------------------ overview */
+
+.st-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 4); }
+.st-tile { padding: calc(var(--u) * 3) calc(var(--u) * 4); border: 1px solid var(--border-lo); min-width: 0; }
+.st-k { color: var(--text-2); }
+.st-n { font-size: var(--step-up); font-weight: 600; line-height: calc(var(--u) * 10); font-variant-numeric: tabular-nums; }
+.st-note { font-size: 1rem; font-weight: normal; color: var(--text-2); }
+
+/* a count's parts as one bar, each part as long as its share */
+.st-split { display: flex; gap: var(--u); height: calc(var(--u) * 3); margin: calc(var(--u) * 2) 0; }
+.st-split i { background: currentColor; min-width: var(--u); }
+.st-split i:first-child { border-radius: var(--u) 0 0 var(--u); }
+.st-split i:last-child { border-radius: 0 var(--u) var(--u) 0; }
+.st-split i:only-child { border-radius: var(--u); }
+.st-split i.off { opacity: 0.35; }
+.st-split i.hot { outline: 1px solid var(--text); }
+.st-split.none { background: var(--border-lo); border-radius: var(--u); }
+
+.st-parts { list-style: none; }
+.st-parts li { display: flex; align-items: center; gap: calc(var(--u) * 2); line-height: var(--row); color: var(--text-2); white-space: nowrap; }
+.st-parts li .n { color: var(--text); font-variant-numeric: tabular-nums; }
+.st-parts li.off, .st-parts li.off .n { color: var(--text-3); }
+.st-glyph { display: inline-flex; align-items: center; justify-content: center; width: calc(var(--u) * 7); flex: none; }
+.st-glyph > .ms { font-size: calc(var(--u) * 7); width: calc(var(--u) * 7); height: calc(var(--u) * 7); }
+.st-sw { display: block; width: calc(var(--u) * 4); height: calc(var(--u) * 4); border-radius: var(--u); background: currentColor; }
+
+/* ------------------------------------------------------------------ bands and panels */
+
+.st-band {
+  font-size: 1rem; font-weight: 600; color: var(--text-2);
+  margin: calc(var(--u) * 8) 0 calc(var(--u) * 3);
+  padding-bottom: var(--u);
+  border-bottom: 1px solid var(--border-lo);
+}
+.st-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 4); align-items: start; }
+.st-panel { padding: calc(var(--u) * 2) calc(var(--u) * 4) calc(var(--u) * 3); border: 1px solid var(--border-lo); min-width: 0; }
+.st-panel h3 {
+  display: flex; align-items: center; gap: calc(var(--u) * 2);
+  font-size: 1rem; font-weight: 600; color: var(--text-2);
+  line-height: var(--row); margin-bottom: var(--u);
+}
+.st-panel h3 .count { font-weight: normal; color: var(--text-3); }
+.st-sub { color: var(--text-2); line-height: var(--row); margin-top: calc(var(--u) * 2); }
+.st-foot { margin-top: var(--u); }
+.st-panel .n { overflow: hidden; text-overflow: ellipsis; }
+.st-panel dl.props dd .ms, .st-table .ms { font-size: var(--line); width: var(--line); height: var(--line); vertical-align: top; }
+
+/* a table in a panel runs to the panel's edges, like a list in the inspector */
+.st-panel table.st-table { width: calc(100% + var(--u) * 8); min-width: 0; margin: 0 calc(var(--u) * -4) calc(var(--u) * -3); table-layout: fixed; }
+.st-panel table.st-table th { position: static; }
+table.st-table tr.archived td { color: var(--text-2); }
+
+/* a count with its bar in a table's last column */
+.st-inline { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 2); }
+.st-inline i { height: calc(var(--u) * 4); background: var(--accent); border-radius: 0 var(--u) var(--u) 0; }
+
+/* ------------------------------------------------------------------ columns */
+
+.st-cols { position: relative; display: flex; align-items: flex-start; gap: var(--u); padding-top: var(--line); }
+.st-plot {
+  position: absolute; left: 0; right: 0; top: var(--line); height: var(--plot);
+  border-bottom: 1px solid var(--border); pointer-events: none;
+}
+.st-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.st-bar {
+  position: relative; height: var(--plot);
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--u);
+}
+.st-bar i { display: block; width: 100%; max-width: calc(var(--u) * 12); background: var(--accent); border-radius: calc(var(--u) * 2) calc(var(--u) * 2) 0 0; flex: none; }
+.st-bar i + i { border-radius: 0; }
+.st-bar i.is-installed, .st-bar i.is-quiet { background: currentColor; }
+.st-col.hot .st-bar { background: var(--hover); }
+.st-cap { position: absolute; left: 0; right: 0; margin-bottom: var(--u); text-align: center; color: var(--text); line-height: var(--line); }
+.st-x { text-align: center; color: var(--text-3); line-height: var(--line); white-space: nowrap; overflow: hidden; padding-top: var(--u); }
+.st-col.zero .st-x { color: var(--text-3); }
+
+/* the average across the columns: a solid hairline, its value at the right end */
+.st-avg { position: absolute; left: 0; right: 0; border-top: 1px solid var(--text-3); }
+.st-avg span { position: absolute; right: 0; bottom: 0; padding: 0 var(--u); background: var(--surface); color: var(--text-2); line-height: var(--line); }
+
+.st-legend { display: flex; gap: calc(var(--u) * 4); color: var(--text-2); line-height: var(--row); }
+.st-legend i { display: inline-block; width: calc(var(--u) * 4); height: calc(var(--u) * 4); margin-right: calc(var(--u) * 2); border-radius: var(--u); background: currentColor; vertical-align: calc(var(--u) * -0.5); }
+
+/* ------------------------------------------------------------------ bar lists */
+
+table.st-bars { width: 100%; border-collapse: collapse; }
+table.st-bars td { line-height: var(--line); padding: var(--pad-y) 0; white-space: nowrap; }
+table.st-bars td.l { width: var(--lw); max-width: var(--lw); overflow: hidden; text-overflow: ellipsis; padding-right: calc(var(--u) * 3); }
+table.st-bars td.b i { display: block; height: calc(var(--u) * 5); min-width: 1px; background: var(--accent); border-radius: 0 calc(var(--u) * 2) calc(var(--u) * 2) 0; }
+table.st-bars td.num { width: calc(var(--u) * 14); text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
+table.st-bars tr.quiet td.b i { background: var(--unknown); }
+table.st-bars tr.quiet td.l { color: var(--text-2); }
+table.st-bars tr.hot td { background: var(--hover); }
+table.st-bars .tag { vertical-align: top; }
+
+/* ------------------------------------------------------------------ the last thirty days */
+
+.st-strip { display: flex; align-items: flex-end; gap: var(--u); height: calc(var(--u) * 12); }
+.st-strip + .st-strip { margin-top: calc(var(--u) * 2); }
+.st-sl { flex: none; width: calc(var(--u) * 34); align-self: center; color: var(--text-2); }
+.st-cell { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; border-bottom: 1px solid var(--border-lo); }
+.st-cell i { display: block; width: 100%; background: var(--accent); border-radius: var(--u) var(--u) 0 0; }
+.st-cell.hot { background: var(--hover); }
+.st-strip.axis { height: auto; align-items: flex-start; }
+.st-strip.axis .st-cell { border: 0; color: var(--text-3); white-space: nowrap; overflow: visible; line-height: var(--line); }
+
+/* ------------------------------------------------------------------ collections */
+
+.st-largest { display: flex; align-items: center; gap: calc(var(--u) * 3); min-width: 0; }
+.st-largest > div { min-width: 0; }
+.st-largest img, .st-largest .noart { width: calc(var(--u) * 20); height: calc(var(--u) * 20); object-fit: cover; flex: none; border: 1px solid var(--border-lo); }
+.st-largest .noart { background: var(--tag-bg); }
+
+/* ------------------------------------------------------------------ tooltip */
+
+.pop.tip { padding: var(--u) calc(var(--u) * 3); white-space: nowrap; pointer-events: none; line-height: var(--line); }
