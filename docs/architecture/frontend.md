@@ -251,15 +251,34 @@ projects in a used-in list are marked.
 
 ### Stats
 
-Lowest priority. A dashboard from `/api/v1/system/statistics`, with CSV export via
-`/api/v1/system/statistics/export`. Sections, top to bottom: overview cards (counts of
-projects, collections, plugins, samples, tags, tasks with completion rate); musical
-analytics (tempo histogram, key and time-signature distributions, average duration);
-plugin and sample analytics (top ten of each, top vendors, averages per project);
-activity (projects per year and per month, recent activity); insights (most complex
-projects, longest project, share under forty seconds, Ableton version distribution);
-collection and tag analytics; task completion. A date-range selector and filters by
-collection or tag apply across sections.
+One scrolling page from `/api/v1/system/statistics`, with no inspector (ADR-0045). The
+view toolbar has the title, the project scope (`scope=active|all`, the same preference
+as the other views) and Export CSV (`/api/v1/system/statistics/export`, same scope). No
+date range and no collection or tag filter; a collection's statistics are in its
+inspector.
+
+**Overview.** One row of counts, each with its states under it, the total being their
+sum: projects (active, archived, both shown whatever the scope), plugins (installed,
+missing, not scanned), samples (present, missing), collections (with projects, empty),
+tags (in use, unused), tasks (completed, pending, and the completed share). Every figure
+but the project split counts the projects in scope and what they use.
+
+Then bands of small panels, each a titled box:
+
+- **Music.** Tempo histogram in 10 BPM bins, empty bins as gaps; keys, most common
+  first, spelled by the ♯/♭ switch, with "No key" last; time signatures; average
+  length, the longest project, and how many are under forty seconds.
+- **Plugins and samples.** Top ten plugins (name, vendor, projects), top vendors
+  (plugins, uses), top ten samples (name, folder, projects), and the averages per
+  project.
+- **Activity.** Projects created per month over the last twelve calendar months with
+  the monthly average, per year, and created and modified per day over the last thirty.
+- **Library.** Ableton versions; the five most complex projects (plugins plus samples);
+  top tags; collections (average projects, the largest); task completion per month.
+
+Time series come oldest first with empty periods as zero, so the charts draw them as
+they come. Under `all`, an archived project named anywhere on the page is marked. The
+status bar says when archived projects are counted, and carries the ♯/♭ switch.
 
 ## Native-only features
 
