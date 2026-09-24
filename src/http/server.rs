@@ -31,17 +31,7 @@ use super::state::AppState;
 pub fn build_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
-            origin
-                .to_str()
-                .map(|s| {
-                    s.starts_with("http://localhost")
-                        || s.starts_with("http://127.0.0.1")
-                        || s.starts_with("https://localhost")
-                        || s.starts_with("https://127.0.0.1")
-                        || s.starts_with("tauri://")
-                        || s.starts_with("https://tauri.localhost")
-                })
-                .unwrap_or(false)
+            origin.to_str().map(is_local_origin).unwrap_or(false)
         }))
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any);
@@ -392,4 +382,64 @@ pub fn build_router(state: AppState) -> Router {
 
 async fn health() -> impl IntoResponse {
     Json(json!({ "status": "ok" }))
+}
+
+/// Whether an `Origin` header names a page on this machine.
+///
+/// The host is matched exactly, never by prefix: a prefix check lets
+/// `http://localhost.example.com` through. The Tauri webview's origin depends on
+/// platform and version: `tauri://localhost` on macOS and Linux, and on Windows
+/// `http://tauri.localhost` in Tauri 2 (the default) or `https://tauri.localhost` in
+/// Tauri 1 and Tauri 2 with `useHttpsScheme`.
+fn is_local_origin(origin: &str) -> bool {
+    let Some((scheme, authority)) = origin.split_once("://") else {
+        return false;
+    };
+    let host = match authority.rsplit_once(':') {
+        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => {
+            host
+        }
+        _ => authority,
+    };
+    match scheme {
+        "http" | "https" => matches!(host, "localhost" | "127.0.0.1" | "tauri.localhost"),
+        "tauri" => host == "localhost",
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_local_origin;
+
+    #[test]
+    fn local_and_tauri_origins_are_allowed() {
+        for origin in [
+            "http://localhost",
+            "http://localhost:5173",
+            "https://localhost:5173",
+            "http://127.0.0.1:8080",
+            "tauri://localhost",
+            "http://tauri.localhost",
+            "https://tauri.localhost",
+        ] {
+            assert!(is_local_origin(origin), "{origin} should be allowed");
+        }
+    }
+
+    #[test]
+    fn hosts_that_only_start_like_a_local_one_are_refused() {
+        for origin in [
+            "http://localhost.example.com",
+            "http://127.0.0.1.example.com",
+            "https://tauri.localhost.example.com",
+            "tauri://localhost.example.com",
+            "http://localhost:80.example.com",
+            "ftp://localhost",
+            "null",
+            "",
+        ] {
+            assert!(!is_local_origin(origin), "{origin} should be refused");
+        }
+    }
 }

@@ -90,6 +90,14 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **The CORS check refused Tauri 2's Windows origin and accepted look-alike hosts**
+  (found 2026-09-24, fixed 2026-09-24). `build_router` in `src/http/server.rs` matched
+  origins by prefix. It accepted `https://tauri.localhost` but not `http://tauri.localhost`,
+  the default origin of a Tauri 2 webview on Windows, so every request from the planned
+  shell (ADR-0048) would have been refused. The prefix match also let
+  `http://localhost.example.com` through as local. The host is now matched exactly.
+  Regression tests: `local_and_tauri_origins_are_allowed`,
+  `hosts_that_only_start_like_a_local_one_are_refused` (`src/http/server.rs`).
 - **The CSV export put the task completion rate at a hundred times its value** (found
   2026-09-24, fixed 2026-09-24). `get_task_statistics` returned a percentage and both
   CSV exports multiplied it by 100 again, so 45% exported as "4545.45%". The rate is
