@@ -494,10 +494,12 @@ impl SystemService {
         drop(events_guard);
 
         let db_clone = Arc::clone(&self.db);
-        tokio::spawn(async move {
+        // A blocking thread: `recv()` waits for as long as the stream is open, and in a
+        // task that would take a runtime worker with it.
+        tokio::task::spawn_blocking(move || {
             while let Ok(file_event) = event_receiver.recv() {
                 if let FileEvent::Deleted(path) = &file_event {
-                    let mut db = db_clone.lock().await;
+                    let mut db = db_clone.blocking_lock();
                     match db.get_project_by_path(&path.to_string_lossy()) {
                         Ok(Some(project)) => {
                             if let Err(e) = db.mark_project_deleted(&project.id) {
@@ -830,5 +832,40 @@ mod tests {
 
         assert_eq!(*system.scan_status.lock().await, ScanStatus::ScanCompleted);
         assert!(system.start_scan_with(|_| {}, |_| Ok(())).await, "a new scan can start");
+    }
+
+    /// The watcher stream once looped on a blocking `recv()` inside an async task, so
+    /// while a client streamed events, one runtime worker did nothing else. On a
+    /// current-thread runtime that is all of them: no other task ran again.
+    #[test]
+    fn a_watcher_event_stream_leaves_the_runtime_free() {
+        let (event_tx, event_rx) = std::sync::mpsc::channel::<FileEvent>();
+        let db = ProjectDatabase::new(PathBuf::from(":memory:")).unwrap();
+        let system = SystemService::new(
+            Arc::new(Mutex::new(db)),
+            Arc::new(Mutex::new(ScanStatus::ScanUnknown)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(Some(event_rx))),
+            Instant::now(),
+        );
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let runtime = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            rt.block_on(async {
+                assert!(system.start_watcher_event_stream(|_| {}).await);
+                // Give the stream its turn, then see whether anything else gets one.
+                tokio::task::yield_now().await;
+                tokio::spawn(async {}).await.unwrap();
+                let _ = done_tx.send(());
+            });
+        });
+
+        let other_task_ran = done_rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
+        // Ends the stream either way, so the runtime thread can finish.
+        drop(event_tx);
+        runtime.join().unwrap();
+        assert!(other_task_ran, "the stream blocked the runtime");
     }
 }
