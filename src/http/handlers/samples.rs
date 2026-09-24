@@ -23,6 +23,7 @@ use crate::models::{OTHER_SAMPLE_FORMAT, SAMPLE_FORMATS};
 use crate::models::Sample;
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+use crate::services::system::send_scan_update;
 
 /// Attach each sample's project count (ADR-0034), counting the projects in `scope`
 /// (ADR-0040), and its measured size (ADR-0041), with one query each for the page.
@@ -159,12 +160,13 @@ pub async fn check_samples(
     let started = state
         .system
         .start_sample_check(move |response, result| {
+            let status = response.status;
             let dto = SampleCheckEventDto {
                 progress: response.into(),
                 result,
             };
             if let Ok(json) = serde_json::to_string(&dto) {
-                let _ = tx.try_send(Ok(Event::default().data(json)));
+                send_scan_update(&tx, status, Ok(Event::default().data(json)));
             }
         })
         .await;
@@ -245,4 +247,64 @@ pub async fn get_sample_formats(State(state): State<AppState>) -> Result<impl In
         });
     }
     Ok(Json(SampleFormatListResponse { formats }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::ProjectDatabase;
+    use crate::grpc::common::ScanStatus;
+    use crate::media::{MediaConfig, MediaStorageManager};
+    use crate::services::{Services, SystemService};
+    use axum::body::HttpBody;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+    use tokio::sync::Mutex;
+
+    /// Streams sent with `try_send` into a channel of 100, so a client more than 100
+    /// updates behind lost them, the last one included, and that one carries the
+    /// result. This check sends about 300 and nothing reads until it has finished.
+    #[tokio::test]
+    async fn a_slow_client_still_gets_the_final_update() {
+        let db = ProjectDatabase::new(":memory:".into()).unwrap();
+        for i in 0..300 {
+            db.conn
+                .execute(
+                    "INSERT INTO samples (id, name, path, is_present) VALUES (?, 'kick.wav', ?, 1)",
+                    rusqlite::params![format!("sample-{i}"), format!("Z:/nowhere/folder {i}/kick.wav")],
+                )
+                .unwrap();
+        }
+        let db = Arc::new(Mutex::new(db));
+        let media_dir = tempfile::tempdir().unwrap();
+        let media = Arc::new(MediaStorageManager::new(media_dir.path().to_path_buf(), MediaConfig::default()).unwrap());
+        let status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
+        let system = SystemService::new(
+            Arc::clone(&db),
+            Arc::clone(&status),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(None)),
+            Instant::now(),
+        );
+        let state = AppState::new(Services::new(db, media), system);
+
+        let mut body = check_samples(State(state)).await.unwrap().into_response().into_body();
+
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !matches!(*status.lock().await, ScanStatus::ScanCompleted | ScanStatus::ScanError) {
+            assert!(Instant::now() < deadline, "the check never finished");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // The status is written just before the final update is sent.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let mut text = String::new();
+        while let Some(chunk) = body.data().await {
+            text.push_str(&String::from_utf8_lossy(&chunk.unwrap()));
+        }
+        let last = text.lines().filter_map(|l| l.strip_prefix("data:")).last().unwrap();
+        let last: serde_json::Value = serde_json::from_str(last.trim()).unwrap();
+        assert!(!last["result"].is_null(), "the last update received is not the final one: {last}");
+    }
 }

@@ -9,6 +9,7 @@ use super::super::scanning::*;
 use super::super::system::*;
 use super::super::watcher::*;
 use super::utils::convert_live_set_to_proto;
+use crate::services::system::send_scan_update;
 use crate::services::SystemService;
 
 #[derive(Clone)]
@@ -29,15 +30,10 @@ impl SystemHandler {
         let _req = request.into_inner();
 
         let (tx, rx) = mpsc::channel(100);
-        let tx_for_callback = tx.clone();
 
         let started = self
             .service
-            .start_scan(move |response| {
-                if let Err(e) = tx_for_callback.try_send(Ok(response)) {
-                    error!("Failed to send progress update: {:?}", e);
-                }
-            })
+            .start_scan(move |response| send_scan_update(&tx, response.status, Ok(response)))
             .await;
         if !started {
             return Err(Status::failed_precondition("A scan is already running"));

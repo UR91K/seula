@@ -22,6 +22,22 @@ use crate::watcher::file_watcher::{FileEvent, FileWatcher};
 /// What a project scan reports through: completed, total, progress, message, phase.
 type ProgressCallback = Box<dyn FnMut(u32, u32, f32, String, &str) + Send>;
 
+/// Queues one scan update on a stream's channel. A client that falls behind misses
+/// updates rather than slowing the scan, but never the last one (`completed` or
+/// `error`, by `status`), which carries the result: that one waits for room.
+///
+/// Call it only from a scan's progress callback. `start_scan`, `start_plugin_scan` and
+/// `start_sample_check` run those on a blocking thread, where waiting is allowed; in a
+/// task it would panic.
+pub fn send_scan_update<T>(tx: &tokio::sync::mpsc::Sender<T>, status: i32, update: T) {
+    let last = status == ScanStatus::ScanCompleted as i32 || status == ScanStatus::ScanError as i32;
+    if last {
+        let _ = tx.blocking_send(update);
+    } else {
+        let _ = tx.try_send(update);
+    }
+}
+
 /// Owns the state shared across the scanning/watcher/statistics RPCs: scan
 /// status/progress, the active file watcher (if any), and process start time.
 /// Reuses the gRPC-generated `ScanStatus`/`ScanProgressResponse`/`WatcherEventResponse`

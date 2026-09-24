@@ -24,6 +24,7 @@ use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::{project_to_dto, KeySignatureDto};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+use crate::services::system::send_scan_update;
 
 pub async fn get_system_info(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let (version, watch_paths, watcher_active, uptime_seconds) = state
@@ -57,9 +58,10 @@ pub async fn scan_directories(
     let started = state
         .system
         .start_scan(move |response| {
+            let status = response.status;
             let dto = ScanProgressDto::from(response);
             if let Ok(json) = serde_json::to_string(&dto) {
-                let _ = tx.try_send(Ok(Event::default().data(json)));
+                send_scan_update(&tx, status, Ok(Event::default().data(json)));
             }
         })
         .await;

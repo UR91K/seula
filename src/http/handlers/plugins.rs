@@ -21,6 +21,7 @@ use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+use crate::services::system::send_scan_update;
 use crate::models::Plugin as DomainPlugin;
 
 /// Attach each plugin's project count with one query for the page (ADR-0034), counting
@@ -225,12 +226,13 @@ pub async fn scan_plugins(
     let started = state
         .system
         .start_plugin_scan(move |response, result| {
+            let status = response.status;
             let dto = PluginScanEventDto {
                 progress: response.into(),
                 result,
             };
             if let Ok(json) = serde_json::to_string(&dto) {
-                let _ = tx.try_send(Ok(Event::default().data(json)));
+                send_scan_update(&tx, status, Ok(Event::default().data(json)));
             }
         })
         .await;

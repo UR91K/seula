@@ -89,7 +89,6 @@ folders, two are hardcoded to paths on the maintainer's machine.
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
 | **The project scan writes through a second database connection** (found 2026-09-24). `SharedState` in `src/main.rs` is documented as giving every adapter one shared connection, but `process_projects_with_progress` opens its own `ProjectDatabase` and writes the whole batch in one transaction on it, outside the `Arc<Mutex<ProjectDatabase>>`. No journal mode or busy timeout is set, so the database uses rollback journalling and rusqlite's default busy timeout. A write over HTTP or gRPC (a tag, a collection edit) that arrives while the batch holds the write lock waits out that timeout and then fails with "database is locked". Also checked: the first-run plugin scan persists over the same second connection. Not reproduced yet. The fix is a choice between having the scan take the shared handle (and deciding how long it may hold the lock) and switching to WAL. Record that choice in an ADR when it is made. | `src/lib.rs` (`process_projects_with_progress`), `src/database/core.rs` | Medium |
-| **Progress updates are dropped when a client reads slowly, the final one included** (found 2026-09-24). Every scan and watcher stream sends through a `tokio::sync::mpsc::channel(100)` with `try_send`. A client that falls 100 updates behind loses updates, and that can include the last one, which carries the scan's result (`PluginRefreshResult`, `SampleRefreshResult`). Losing heartbeats and per-file updates is fine; losing the final update isn't. | `src/http/handlers/system.rs`, `src/http/handlers/plugins.rs`, `src/http/handlers/samples.rs`, `src/grpc/handlers/system.rs` | Low |
 | **The architecture overview and one comment describe code that has changed** (found 2026-09-24). `docs/architecture/overview.md` still shows `ableton_db.rs` in the plugin pipeline and says the scan-to-plugin join is not implemented, though ADR-0006 retired the Ableton database and the join is done. It has no HTTP adapter or service layer. It says 12 gRPC services; there are 12 protos in `proto/services/`, but `src/main.rs` registers 11, with no config service. In `process_projects_with_progress`, the comment "Parser is dropped here" is wrong: the receiver borrows the parser, which lives until the function returns, and the collect loop ends by counting results. | `docs/architecture/overview.md`, `src/main.rs`, `src/lib.rs` | Low |
 
 Resolved:
@@ -102,6 +101,13 @@ Resolved:
   and writes every status in order. That also closes the older entry about the scan
   occupying a runtime worker. Regression test:
   `a_late_progress_update_cannot_overwrite_the_final_status` (`src/services/system.rs`).
+- **A slow client lost scan updates, the final one included** (found 2026-09-24, fixed
+  2026-09-24). The scan streams sent with `try_send` into a channel of 100, so a client
+  that fell behind could miss the last update, which carries the result.
+  `send_scan_update` (`src/services/system.rs`) still drops intermediate updates rather
+  than slow the scan, but waits for room for the final one. The watcher streams keep
+  `try_send`: they have no final update. Regression test:
+  `a_slow_client_still_gets_the_final_update` (`src/http/handlers/samples.rs`).
 - **The watcher event stream held a runtime worker** (found 2026-09-24, fixed
   2026-09-24). `start_watcher_event_stream` looped on a blocking `recv()` inside
   `tokio::spawn`; it now runs on a blocking thread. Regression test:
