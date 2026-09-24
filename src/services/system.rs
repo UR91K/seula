@@ -15,7 +15,7 @@ use crate::grpc::scanning::ScanProgressResponse;
 use crate::grpc::system::GetStatisticsResponse;
 use crate::grpc::watcher::WatcherEventResponse;
 use crate::grpc::handlers::utils::convert_live_set_to_proto;
-use crate::process_projects_with_progress;
+use crate::process_projects_into;
 use crate::project::Project;
 use crate::watcher::file_watcher::{FileEvent, FileWatcher};
 
@@ -139,8 +139,12 @@ impl SystemService {
     where
         F: Fn(ScanProgressResponse) + Send + Sync + 'static,
     {
-        self.start_scan_with(on_progress, |callback| process_projects_with_progress(Some(callback)))
-            .await
+        let db = Arc::clone(&self.db);
+        self.start_scan_with(on_progress, move |callback| {
+            let config = CONFIG.as_ref().map_err(|e| LiveSetError::ConfigError(e.clone()))?;
+            process_projects_into(&db, config, Some(callback))
+        })
+        .await
     }
 
     /// `start_scan` with the scan itself passed in, so tests can drive the status

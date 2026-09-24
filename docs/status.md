@@ -88,10 +88,16 @@ folders, two are hardcoded to paths on the maintainer's machine.
 | `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. Both are now `#[ignore]`d (2026-09-16, CLAUDE.md) so this only surfaces under `cargo test --tests -- --ignored`. | `tests/integration/scanning.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
-| **The project scan writes through a second database connection** (found 2026-09-24). `SharedState` in `src/main.rs` is documented as giving every adapter one shared connection, but `process_projects_with_progress` opens its own `ProjectDatabase` and writes the whole batch in one transaction on it, outside the `Arc<Mutex<ProjectDatabase>>`. No journal mode or busy timeout is set, so the database uses rollback journalling and rusqlite's default busy timeout. A write over HTTP or gRPC (a tag, a collection edit) that arrives while the batch holds the write lock waits out that timeout and then fails with "database is locked". Also checked: the first-run plugin scan persists over the same second connection. Not reproduced yet. The fix is a choice between having the scan take the shared handle (and deciding how long it may hold the lock) and switching to WAL. Record that choice in an ADR when it is made. | `src/lib.rs` (`process_projects_with_progress`), `src/database/core.rs` | Medium |
 
 Resolved:
 
+- **The project scan wrote through a second database connection** (found 2026-09-24,
+  fixed 2026-09-24). In the daemon, `process_projects_with_progress` opened its own
+  connection and held SQLite's write lock through the batch insert, so an adapter write
+  arriving then waited out the five-second busy timeout and failed with "database is
+  locked". The daemon's scan now goes through `process_projects_into`, on the shared
+  handle, locking it only for each database step (ADR-0049). The CLI still opens its
+  own. Regression test: `a_scan_writes_through_the_database_it_is_given` (`src/lib.rs`).
 - **A late progress update could leave the scan looking like it was still running**
   (found 2026-09-24, fixed 2026-09-24). `start_scan` wrote each progress update's
   status from a newly spawned task, unordered against the final Completed or Error

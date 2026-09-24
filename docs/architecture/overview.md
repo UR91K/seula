@@ -90,7 +90,8 @@ powers search with operators (`plugin:`, `bpm:`, `key:`, `missing:`).
 Three adapters over one service layer. `src/services/` owns validation and
 orchestration (ADR-0018); the gRPC server, the HTTP router and the CLI call into it,
 never into the database directly. The tray daemon builds the services once and hands
-the same instances, and the same database connection, to gRPC and HTTP.
+the same instances, and the same database connection, to gRPC and HTTP. Its project
+scan writes through that connection too (ADR-0049).
 
 - **HTTP**: `src/http/`, JSON over axum, with Server-Sent Events for scan progress
   (ADR-0024). The frontend uses this one.

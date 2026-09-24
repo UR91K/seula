@@ -246,12 +246,94 @@ pub fn process_projects() -> Result<(), LiveSetError> {
 /// - `"inserting"`: Saving results to database
 /// - `"completed"`: Operation finished successfully
 pub fn process_projects_with_progress<F>(
+    progress_callback: Option<F>,
+) -> Result<(), LiveSetError>
+where
+    F: FnMut(u32, u32, f32, String, &str) + Send + 'static,
+{
+    let config = CONFIG
+        .as_ref()
+        .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
+    scan_projects(config, open_scan_database(config)?, progress_callback)
+}
+
+/// The same scan, reading and writing through `db`: the tray daemon's one connection,
+/// shared with the HTTP and gRPC adapters. A second connection would hold SQLite's
+/// write lock through the batch insert, and a write from an adapter would wait out the
+/// busy timeout and fail. On the shared handle it waits on the mutex instead.
+///
+/// `db` is locked only for each database step, never while discovering, parsing or
+/// scanning plugins, and never across a progress callback. Call this from a blocking
+/// thread: it takes the lock with `blocking_lock`.
+pub fn process_projects_into<F>(
+    db: &tokio::sync::Mutex<ProjectDatabase>,
+    config: &config::Config,
+    progress_callback: Option<F>,
+) -> Result<(), LiveSetError>
+where
+    F: FnMut(u32, u32, f32, String, &str) + Send + 'static,
+{
+    scan_projects(config, ScanDatabase::Shared(db), progress_callback)
+}
+
+fn open_scan_database(config: &config::Config) -> Result<ScanDatabase<'static>, LiveSetError> {
+    let database_path = config
+        .database_path
+        .as_ref()
+        .expect("Database path should be set by config initialization");
+    debug!("Initializing database at {}", database_path);
+    Ok(ScanDatabase::Own(ProjectDatabase::new(PathBuf::from(database_path))?))
+}
+
+/// Where a scan reads and writes: a connection of its own (the CLI), or the daemon's
+/// shared one.
+enum ScanDatabase<'a> {
+    Own(ProjectDatabase),
+    Shared(&'a tokio::sync::Mutex<ProjectDatabase>),
+}
+
+impl ScanDatabase<'_> {
+    fn lock(&mut self) -> ScanDatabaseGuard<'_> {
+        match self {
+            ScanDatabase::Own(db) => ScanDatabaseGuard::Own(db),
+            ScanDatabase::Shared(db) => ScanDatabaseGuard::Shared(db.blocking_lock()),
+        }
+    }
+}
+
+enum ScanDatabaseGuard<'a> {
+    Own(&'a mut ProjectDatabase),
+    Shared(tokio::sync::MutexGuard<'a, ProjectDatabase>),
+}
+
+impl std::ops::Deref for ScanDatabaseGuard<'_> {
+    type Target = ProjectDatabase;
+    fn deref(&self) -> &ProjectDatabase {
+        match self {
+            ScanDatabaseGuard::Own(db) => db,
+            ScanDatabaseGuard::Shared(db) => db,
+        }
+    }
+}
+
+impl std::ops::DerefMut for ScanDatabaseGuard<'_> {
+    fn deref_mut(&mut self) -> &mut ProjectDatabase {
+        match self {
+            ScanDatabaseGuard::Own(db) => db,
+            ScanDatabaseGuard::Shared(db) => db,
+        }
+    }
+}
+
+fn scan_projects<F>(
+    config: &config::Config,
+    mut db: ScanDatabase<'_>,
     mut progress_callback: Option<F>,
 ) -> Result<(), LiveSetError>
 where
     F: FnMut(u32, u32, f32, String, &str) + Send + 'static,
 {
-    debug!("Starting process_projects_with_progress");
+    debug!("Starting a project scan");
 
     // Helper macro to call progress callback if provided
     macro_rules! progress {
@@ -264,20 +346,7 @@ where
 
     progress!(0, 0, 0.0, "Starting scan...".to_string(), "starting");
 
-    // Get paths from config
-    let config = CONFIG
-        .as_ref()
-        .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
-    let database_path = config
-        .database_path
-        .as_ref()
-        .expect("Database path should be set by config initialization");
-    debug!("Using database path from config: {}", database_path);
     debug!("Using project paths from config: {:?}", config.paths);
-
-    // Initialize database early to use for filtering
-    debug!("Initializing database at {}", database_path);
-    let mut db = ProjectDatabase::new(PathBuf::from(database_path))?;
 
     let scanner = ProjectPathScanner::new()?;
     let mut found_projects = HashSet::new();
@@ -295,7 +364,9 @@ where
     // resolves against the plugins table. Scanning afterwards would work — the upsert
     // matches on identity either way — but it would leave a first run reporting every
     // plugin as unknown until the user found `seula plugin refresh` on their own.
-    if !db.has_scanned_plugins()? {
+    // Each database step locks for itself: `db.lock()` in a statement or condition is
+    // released at its end.
+    if !db.lock().has_scanned_plugins()? {
         info!("No plugin scan has completed yet; scanning installed plugins first");
 
         let roots: Vec<PathBuf> = config.vst_search_paths.iter().map(PathBuf::from).collect();
@@ -332,7 +403,8 @@ where
                 // A truncated scan has not really looked everywhere, so it neither
                 // sweeps nor counts as having run.
                 let full_scan = !report.budget_exhausted;
-                match db.persist_plugin_scan(&report, full_scan) {
+                let persisted = db.lock().persist_plugin_scan(&report, full_scan);
+                match persisted {
                     Ok(persisted) => info!(
                         "First-run plugin scan: {} installed, {} missing, {} failed to load",
                         persisted.inserted + persisted.updated,
@@ -388,7 +460,7 @@ where
 
     // Preprocess and filter projects
     let preprocessed = preprocess_projects(found_projects)?;
-    let projects_to_parse = filter_unchanged_projects(preprocessed, &db)?;
+    let projects_to_parse = filter_unchanged_projects(preprocessed, &db.lock())?;
 
     if projects_to_parse.is_empty() {
         info!("No projects need updating");
@@ -530,8 +602,11 @@ where
     let num_projects = successful_projects.len();
     info!("Inserting {} projects into database", num_projects);
     let projects = std::sync::Arc::new(successful_projects);
-    let mut batch_manager = BatchInsertManager::new(&mut db.conn, projects);
-    let stats = batch_manager.execute()?;
+    let stats = {
+        let mut db = db.lock();
+        let mut batch_manager = BatchInsertManager::new(&mut db.conn, projects);
+        batch_manager.execute()?
+    };
 
     info!(
         "Batch insert complete: {} projects, {} plugins, {} samples",
@@ -642,4 +717,59 @@ fn filter_unchanged_projects(
         total_count
     );
     Ok(to_parse)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::{write::GzEncoder, Compression};
+    use std::io::Write;
+
+    /// The daemon's scan once opened a connection of its own and wrote the whole batch
+    /// through it, so a write from the HTTP or gRPC adapter during the insert waited out
+    /// SQLite's busy timeout and failed. It has to write through the handle it is given;
+    /// an in-memory database makes that checkable, since no other connection can reach
+    /// it.
+    #[test]
+    fn a_scan_writes_through_the_database_it_is_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let projects = dir.path().join("projects");
+        // Empty, so the first-run plugin scan finds nothing instead of this machine's.
+        let plugins = dir.path().join("plugins");
+        std::fs::create_dir_all(&projects).unwrap();
+        std::fs::create_dir_all(&plugins).unwrap();
+
+        let als = projects.join("Song.als");
+        let mut gz = GzEncoder::new(std::fs::File::create(&als).unwrap(), Compression::default());
+        gz.write_all(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12.0_12049" Creator="Ableton Live 12.0">
+    <LiveSet>
+        <Tempo>
+            <LomId Value="0" />
+            <Manual Value="120.0" />
+        </Tempo>
+        <EnumEvent Value="201" />
+    </LiveSet>
+</Ableton>"#,
+        )
+        .unwrap();
+        gz.finish().unwrap();
+
+        let config: config::Config = toml::from_str(&format!(
+            "paths = [{:?}]\ndatabase_path = {:?}\nmedia_storage_dir = {:?}\nvst_search_paths = [{:?}]\n",
+            projects.to_string_lossy(),
+            dir.path().join("elsewhere.db").to_string_lossy(),
+            dir.path().join("media").to_string_lossy(),
+            plugins.to_string_lossy(),
+        ))
+        .unwrap();
+
+        let shared = tokio::sync::Mutex::new(ProjectDatabase::new(PathBuf::from(":memory:")).unwrap());
+        process_projects_into::<fn(u32, u32, f32, String, &str)>(&shared, &config, None).unwrap();
+
+        let mut db = shared.blocking_lock();
+        let project = db.get_project_by_path(&als.to_string_lossy()).unwrap();
+        assert!(project.is_some(), "the scanned project is not in the database the scan was given");
+    }
 }
