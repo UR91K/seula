@@ -6,6 +6,7 @@ pub mod audio_files;
 pub mod batch;
 pub mod collections;
 pub mod core;
+pub mod library_stats;
 pub mod media;
 pub mod plugin_details;
 pub mod plugin_scan;

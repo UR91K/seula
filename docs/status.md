@@ -90,6 +90,43 @@ folders, two are hardcoded to paths on the maintainer's machine.
 
 Resolved:
 
+- **The CSV export put the task completion rate at a hundred times its value** (found
+  2026-09-24, fixed 2026-09-24). `get_task_statistics` returned a percentage and both
+  CSV exports multiplied it by 100 again, so 45% exported as "4545.45%". The rate is
+  now a fraction from 0 to 1, as the monthly trends' rates already were. Regression
+  tests: `completion_rates_are_fractions` (`tests/database/library_stats.rs`),
+  `csv_completion_rate_is_a_percentage_once` (`src/http/handlers/system.rs`).
+- **The library statistics' key distribution was one string per key** (found
+  2026-09-24, fixed 2026-09-24). `/system/statistics` sent `"DSharp Minor"`, the enum
+  names joined, where ADR-0035 has every key carry `tonic`, `scale`, `sharp` and `flat`;
+  projects with no key were a key named "Unknown". The HTTP route now sends the key
+  shape, and `null` for no key. Regression test: `projects_with_no_key_have_no_key`.
+- **The tempo histogram lumped every slow and every fast tempo into one bin** (found
+  2026-09-24, fixed 2026-09-24). Bins were 10 BPM wide except the first, "under 90",
+  labelled 80, and the last, "180 and up"; in the mock library the 80 bin held 62
+  projects from 70 to 89.85 BPM. Empty bins were left out, so a chart closed the gap.
+  Bins are now 10 BPM wide from the lowest tempo used to the highest, empty ones as
+  zero. Regression test: `tempo_bins_are_equal_width_with_empty_bins_as_zero`.
+- **"The last 12 months" was the last 12 months with a project in them** (found
+  2026-09-24, fixed 2026-09-24). Projects per month and task completion trends skipped
+  quiet months, so the window reached further back and the monthly average divided by
+  busy months only. Both are now the 12 calendar months to date, empty ones as zero;
+  projects per year and the 30-day activity are filled the same way. Regression tests:
+  `projects_per_month_is_twelve_calendar_months_with_quiet_months_as_zero`,
+  `projects_per_year_fills_the_years_between`, `recent_activity_has_every_day_oldest_first`.
+- **The library statistics counted different things side by side** (found 2026-09-24,
+  fixed 2026-09-24). Projects were active only; plugins and samples were every row in
+  their tables, used or not; tasks included archived projects'; the collection figures
+  counted archived projects; and plugins and samples per project were averaged over the
+  projects that had any. Every figure now counts the projects in the scope and what
+  they use (ADR-0045), and averages divide by every project in scope. Regression tests:
+  `every_count_takes_the_scope_and_splits_into_its_states`,
+  `averages_divide_by_everything_in_scope_including_zeros`.
+- **The longest and most complex projects could never be archived ones** (found
+  2026-09-24, fixed 2026-09-24). The statistics loaded them with `get_project_by_id`,
+  which returns only active projects, and the HTTP adapter marked every one active
+  because the proto `Project` had no flag. It now has `is_active`, and the statistics
+  load projects of either status, which `scope=all` needs.
 - **Sorting the collection list by project count failed** (found 2026-09-24, fixed
   2026-09-24). `list_collections` accepted `sort_by=project_count` and put it straight
   into `ORDER BY`, but the collections table has no such column, so SQLite answered "no

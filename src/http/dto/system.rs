@@ -25,9 +25,9 @@ use crate::http::dto::tags::TagDto;
 fn proto_project_to_dto(p: ProtoProject) -> ProjectDto {
     ProjectDto {
         id: p.id,
-        // The proto Project has no active flag. The statistics these come from are
-        // computed over active projects only.
-        is_active: true,
+        // False for an archived project, which the statistics include under
+        // `scope=all` (ADR-0045).
+        is_active: p.is_active,
         name: p.name,
         path: p.path,
         hash: p.hash,
@@ -243,7 +243,8 @@ pub struct TempoStatisticDto {
 
 #[derive(Serialize)]
 pub struct KeyStatisticDto {
-    pub key: String,
+    /// The ADR-0035 key shape; `None` for the projects with no key.
+    pub key: Option<KeySignatureDto>,
     pub count: i32,
 }
 
@@ -312,14 +313,63 @@ pub struct TaskCompletionTrendStatisticDto {
     pub completion_rate: f64,
 }
 
+// The overview figures, each split into its states (ADR-0045). `total` is the sum of
+// the parts. The project figures ignore the scope, since they are what it chooses
+// between; every other figure counts what the projects in scope use.
+
+#[derive(Serialize)]
+pub struct ProjectCountsDto {
+    pub total: i32,
+    pub active: i32,
+    pub archived: i32,
+}
+
+#[derive(Serialize)]
+pub struct PluginCountsDto {
+    pub total: i32,
+    pub installed: i32,
+    pub missing: i32,
+    pub not_scanned: i32,
+}
+
+#[derive(Serialize)]
+pub struct SampleCountsDto {
+    pub total: i32,
+    pub present: i32,
+    pub missing: i32,
+}
+
+#[derive(Serialize)]
+pub struct CollectionCountsDto {
+    pub total: i32,
+    pub with_projects: i32,
+    pub empty: i32,
+}
+
+#[derive(Serialize)]
+pub struct TagCountsDto {
+    pub total: i32,
+    pub in_use: i32,
+    pub unused: i32,
+}
+
+#[derive(Serialize)]
+pub struct TaskCountsDto {
+    pub total: i32,
+    pub completed: i32,
+    pub pending: i32,
+    /// 0 to 1.
+    pub completion_rate: f64,
+}
+
 #[derive(Serialize)]
 pub struct StatisticsDto {
-    pub total_projects: i32,
-    pub total_plugins: i32,
-    pub total_samples: i32,
-    pub total_collections: i32,
-    pub total_tags: i32,
-    pub total_tasks: i32,
+    pub projects: ProjectCountsDto,
+    pub plugins: PluginCountsDto,
+    pub samples: SampleCountsDto,
+    pub collections: CollectionCountsDto,
+    pub tags: TagCountsDto,
+    pub tasks: TaskCountsDto,
     pub top_plugins: Vec<PluginStatisticDto>,
     pub top_vendors: Vec<VendorStatisticDto>,
     pub tempo_distribution: Vec<TempoStatisticDto>,
@@ -336,9 +386,6 @@ pub struct StatisticsDto {
     pub average_samples_per_project: f64,
     pub top_samples: Vec<SampleStatisticDto>,
     pub top_tags: Vec<TagStatisticDto>,
-    pub completed_tasks: i32,
-    pub pending_tasks: i32,
-    pub task_completion_rate: f64,
     pub recent_activity: Vec<ActivityTrendStatisticDto>,
     pub ableton_versions: Vec<VersionStatisticDto>,
     pub average_projects_per_collection: f64,
@@ -348,13 +395,40 @@ pub struct StatisticsDto {
 
 impl From<proto::GetStatisticsResponse> for StatisticsDto {
     fn from(s: proto::GetStatisticsResponse) -> Self {
+        let c = s.counts.unwrap_or_default();
         Self {
-            total_projects: s.total_projects,
-            total_plugins: s.total_plugins,
-            total_samples: s.total_samples,
-            total_collections: s.total_collections,
-            total_tags: s.total_tags,
-            total_tasks: s.total_tasks,
+            projects: ProjectCountsDto {
+                total: c.projects_active + c.projects_archived,
+                active: c.projects_active,
+                archived: c.projects_archived,
+            },
+            plugins: PluginCountsDto {
+                total: c.plugins_installed + c.plugins_missing + c.plugins_not_scanned,
+                installed: c.plugins_installed,
+                missing: c.plugins_missing,
+                not_scanned: c.plugins_not_scanned,
+            },
+            samples: SampleCountsDto {
+                total: c.samples_present + c.samples_missing,
+                present: c.samples_present,
+                missing: c.samples_missing,
+            },
+            collections: CollectionCountsDto {
+                total: c.collections_with_projects + c.collections_empty,
+                with_projects: c.collections_with_projects,
+                empty: c.collections_empty,
+            },
+            tags: TagCountsDto {
+                total: c.tags_in_use + c.tags_unused,
+                in_use: c.tags_in_use,
+                unused: c.tags_unused,
+            },
+            tasks: TaskCountsDto {
+                total: c.tasks_completed + c.tasks_pending,
+                completed: c.tasks_completed,
+                pending: c.tasks_pending,
+                completion_rate: s.task_completion_rate,
+            },
             top_plugins: s
                 .top_plugins
                 .into_iter()
@@ -385,7 +459,7 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
                 .key_distribution
                 .into_iter()
                 .map(|k| KeyStatisticDto {
-                    key: k.key,
+                    key: k.key.as_deref().and_then(KeySignatureDto::from_joined),
                     count: k.count,
                 })
                 .collect(),
@@ -448,9 +522,6 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
                     usage_count: t.usage_count,
                 })
                 .collect(),
-            completed_tasks: s.completed_tasks,
-            pending_tasks: s.pending_tasks,
-            task_completion_rate: s.task_completion_rate,
             recent_activity: s
                 .recent_activity
                 .into_iter()
@@ -490,4 +561,10 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
 #[derive(Deserialize)]
 pub struct ExportStatisticsQuery {
     pub format: Option<String>,
+    pub scope: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct StatisticsQuery {
+    pub scope: Option<String>,
 }

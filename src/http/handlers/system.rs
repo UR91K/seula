@@ -17,10 +17,11 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::http::dto::system::{
     scan_status_name, AddMultipleProjectsRequest, AddMultipleProjectsResponse, AddProjectResponse,
-    AddSingleProjectRequest, ExportStatisticsQuery, ScanProgressDto, ScanStatusResponse,
+    AddSingleProjectRequest, ExportStatisticsQuery, StatisticsQuery, ScanProgressDto, ScanStatusResponse,
     StatisticsDto, SystemInfoResponse, WatcherActionResponse, WatcherEventDto,
 };
-use crate::http::dto::projects::project_to_dto;
+use crate::http::dto::parse_project_scope;
+use crate::http::dto::projects::{project_to_dto, KeySignatureDto};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 
@@ -189,10 +190,14 @@ pub async fn get_watcher_events(
     Ok(Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()))
 }
 
-pub async fn get_statistics(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+pub async fn get_statistics(
+    State(state): State<AppState>,
+    Query(query): Query<StatisticsQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let scope = parse_project_scope(query.scope.as_deref())?;
     let stats = state
         .system
-        .get_statistics()
+        .get_statistics(scope)
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
@@ -207,10 +212,11 @@ pub async fn export_statistics(
     // unrecognised or missing format falls back to it rather than erroring,
     // since it's the only variant that has ever existed.
     let _ = query.format;
+    let scope = parse_project_scope(query.scope.as_deref())?;
 
     let stats = state
         .system
-        .get_statistics()
+        .get_statistics(scope)
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
@@ -280,8 +286,29 @@ fn generate_csv_export(stats: crate::grpc::system::GetStatisticsResponse) -> Vec
     csv_content.push_str("Key Distribution\n");
     csv_content.push_str("Key,Count\n");
     for key in stats.key_distribution {
-        csv_content.push_str(&format!("{},{}\n", key.key, key.count));
+        let name = key
+            .key
+            .as_deref()
+            .and_then(KeySignatureDto::from_joined)
+            .map(|k| k.sharp)
+            .unwrap_or_else(|| "No key".to_string());
+        csv_content.push_str(&format!("{},{}\n", name, key.count));
     }
 
     csv_content.into_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_csv_export;
+    use crate::grpc::system::GetStatisticsResponse;
+
+    /// Regression: the rate arrived as a percentage and was multiplied by 100 again,
+    /// so half the tasks done exported as "5000.00%".
+    #[test]
+    fn csv_completion_rate_is_a_percentage_once() {
+        let stats = GetStatisticsResponse { task_completion_rate: 0.5, ..Default::default() };
+        let csv = String::from_utf8(generate_csv_export(stats)).unwrap();
+        assert!(csv.contains("Task Completion Rate,50.00%"), "{csv}");
+    }
 }

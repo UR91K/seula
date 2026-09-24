@@ -70,7 +70,7 @@ message GetStatisticsResponse {
   // Task statistics
   int32 completed_tasks = 23;
   int32 pending_tasks = 24;
-  double task_completion_rate = 25;
+  double task_completion_rate = 25;  // 0 to 1, like the trends' rates
   
   // Activity trends
   repeated ActivityTrendStatistic recent_activity = 26;
@@ -84,6 +84,26 @@ message GetStatisticsResponse {
   
   // Historical task analytics
   repeated TaskCompletionTrendStatistic task_completion_trends = 30;
+
+  // The overview figures split into their states (ADR-0045). The flat totals above
+  // are their sums, except total_projects, which counts the projects in scope.
+  LibraryCounts counts = 31;
+}
+
+message LibraryCounts {
+  int32 projects_active = 1;
+  int32 projects_archived = 2;
+  int32 plugins_installed = 3;
+  int32 plugins_missing = 4;
+  int32 plugins_not_scanned = 5;
+  int32 samples_present = 6;
+  int32 samples_missing = 7;
+  int32 collections_with_projects = 8;
+  int32 collections_empty = 9;
+  int32 tags_in_use = 10;
+  int32 tags_unused = 11;
+  int32 tasks_completed = 12;
+  int32 tasks_pending = 13;
 }
 
 message ExportStatisticsRequest {
@@ -111,7 +131,8 @@ message TempoStatistic {
 }
 
 message KeyStatistic {
-  string key = 1;
+  // "<tonic> <scale>"; absent for projects with no key.
+  optional string key = 1;
   int32 count = 2;
 }
 

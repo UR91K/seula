@@ -219,11 +219,12 @@ impl SystemHandler {
     ) -> Result<Response<GetStatisticsResponse>, Status> {
         debug!("Getting comprehensive statistics: {:?}", request);
         // TODO: Implement filtering based on request.date_range, collection_ids,
-        // tag_ids, ableton_version_filter -- unfiltered for now (unchanged).
+        // tag_ids, ableton_version_filter -- unfiltered for now (unchanged). The
+        // HTTP route takes a project scope; gRPC keeps active projects (ADR-0045).
 
         let stats = self
             .service
-            .get_statistics()
+            .get_statistics(crate::database::ProjectScope::Active)
             .await
             .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
@@ -311,7 +312,7 @@ impl SystemHandler {
         csv_content.push_str("Key Distribution\n");
         csv_content.push_str("Key,Count\n");
         for key in stats.key_distribution {
-            csv_content.push_str(&format!("{},{}\n", key.key, key.count));
+            csv_content.push_str(&format!("{},{}\n", key.key.as_deref().unwrap_or("No key"), key.count));
         }
 
         Ok(csv_content.into_bytes())

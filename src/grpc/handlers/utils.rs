@@ -49,6 +49,7 @@ pub fn convert_live_set_to_proto(
         .collect();
 
     Ok(Project {
+        is_active: live_set.is_active,
         id: project_id,
         name: live_set.name,
         path: live_set.file_path.to_string_lossy().to_string(),

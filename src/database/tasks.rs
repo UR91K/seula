@@ -169,46 +169,55 @@ impl ProjectDatabase {
         Ok(tasks)
     }
 
+    /// Tasks created in each of the `months` calendar months ending with `today`'s, and
+    /// how many of them are completed, oldest first, with empty months as zero. The
+    /// rate is a fraction from 0 to 1.
     pub fn get_task_completion_trends(
         &mut self,
-        months: i32,
+        months: u32,
+        today: chrono::NaiveDate,
+        scope: super::ProjectScope,
     ) -> Result<Vec<(i32, i32, i32, i32, f64)>, DatabaseError> {
         debug!("Getting task completion trends for last {} months", months);
-        let mut stmt = self.conn.prepare(
+        let window = super::stats::calendar_months(today, months);
+        let Some(&(start_year, start_month)) = window.first() else {
+            return Ok(Vec::new());
+        };
+        let start = chrono::NaiveDate::from_ymd_opt(start_year, start_month, 1)
+            .and_then(|d| d.and_hms_opt(0, 0, 0))
+            .map(|dt| dt.and_utc().timestamp())
+            .unwrap_or(0);
+        let mut stmt = self.conn.prepare(&format!(
             r#"
-            SELECT 
-                strftime('%Y', datetime(created_at, 'unixepoch')) as year,
-                strftime('%m', datetime(created_at, 'unixepoch')) as month,
-                COUNT(CASE WHEN completed = 1 THEN 1 END) as completed_tasks,
-                COUNT(*) as total_tasks,
-                CAST(COUNT(CASE WHEN completed = 1 THEN 1 END) AS REAL) / COUNT(*) as completion_rate
-            FROM project_tasks
-            WHERE created_at IS NOT NULL AND datetime(created_at, 'unixepoch') >= datetime('now', '-' || ? || ' months')
+            SELECT
+                CAST(strftime('%Y', datetime(t.created_at, 'unixepoch')) AS INTEGER) as year,
+                CAST(strftime('%m', datetime(t.created_at, 'unixepoch')) AS INTEGER) as month,
+                COUNT(CASE WHEN t.completed = 1 THEN 1 END) as completed_tasks,
+                COUNT(*) as total_tasks
+            FROM project_tasks t
+            {}
+            WHERE t.created_at >= ?
             GROUP BY year, month
-            ORDER BY year, month
-            "#
-        )?;
+            "#,
+            scope.join("t.project_id")
+        ))?;
 
-        let trends = stmt
-            .query_map([months], |row| {
-                let year_str: Option<String> = row.get(0)?;
-                let month_str: Option<String> = row.get(1)?;
-                let year: i32 = year_str.unwrap_or_default().parse().unwrap_or(0);
-                let month: i32 = month_str.unwrap_or_default().parse().unwrap_or(0);
-                let completed_tasks: i32 = row.get(2)?;
-                let total_tasks: i32 = row.get(3)?;
-                let completion_rate: f64 = row.get(4)?;
-                debug!(
-                    "Found trend: {}-{:02}: {}/{} tasks ({:.2}%)",
-                    year,
-                    month,
-                    completed_tasks,
-                    total_tasks,
-                    completion_rate * 100.0
-                );
-                Ok((year, month, completed_tasks, total_tasks, completion_rate))
-            })?
-            .filter_map(|r| r.ok())
+        let rows = stmt.query_map([start], |row| {
+            Ok((row.get::<_, i32>(0)?, row.get::<_, u32>(1)?, row.get::<_, i32>(2)?, row.get::<_, i32>(3)?))
+        })?;
+        let mut found = std::collections::HashMap::new();
+        for row in rows {
+            let (year, month, completed, total) = row?;
+            found.insert((year, month), (completed, total));
+        }
+
+        let trends = window
+            .into_iter()
+            .map(|(year, month)| {
+                let (completed, total) = found.get(&(year, month)).copied().unwrap_or((0, 0));
+                let rate = if total > 0 { completed as f64 / total as f64 } else { 0.0 };
+                (year, month as i32, completed, total, rate)
+            })
             .collect();
 
         debug!("Successfully retrieved task completion trends");
@@ -437,7 +446,7 @@ impl ProjectDatabase {
             // For specific project, we need a different query
             self.get_project_task_trends(pid, 12)?
         } else {
-            self.get_task_completion_trends(12)?
+            self.get_task_completion_trends(12, Local::now().date_naive(), super::ProjectScope::All)?
         };
 
         Ok(TaskAnalytics {

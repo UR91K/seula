@@ -1,5 +1,6 @@
 //! Statistics-related gRPC tests
 
+use seula::database::ProjectScope;
 use seula::grpc::system::system_service_server::SystemService;
 
 use super::*;
@@ -99,13 +100,14 @@ async fn test_individual_statistics_functions() {
 
     // Create a test project
     let _ = create_test_project_in_db(db).await;
+    let today = chrono::Utc::now().date_naive();
 
     // Test individual statistics functions that might be causing issues
     {
         let db_guard = db.lock().await;
 
         println!("Testing get_projects_per_year...");
-        match db_guard.get_projects_per_year() {
+        match db_guard.get_projects_per_year(ProjectScope::Active) {
             Ok(projects_per_year) => {
                 println!(
                     "[OK] get_projects_per_year succeeded: {:?}",
@@ -119,7 +121,7 @@ async fn test_individual_statistics_functions() {
         }
 
         println!("Testing get_projects_per_month...");
-        match db_guard.get_projects_per_month(12) {
+        match db_guard.get_projects_per_month(12, today, ProjectScope::Active) {
             Ok(projects_per_month) => {
                 println!(
                     "[OK] get_projects_per_month succeeded: {:?}",
@@ -133,7 +135,7 @@ async fn test_individual_statistics_functions() {
         }
 
         println!("Testing get_recent_activity...");
-        match db_guard.get_recent_activity(30) {
+        match db_guard.get_recent_activity(30, today, ProjectScope::Active) {
             Ok(recent_activity) => {
                 println!("[OK] get_recent_activity succeeded: {:?}", recent_activity);
             }
@@ -149,7 +151,7 @@ async fn test_individual_statistics_functions() {
         let mut db_guard = db.lock().await;
 
         println!("Testing get_task_completion_trends...");
-        match db_guard.get_task_completion_trends(12) {
+        match db_guard.get_task_completion_trends(12, today, ProjectScope::Active) {
             Ok(task_trends) => {
                 println!(
                     "[OK] get_task_completion_trends succeeded: {:?}",

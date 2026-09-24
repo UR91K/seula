@@ -22,4 +22,4 @@ pub use project_counts::ProjectScope;
 pub use plugin_scan::PluginScanPersist;
 pub use plugins::{PluginFilter, PluginStats};
 pub use samples::{SampleStats, SampleUsageInfo};
-pub use stats::ProjectStatistics;
+pub use stats::{LibraryCounts, ProjectStatistics};

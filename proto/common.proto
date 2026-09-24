@@ -33,6 +33,8 @@ message Project {
   repeated Task tasks = 18;
   repeated string collection_ids = 19;
   optional string audio_file_id = 20;
+  // False for an archived project.
+  bool is_active = 21;
 }
 
 message Plugin {

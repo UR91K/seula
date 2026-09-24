@@ -7,7 +7,7 @@ use crate::config::CONFIG;
 use crate::database::batch::BatchInsertManager;
 use crate::database::plugins::PluginRefreshResult;
 use crate::database::samples::SampleRefreshResult;
-use crate::database::ProjectDatabase;
+use crate::database::{ProjectDatabase, ProjectScope};
 use crate::scan::sample_check::{check_sample_files, default_threads};
 use crate::error::DatabaseError;
 use crate::grpc::common::{ScanStatus, WatcherEventType};
@@ -537,17 +537,43 @@ impl SystemService {
 
     /// Gathers every statistic and returns the assembled proto response
     /// directly -- this data is proto-shaped by nature (it exists to answer
-    /// `GetStatistics`) and has no other consumer today.
-    pub async fn get_statistics(&self) -> Result<GetStatisticsResponse, DatabaseError> {
+    /// `GetStatistics`), and the HTTP adapter mirrors it field by field.
+    ///
+    /// Every figure counts the projects in `scope` and what they use (ADR-0045).
+    pub async fn get_statistics(&self, scope: ProjectScope) -> Result<GetStatisticsResponse, DatabaseError> {
         use crate::grpc::system::*;
 
+        let today = chrono::Utc::now().date_naive();
         let mut db = self.db.lock().await;
 
-        let (total_projects, total_plugins, total_samples, total_collections, total_tags, total_tasks) =
-            db.get_basic_counts()?;
+        let c = db.get_library_counts(scope)?;
+        let total_projects = match scope {
+            ProjectScope::Active => c.projects_active,
+            ProjectScope::All => c.projects_active + c.projects_archived,
+        };
+        let total_plugins = c.plugins_installed + c.plugins_missing + c.plugins_not_scanned;
+        let total_samples = c.samples_present + c.samples_missing;
+        let total_collections = c.collections_with_projects + c.collections_empty;
+        let total_tags = c.tags_in_use + c.tags_unused;
+        let total_tasks = c.tasks_completed + c.tasks_pending;
+        let counts = LibraryCounts {
+            projects_active: c.projects_active,
+            projects_archived: c.projects_archived,
+            plugins_installed: c.plugins_installed,
+            plugins_missing: c.plugins_missing,
+            plugins_not_scanned: c.plugins_not_scanned,
+            samples_present: c.samples_present,
+            samples_missing: c.samples_missing,
+            collections_with_projects: c.collections_with_projects,
+            collections_empty: c.collections_empty,
+            tags_in_use: c.tags_in_use,
+            tags_unused: c.tags_unused,
+            tasks_completed: c.tasks_completed,
+            tasks_pending: c.tasks_pending,
+        };
 
         let top_plugins = db
-            .get_top_plugins(10)?
+            .get_top_plugins(10, scope)?
             .into_iter()
             .map(|(name, vendor, count)| PluginStatistic {
                 name,
@@ -557,7 +583,7 @@ impl SystemService {
             .collect();
 
         let top_vendors = db
-            .get_top_vendors(10)?
+            .get_top_vendors(10, scope)?
             .into_iter()
             .map(|(vendor, plugin_count, usage_count)| VendorStatistic {
                 vendor,
@@ -567,19 +593,19 @@ impl SystemService {
             .collect();
 
         let tempo_distribution = db
-            .get_tempo_distribution()?
+            .get_tempo_distribution(scope)?
             .into_iter()
             .map(|(tempo, count)| TempoStatistic { tempo, count })
             .collect();
 
         let key_distribution = db
-            .get_key_distribution()?
+            .get_key_distribution(scope)?
             .into_iter()
             .map(|(key, count)| KeyStatistic { key, count })
             .collect();
 
         let time_signature_distribution = db
-            .get_time_signature_distribution()?
+            .get_time_signature_distribution(scope)?
             .into_iter()
             .map(|(numerator, denominator, count)| TimeSignatureStatistic {
                 numerator,
@@ -589,13 +615,13 @@ impl SystemService {
             .collect();
 
         let projects_per_year = db
-            .get_projects_per_year()?
+            .get_projects_per_year(scope)?
             .into_iter()
             .map(|(year, count)| YearStatistic { year, count })
             .collect();
 
         let projects_per_month: Vec<MonthStatistic> = db
-            .get_projects_per_month(12)?
+            .get_projects_per_month(12, today, scope)?
             .into_iter()
             .map(|(year, month, count)| MonthStatistic { year, month, count })
             .collect();
@@ -608,10 +634,10 @@ impl SystemService {
         };
 
         let (average_project_duration_seconds, projects_under_40_seconds, longest_project_id) =
-            db.get_duration_analytics()?;
+            db.get_duration_analytics(scope)?;
 
         let longest_project = if let Some(project_id) = longest_project_id {
-            match db.get_project_by_id(&project_id) {
+            match db.get_project_by_id_any_status(&project_id) {
                 Ok(Some(project)) => convert_live_set_to_proto(project, &mut db).ok(),
                 _ => None,
             }
@@ -619,12 +645,12 @@ impl SystemService {
             None
         };
 
-        let (average_plugins_per_project, average_samples_per_project) = db.get_complexity_metrics()?;
+        let (average_plugins_per_project, average_samples_per_project) = db.get_complexity_metrics(scope)?;
 
-        let most_complex_projects_raw = db.get_most_complex_projects(5)?;
+        let most_complex_projects_raw = db.get_most_complex_projects(5, scope)?;
         let mut most_complex_projects = Vec::new();
         for (project_id, plugin_count, sample_count, complexity_score) in most_complex_projects_raw {
-            if let Ok(Some(project)) = db.get_project_by_id(&project_id) {
+            if let Ok(Some(project)) = db.get_project_by_id_any_status(&project_id) {
                 if let Ok(proto_project) = convert_live_set_to_proto(project, &mut db) {
                     most_complex_projects.push(ProjectComplexityStatistic {
                         project: Some(proto_project),
@@ -637,7 +663,7 @@ impl SystemService {
         }
 
         let top_samples = db
-            .get_top_samples(10)?
+            .get_top_samples(10, scope)?
             .into_iter()
             .map(|(name, path, usage_count)| SampleStatistic {
                 name,
@@ -647,15 +673,15 @@ impl SystemService {
             .collect();
 
         let top_tags = db
-            .get_top_tags(10)?
+            .get_top_tags(10, scope)?
             .into_iter()
             .map(|(name, usage_count)| TagStatistic { name, usage_count })
             .collect();
 
-        let (completed_tasks, pending_tasks, task_completion_rate) = db.get_task_statistics()?;
+        let (completed_tasks, pending_tasks, task_completion_rate) = db.get_task_statistics(scope)?;
 
         let recent_activity = db
-            .get_recent_activity(30)?
+            .get_recent_activity(30, today, scope)?
             .into_iter()
             .map(|(year, month, day, projects_created, projects_modified)| ActivityTrendStatistic {
                 year,
@@ -667,18 +693,18 @@ impl SystemService {
             .collect();
 
         let ableton_versions = db
-            .get_ableton_version_stats()?
+            .get_ableton_version_stats(scope)?
             .into_iter()
             .map(|(version, count)| VersionStatistic { version, count })
             .collect();
 
-        let (average_projects_per_collection, largest_collection_id) = db.get_collection_analytics()?;
+        let (average_projects_per_collection, largest_collection_id) = db.get_collection_analytics(scope)?;
 
         let largest_collection = if let Some(collection_id) = largest_collection_id {
-            match db.get_collection_by_id(&collection_id, crate::database::ProjectScope::All) {
+            match db.get_collection_by_id(&collection_id, scope) {
                 Ok(Some((id, name, description, notes, created_at, modified_at, project_ids, cover_art_id))) => {
                     let (total_duration_seconds, project_count) =
-                        db.get_collection_statistics(&id, crate::database::ProjectScope::All).unwrap_or((None, 0));
+                        db.get_collection_statistics(&id, scope).unwrap_or((None, 0));
                     Some(crate::grpc::common::Collection {
                         id,
                         name,
@@ -699,7 +725,7 @@ impl SystemService {
         };
 
         let task_completion_trends = db
-            .get_task_completion_trends(12)?
+            .get_task_completion_trends(12, today, scope)?
             .into_iter()
             .map(
                 |(year, month, completed_tasks, total_tasks, completion_rate)| TaskCompletionTrendStatistic {
@@ -743,6 +769,7 @@ impl SystemService {
             average_projects_per_collection,
             largest_collection,
             task_completion_trends,
+            counts: Some(counts),
         })
     }
 }
