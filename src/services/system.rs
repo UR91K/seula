@@ -370,8 +370,12 @@ impl SystemService {
             return Err("File must have .als extension".to_string());
         }
 
-        let live_set =
-            Project::new(file_path.to_path_buf()).map_err(|e| format!("Failed to parse project: {}", e))?;
+        // A full gunzip and parse: a blocking thread, not the runtime's.
+        let path = file_path.to_path_buf();
+        let live_set = tokio::task::spawn_blocking(move || Project::new(path))
+            .await
+            .unwrap_or_else(|e| std::panic::resume_unwind(e.into_panic()))
+            .map_err(|e| format!("Failed to parse project: {}", e))?;
         let project_id = live_set.id.to_string();
 
         let mut db = self.db.lock().await;
@@ -394,26 +398,34 @@ impl SystemService {
         &self,
         file_paths: Vec<String>,
     ) -> (Vec<(String, Project)>, Vec<(String, String)>) {
-        let mut failures = Vec::new();
-        let mut parsed: Vec<(String, Project)> = Vec::new();
+        // Parsing is a full gunzip and parse per file: a blocking thread, not the
+        // runtime's.
+        let (mut failures, parsed) = tokio::task::spawn_blocking(move || {
+            let mut failures = Vec::new();
+            let mut parsed: Vec<(String, Project)> = Vec::new();
 
-        for file_path_str in file_paths {
-            let file_path = PathBuf::from(&file_path_str);
+            for file_path_str in file_paths {
+                let file_path = PathBuf::from(&file_path_str);
 
-            if !file_path.exists() {
-                failures.push((file_path_str, "File does not exist".to_string()));
-                continue;
-            }
-            if !file_path.extension().map_or(false, |ext| ext == "als") {
-                failures.push((file_path_str, "File must have .als extension".to_string()));
-                continue;
+                if !file_path.exists() {
+                    failures.push((file_path_str, "File does not exist".to_string()));
+                    continue;
+                }
+                if !file_path.extension().map_or(false, |ext| ext == "als") {
+                    failures.push((file_path_str, "File must have .als extension".to_string()));
+                    continue;
+                }
+
+                match Project::new(file_path.clone()) {
+                    Ok(live_set) => parsed.push((file_path_str, live_set)),
+                    Err(e) => failures.push((file_path_str, format!("Failed to parse project: {}", e))),
+                }
             }
 
-            match Project::new(file_path.clone()) {
-                Ok(live_set) => parsed.push((file_path_str, live_set)),
-                Err(e) => failures.push((file_path_str, format!("Failed to parse project: {}", e))),
-            }
-        }
+            (failures, parsed)
+        })
+        .await
+        .unwrap_or_else(|e| std::panic::resume_unwind(e.into_panic()));
 
         let mut successes = Vec::new();
         if !parsed.is_empty() {
@@ -867,5 +879,33 @@ mod tests {
         drop(event_tx);
         runtime.join().unwrap();
         assert!(other_task_ran, "the stream blocked the runtime");
+    }
+
+    /// Adding projects once parsed them inline, so the runtime worker ran nothing else
+    /// until every file was gunzipped and parsed. Here, a task spawned first has to get
+    /// a turn before each call returns.
+    #[tokio::test]
+    async fn adding_projects_parses_them_off_the_runtime() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("not really.als");
+        std::fs::write(&path, b"not gzip").unwrap();
+        let system = test_service();
+
+        for multiple in [false, true] {
+            let returned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let returned_seen = Arc::clone(&returned);
+            let other = tokio::spawn(async move { !returned_seen.load(std::sync::atomic::Ordering::SeqCst) });
+
+            if multiple {
+                let (added, failed) = system.add_multiple_projects(vec![path.to_string_lossy().into_owned()]).await;
+                assert!(added.is_empty() && failed.len() == 1);
+            } else {
+                assert!(system.add_single_project(&path).await.is_err());
+            }
+            returned.store(true, std::sync::atomic::Ordering::SeqCst);
+
+            let ran_during_the_call = other.await.unwrap();
+            assert!(ran_during_the_call, "parsing held the runtime (multiple: {multiple})");
+        }
     }
 }
