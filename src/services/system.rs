@@ -9,7 +9,7 @@ use crate::database::plugins::PluginRefreshResult;
 use crate::database::samples::SampleRefreshResult;
 use crate::database::{ProjectDatabase, ProjectScope};
 use crate::scan::sample_check::{check_sample_files, default_threads};
-use crate::error::DatabaseError;
+use crate::error::{DatabaseError, LiveSetError};
 use crate::grpc::common::{ScanStatus, WatcherEventType};
 use crate::grpc::scanning::ScanProgressResponse;
 use crate::grpc::system::GetStatisticsResponse;
@@ -18,6 +18,9 @@ use crate::grpc::handlers::utils::convert_live_set_to_proto;
 use crate::process_projects_with_progress;
 use crate::project::Project;
 use crate::watcher::file_watcher::{FileEvent, FileWatcher};
+
+/// What a project scan reports through: completed, total, progress, message, phase.
+type ProgressCallback = Box<dyn FnMut(u32, u32, f32, String, &str) + Send>;
 
 /// Owns the state shared across the scanning/watcher/statistics RPCs: scan
 /// status/progress, the active file watcher (if any), and process start time.
@@ -120,18 +123,36 @@ impl SystemService {
     where
         F: Fn(ScanProgressResponse) + Send + Sync + 'static,
     {
+        self.start_scan_with(on_progress, |callback| process_projects_with_progress(Some(callback)))
+            .await
+    }
+
+    /// `start_scan` with the scan itself passed in, so tests can drive the status
+    /// handling without a configured project folder.
+    async fn start_scan_with<F, S>(&self, on_progress: F, scan: S) -> bool
+    where
+        F: Fn(ScanProgressResponse) + Send + Sync + 'static,
+        S: FnOnce(ProgressCallback) -> Result<(), LiveSetError> + Send + 'static,
+    {
         if !self.begin_scan(ScanStatus::ScanStarting).await {
             return false;
         }
 
         let scan_status = Arc::clone(&self.scan_status);
         let scan_progress = Arc::clone(&self.scan_progress);
-        let scan_status_for_callback = Arc::clone(&scan_status);
-        let scan_progress_for_callback = Arc::clone(&scan_progress);
-        let on_progress = Arc::new(on_progress);
-        let on_progress_for_callback = Arc::clone(&on_progress);
 
-        tokio::spawn(async move {
+        // A blocking thread, like the plugin scan: the scan is synchronous, and writing
+        // the status here, in order, is what stops an update landing after the final
+        // one. Written from spawned tasks, one could, and it left the scan "running".
+        tokio::task::spawn_blocking(move || {
+            // blocking_lock is right here: this is a blocking thread, not a task.
+            let report = Arc::new(move |response: ScanProgressResponse, status: ScanStatus| {
+                *scan_status.blocking_lock() = status;
+                *scan_progress.blocking_lock() = Some(response.clone());
+                on_progress(response);
+            });
+            let report_for_callback = Arc::clone(&report);
+
             let progress_callback =
                 move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
                     let status = match phase {
@@ -151,19 +172,10 @@ impl SystemService {
                         message,
                         status: status as i32,
                     };
-
-                    let scan_status_clone = Arc::clone(&scan_status_for_callback);
-                    let scan_progress_clone = Arc::clone(&scan_progress_for_callback);
-                    let response_clone = response.clone();
-                    tokio::spawn(async move {
-                        *scan_status_clone.lock().await = status;
-                        *scan_progress_clone.lock().await = Some(response_clone);
-                    });
-
-                    on_progress_for_callback(response);
+                    report_for_callback(response, status);
                 };
 
-            match process_projects_with_progress(Some(progress_callback)) {
+            match scan(Box::new(progress_callback)) {
                 Ok(()) => {
                     let final_status = ScanStatus::ScanCompleted;
                     let final_progress = ScanProgressResponse {
@@ -173,9 +185,7 @@ impl SystemService {
                         message: "Scan completed successfully".to_string(),
                         status: final_status as i32,
                     };
-                    *scan_status.lock().await = final_status;
-                    *scan_progress.lock().await = Some(final_progress.clone());
-                    on_progress(final_progress);
+                    report(final_progress, final_status);
                 }
                 Err(e) => {
                     let error_status = ScanStatus::ScanError;
@@ -186,9 +196,7 @@ impl SystemService {
                         message: format!("Scan failed: {}", e),
                         status: error_status as i32,
                     };
-                    *scan_status.lock().await = error_status;
-                    *scan_progress.lock().await = Some(error_progress.clone());
-                    on_progress(error_progress);
+                    report(error_progress, error_status);
                 }
             }
         });
@@ -771,5 +779,56 @@ impl SystemService {
             task_completion_trends,
             counts: Some(counts),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_service() -> SystemService {
+        let db = ProjectDatabase::new(PathBuf::from(":memory:")).unwrap();
+        SystemService::new(
+            Arc::new(Mutex::new(db)),
+            Arc::new(Mutex::new(ScanStatus::ScanUnknown)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(Mutex::new(None)),
+            Instant::now(),
+        )
+    }
+
+    /// Progress updates once wrote the status from tasks spawned per update, which
+    /// nothing ordered against the final write. One that ran late put the scan back to
+    /// `parsing`, and every later scan was refused until a restart.
+    ///
+    /// A current-thread runtime makes the old interleaving certain: the spawned writes
+    /// queue behind the scan and all run after its final status.
+    #[tokio::test]
+    async fn a_late_progress_update_cannot_overwrite_the_final_status() {
+        let system = test_service();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let started = system
+            .start_scan_with(
+                move |response| {
+                    let _ = tx.send(response);
+                },
+                |mut progress| {
+                    for i in 0..100 {
+                        progress(i, 100, i as f32 / 100.0, "Parsing".to_string(), "parsing");
+                    }
+                    Ok(())
+                },
+            )
+            .await;
+        assert!(started);
+
+        while rx.recv().await.is_some() {}
+        for _ in 0..100 {
+            tokio::task::yield_now().await;
+        }
+
+        assert_eq!(*system.scan_status.lock().await, ScanStatus::ScanCompleted);
+        assert!(system.start_scan_with(|_| {}, |_| Ok(())).await, "a new scan can start");
     }
 }
