@@ -89,7 +89,6 @@ folders, two are hardcoded to paths on the maintainer's machine.
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
 | **The project scan writes through a second database connection** (found 2026-09-24). `SharedState` in `src/main.rs` is documented as giving every adapter one shared connection, but `process_projects_with_progress` opens its own `ProjectDatabase` and writes the whole batch in one transaction on it, outside the `Arc<Mutex<ProjectDatabase>>`. No journal mode or busy timeout is set, so the database uses rollback journalling and rusqlite's default busy timeout. A write over HTTP or gRPC (a tag, a collection edit) that arrives while the batch holds the write lock waits out that timeout and then fails with "database is locked". Also checked: the first-run plugin scan persists over the same second connection. Not reproduced yet. The fix is a choice between having the scan take the shared handle (and deciding how long it may hold the lock) and switching to WAL. Record that choice in an ADR when it is made. | `src/lib.rs` (`process_projects_with_progress`), `src/database/core.rs` | Medium |
-| **The architecture overview and one comment describe code that has changed** (found 2026-09-24). `docs/architecture/overview.md` still shows `ableton_db.rs` in the plugin pipeline and says the scan-to-plugin join is not implemented, though ADR-0006 retired the Ableton database and the join is done. It has no HTTP adapter or service layer. It says 12 gRPC services; there are 12 protos in `proto/services/`, but `src/main.rs` registers 11, with no config service. In `process_projects_with_progress`, the comment "Parser is dropped here" is wrong: the receiver borrows the parser, which lives until the function returns, and the collect loop ends by counting results. | `docs/architecture/overview.md`, `src/main.rs`, `src/lib.rs` | Low |
 
 Resolved:
 
@@ -116,6 +115,12 @@ Resolved:
   2026-09-24). `add_single_project` and `add_multiple_projects` now parse on a blocking
   thread. Regression test: `adding_projects_parses_them_off_the_runtime`
   (`src/services/system.rs`).
+- **The architecture overview and one comment described code that had changed** (found
+  2026-09-24, fixed 2026-09-24). `docs/architecture/overview.md` now shows the plugin
+  join as built, without the Ableton database, and describes the service layer and the
+  HTTP adapter, with the 12-protos-but-11-services mismatch stated rather than hidden.
+  The "Parser is dropped here" comment in `process_projects_with_progress` now says
+  what actually happens.
 - **The CORS check refused Tauri 2's Windows origin and accepted look-alike hosts**
   (found 2026-09-24, fixed 2026-09-24). `build_router` in `src/http/server.rs` matched
   origins by prefix. It accepted `https://tauri.localhost` but not `http://tauri.localhost`,

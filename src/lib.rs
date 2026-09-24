@@ -424,7 +424,9 @@ where
         parser.submit_paths(projects_to_parse)?;
         receiver
     };
-    // Parser is dropped here, which will close the work channel
+    // The parser is not dropped here: the receiver borrows it, so its workers live until
+    // this function returns. The loop below ends by counting results, not on a closed
+    // channel.
 
     let mut successful_projects = Vec::new();
 

@@ -8,7 +8,7 @@ Seula is one binary with two modes, plus a sidecar.
 
 | | |
 |---|---|
-| **Tray daemon** (default) | `src/tray.rs` + the gRPC server. Background indexing, file watching, API on `grpc_port`. |
+| **Tray daemon** (default) | `src/tray.rs` + the gRPC server and the HTTP router. Background indexing, file watching, gRPC on `grpc_port`, HTTP on `http_port` (ADR-0024). |
 | **CLI** | `src/cli/`. Any subcommand switches to CLI mode. `seula` with no args is interactive (rustyline). |
 | **`vst-meta`** | `crates/vst-meta`. Sidecar binary, spawned per scan batch, never long-lived. ADR-0004 |
 
@@ -26,7 +26,7 @@ project_scanner.rs ──── walks directories, finds .als files
 parallel.rs ─────────── worker pool, one file per worker      ADR-0002
      │
      ▼
-live_set.rs ─────────── gunzip, then hand the XML to:
+project.rs ──────────── gunzip, then hand the XML to:
      │
      ▼
 parser.rs ───────────── ONE pass, state machine               ADR-0001
@@ -42,7 +42,7 @@ lets the caller report progress per file rather than per batch.
 
 ## The plugin pipeline
 
-Two independent sources that are (as of now) only partly joined. See
+Two independent sources, joined in the database on `(format, uid)`. See
 `architecture/plugins.md` — this is the most intricate area in the codebase.
 
 ```
@@ -60,18 +60,26 @@ PluginInfo                          scan/plugins/discovery.rs   ADR-0008
      │                                       │     (subprocess — loads
      │                                       │      plugin binaries)
      │                                       ▼
-     ▼                                  PluginMeta
-ableton_db.rs                            uid, vendor, version, buses,
-(being retired — ADR-0006)               latency, classes, …
+     │                                  PluginMeta
+     │                                   uid, vendor, version, buses,
+     │                                   latency, classes, …
+     ▼                                       ▼
+database/batch.rs                   database/plugin_scan.rs
+  records a reference,                writes what is installed
+  resolved by (format, uid)           ADR-0007, ADR-0012
+  ADR-0005, ADR-0009                         │
      │                                       │
-     └──────────► Plugin ◄───────────────────┘
-                 (the join is ADR-0005; NOT YET IMPLEMENTED —
-                  scan results are printed, never persisted)
+     └──────────► plugins table ◄────────────┘
 ```
+
+A project parse only ever records a reference; only a plugin scan sets `installed`
+(ADR-0012). The Ableton database that once filled in plugin details is gone
+(ADR-0006).
 
 ## Storage
 
-SQLite, one module per entity under `src/database/`. Schema lives in `core.rs`. FTS5
+SQLite, one module per entity under `src/database/`. Schema lives in `schema.sql`,
+run by `core.rs` on every open. FTS5
 powers search with operators (`plugin:`, `bpm:`, `key:`, `missing:`).
 
 `batch.rs` exists because per-project inserts dominated scan time at this corpus size
@@ -79,10 +87,18 @@ powers search with operators (`plugin:`, `bpm:`, `key:`, `missing:`).
 
 ## API
 
-12 gRPC services in `proto/services/`, one handler each in `src/grpc/handlers/`. The
-service list mirrors the CLI command groups — projects, samples, collections, tags,
-tasks, plugins, search, media, config, system, scanning, watcher — so a feature
-generally exists in both surfaces or neither.
+Three adapters over one service layer. `src/services/` owns validation and
+orchestration (ADR-0018); the gRPC server, the HTTP router and the CLI call into it,
+never into the database directly. The tray daemon builds the services once and hands
+the same instances, and the same database connection, to gRPC and HTTP.
+
+- **HTTP**: `src/http/`, JSON over axum, with Server-Sent Events for scan progress
+  (ADR-0024). The frontend uses this one.
+- **gRPC**: 12 protos in `proto/services/`, one handler each in `src/grpc/handlers/`,
+  but `src/main.rs` registers 11: there is a config handler and no config service.
+- **CLI**: `src/cli/`, command groups mirroring the gRPC services.
+
+ADR-0046 retires gRPC and the CLI in favour of HTTP alone; not yet implemented.
 
 ## Configuration
 
