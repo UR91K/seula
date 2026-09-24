@@ -1,6 +1,6 @@
 # 0029. The web frontend is React, TypeScript, Vite and hand-rolled CSS, living in this repository
 
-- **Status:** Accepted
+- **Status:** Accepted in part: the framework is superseded by 0047 (Solid, not React), and the open serving question is settled by 0048
 - **Recognized:** 2025-08-14, when `docs/archive/FRONTEND_SPEC.md` was first sketched;
   stack settled 2026-09-16 in conversation
 - **Decided:** 2026-09-16

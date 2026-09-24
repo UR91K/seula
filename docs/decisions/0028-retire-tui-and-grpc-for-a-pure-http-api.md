@@ -1,6 +1,6 @@
 # 0028. Retire the CLI (interactive and non-interactive) and the gRPC server, leaving a pure HTTP API
 
-- **Status:** Proposed — tentative, not yet decided, may be superseded
+- **Status:** Superseded by 0046
 - **Recognized:** 2026-09-16, in conversation, immediately after ADR-0024's skeleton landed
 - **Decided:** not yet
 - **Recorded:** 2026-09-16

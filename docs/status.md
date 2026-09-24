@@ -14,8 +14,8 @@ Last reviewed: 2026-09-24.
 | Project scanning / discovery | **Done** | `src/scan/project_scanner.rs` |
 | SQLite storage | **Done** | 5NF schema, `src/database/core.rs` |
 | FTS5 search | **Done** | Operators: `name:`, `path:`, `plugin:`, `sample:`, `tag:`, `collection:`, `key:`, `bpm:`, `ts:`, `version:`, `dc:`, `dm:`. `collection:` filters by membership, not text. Quoted values keep their spaces |
-| CLI | **Done** | 33+ commands, table/JSON/CSV via `src/cli/output.rs` |
-| gRPC API | **Done** | 12 services in `proto/services/` |
+| CLI | **Done, to be removed** | 33+ commands, table/JSON/CSV via `src/cli/output.rs`. Retired with interactive mode by ADR-0046; `--config` and `--server` stay |
+| gRPC API | **Done, to be removed** | 12 services in `proto/services/`. Retired by ADR-0046, once `tests/grpc/` is covered elsewhere |
 | HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
 | Tray mode | **Done** | `src/tray.rs`; default when run with no subcommand |
 | File watcher | **Done** | `src/watcher/`, streams over gRPC |
@@ -29,7 +29,7 @@ Last reviewed: 2026-09-24.
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
 | `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
-| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029, OS bridge ADR-0030, preferences ADR-0031, shell and density ADR-0032. Static mockups come before any React. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round, as review boards (ADR-0036): shell and projects approved; plugins (`mockup/plugins.html`), samples (`mockup/samples.html`), collections (`mockup/collections.html`, ADR-0044) and stats (`mockup/stats.html`, ADR-0045) awaiting review |
+| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029 and ADR-0047 (Solid, not React; one screen is built in both Solid and Svelte 5 before the first view, not done yet), Tauri-only thin shell over the tray daemon ADR-0048 (the Tauri trial is not run yet), preferences ADR-0031, shell and density ADR-0032. Static mockups come before any framework code. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round, as review boards (ADR-0036): shell and projects approved; plugins (`mockup/plugins.html`), samples (`mockup/samples.html`), collections (`mockup/collections.html`, ADR-0044) and stats (`mockup/stats.html`, ADR-0045) awaiting review |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
@@ -41,9 +41,11 @@ SSE streaming endpoints, statistics with CSV export). Each domain has its own
 hand-written DTOs in `src/http/dto/`, independent of the generated proto types, per the
 ADR.
 
-ADR-0028 records a tentative maintainer direction to retire the CLI and gRPC server
-entirely once this surface is proven out, leaving a pure Axum API for a web frontend
-and/or Tauri. Not decided or started — see that ADR before removing anything.
+ADR-0046 (2026-09-24) decides what ADR-0028 left tentative: the gRPC server and the
+CLI, interactive mode included, are removed, and HTTP is the only surface. Not started.
+The order is in the ADR: move the behaviour `tests/grpc/` checks onto the service layer
+or HTTP first, then remove gRPC, then the CLI subcommands, then fold `SystemService`
+into `Services`. The frontend is a Tauri-only thin shell over that surface (ADR-0048).
 
 The plugin migration is complete. Phase 1 (worker + supervisor) landed in `b261200`;
 phase 2 followed in three steps — schema and persistence, the first-run scan, and

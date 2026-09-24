@@ -1,6 +1,6 @@
 # 0030. Trial Tauri as the OS bridge in a branch before the server grows shell-out endpoints
 
-- **Status:** Accepted, with the trial outcome pending
+- **Status:** Superseded by 0048
 - **Recognized:** 2026-09-16, while reading the frontend sketch against the HTTP surface
 - **Decided:** 2026-09-16
 - **Recorded:** 2026-09-16

@@ -1,8 +1,8 @@
 # Frontend
 
-Shape only. For *why*, follow the ADR links. Stack and placement are ADR-0029, the
-browser-versus-native boundary is ADR-0030, preference storage is ADR-0031, the shell
-frame and its density are ADR-0032.
+Shape only. For *why*, follow the ADR links. Stack and placement are ADR-0029 and
+ADR-0047, the Tauri shell and its boundary with the daemon are ADR-0048, preference
+storage is ADR-0031, the shell frame and its density are ADR-0032.
 
 This restates `docs/archive/FRONTEND_SPEC.md` (written 2025-08-14, verified still
 accurate by the maintainer on 2026-09-16) against the HTTP surface that now exists. The
@@ -18,13 +18,17 @@ one review board per view, one view at a time, drawn from shared component rende
 (ADR-0036). Colours live only in `mockup/colors.css`, which the maintainer edits by
 hand. Mockup data is a snapshot of the real HTTP API over a seeded database, made by
 `mockup/data/generate.py` from the same `src/database/schema.sql` the program compiles
-in. No React exists yet. See `docs/status.md` for where things stand.
+in. No Solid code exists yet. See `docs/status.md` for where things stand.
 
 ## What it is
 
-A React + TypeScript single-page app, built by Vite, in `web/`, talking only to the HTTP
-API from ADR-0024 on `http_port`. It has two build targets, **browser** and **Tauri**,
-that differ only in whether three native-only features are shown (ADR-0030).
+A Solid + TypeScript single-page app, built by Vite, in `web/` (ADR-0047). Solid is
+checked against Svelte 5 on one screen before the first view is written. It ships in
+one target, a Tauri app, which is a thin shell (ADR-0048). All data moves over the HTTP
+API from ADR-0024 on `http_port`, served by the tray daemon, which runs separately and
+keeps running when the window closes. Tauri's own IPC carries only the OS calls listed
+under [OS calls](#os-calls). The frontend's assets are bundled into the Tauri app, and
+the daemon does not serve them.
 
 ## Density
 
@@ -137,7 +141,7 @@ hands the row to the next. The row shows the add button when nothing is set to p
 
 **Context menu** on a row: add tag (existing tags, new tag, manage tags); open in
 Ableton; show in Explorer; rename; add audio demo; add to collection; archive, or
-unarchive when already archived. The three marked below are native-only. Single-item
+unarchive when already archived. Open in Ableton and Show in Explorer are OS calls. Single-item
 entries are disabled when several rows are selected.
 
 **Archived projects.** A toggle or filter shows archived projects. From there they can
@@ -149,7 +153,7 @@ database with a confirmation that says the file is untouched
 showing usage counts from `/api/v1/tags/with-usage`. Rename cascades; delete confirms.
 
 **Import.** An add-project button and a drop target for `.als` files from outside the
-watched paths, via `/api/v1/projects/add`. See the native-only note.
+watched paths, via `/api/v1/projects/add`. Picking the path is an OS call.
 
 ### Collections
 
@@ -215,7 +219,7 @@ status bar shows total, installed, missing, not-scanned and unique-vendor counts
 shows in the status bar like a project scan's, and when the stream ends the list and the
 counts are fetched again. The button is disabled while any scan runs.
 
-Context menu: Show in Explorer (installed plugins, native-only), Show projects using it
+Context menu: Show in Explorer (installed plugins, an OS call), Show projects using it
 (the projects view, searching `plugin:` for it), Copy name.
 
 The installed flag is tri-state (ADR-0012). "Not scanned" is a real state the UI must
@@ -242,7 +246,7 @@ library, the size says so rather than showing zero.
 each file is still there, and its size. Progress shows in the status bar like the other
 scans; the button is disabled while any scan runs.
 
-Context menu: Show in Explorer and Play, both native-only (ADR-0030), Show projects
+Context menu: Show in Explorer and Play, both OS calls (ADR-0048), Show projects
 using it, Copy path.
 
 Project counts and used-in lists here and in the plugins view take `scope=active|all`
@@ -280,17 +284,18 @@ Time series come oldest first with empty periods as zero, so the charts draw the
 they come. Under `all`, an archived project named anywhere on the page is marked. The
 status bar says when archived projects are counted, and carries the ♯/♭ switch.
 
-## Native-only features
+## OS calls
 
-Per ADR-0030, these exist in the Tauri target and are hidden in the browser target until
-that trial resolves:
+These features need the operating system, not the API. They are Tauri commands, the
+only use the frontend makes of Tauri's IPC (ADR-0048). None of them touches the
+database, and anything else the page needs goes over HTTP.
 
-| Feature | Why the browser cannot | Where it appears |
+| Feature | Why it needs the OS | Where it appears |
 |---|---|---|
 | Open in Ableton | launches a program | project context menu |
 | Show in Explorer | reveals a path | project, plugin and sample context menus |
 | Play a sample | the file is on the local disk, and the API serves only stored media (ADR-0033) | sample context menu and inspector |
-| Import from an arbitrary path, including drag and drop | a browser drop yields bytes, not a path; `/api/v1/projects/add` needs a path | projects view import |
+| Import from an arbitrary path, including drag and drop | a web drop event yields bytes, not a path; `/api/v1/projects/add` needs a path | projects view import |
 
 ## Live updates
 
