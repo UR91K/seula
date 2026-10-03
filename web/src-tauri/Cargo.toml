@@ -1,0 +1,14 @@
+# Deliberately NOT a member of the root workspace (ADR-0048): Tauri's dependency tree is
+# large, and `cargo build/test --workspace` should not compile it. Own lockfile, own target.
+[package]
+name = "seula-shell"
+version = "0.0.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[workspace]

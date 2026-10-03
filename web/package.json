@@ -1,0 +1,11 @@
+{
+  "name": "seula-web",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

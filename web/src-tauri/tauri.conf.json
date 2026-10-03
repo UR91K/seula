@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Seula",
+  "version": "0.0.0",
+  "identifier": "app.seula.shell",
+  "build": {
+    "frontendDist": "../../mockup"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "title": "Seula", "url": "shell.html", "width": 1280, "height": 800 }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.ico"]
+  }
+}
