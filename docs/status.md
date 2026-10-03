@@ -14,7 +14,8 @@ Last reviewed: 2026-09-24.
 | Project scanning / discovery | **Done** | `src/scan/project_scanner.rs` |
 | SQLite storage | **Done** | 5NF schema, `src/database/core.rs` |
 | FTS5 search | **Done** | Operators: `name:`, `path:`, `plugin:`, `sample:`, `tag:`, `collection:`, `key:`, `bpm:`, `ts:`, `version:`, `dc:`, `dm:`. `collection:` filters by membership, not text. Quoted values keep their spaces |
-| CLI | **Done, to be removed** | 33+ commands, table/JSON/CSV via `src/cli/output.rs`. Retired with interactive mode by ADR-0046; `--config` and `--server` stay |
+| CLI | **Done, to be replaced** | 33+ commands, table/JSON/CSV via `src/cli/output.rs`. Opens the database directly. To be replaced by a CLI client that talks to the daemon over HTTP (ADR-0050, which reverses this part of ADR-0046); `--config` and `--server` stay |
+| CLI client over HTTP | **Not started, decided** | ADR-0050. A separate small program on the `PATH`, no interactive mode. Lands before the old subcommands are deleted, which serve as its reference. A client that finds no daemon starts it; the daemon needs a single-instance guard first (none exists). Starting the daemon from the CLI is disabled if it trips antivirus before the executables are signed. Executables: `seula` is the CLI and the daemon is renamed `seula-service` (not done yet). Tray menu: Open, Rescan, Start with Windows (also in the GUI's settings), Quit |
 | gRPC API | **Done, to be removed** | 12 services in `proto/services/`. Retired by ADR-0046, once `tests/grpc/` is covered elsewhere |
 | HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
 | Tray mode | **Done** | `src/tray.rs`; default when run with no subcommand |
@@ -46,6 +47,13 @@ CLI, interactive mode included, are removed, and HTTP is the only surface. Not s
 The order is in the ADR: move the behaviour `tests/grpc/` checks onto the service layer
 or HTTP first, then remove gRPC, then the CLI subcommands, then fold `SystemService`
 into `Services`. The frontend is a Tauri-only thin shell over that surface (ADR-0048).
+
+ADR-0050 (2026-10-03) reverses the CLI half of that. The shipped application is three
+parts: the tray daemon, the frontend launched from the tray or a shortcut, and a CLI
+client that talks to the daemon over HTTP, for scripts, people who prefer commands, and
+AI agents. Every client reaches the data through the daemon. The current in-process CLI
+subcommands and interactive mode are still removed, but only after the new client has
+landed, so they can be ported from. gRPC removal is unaffected.
 
 The plugin migration is complete. Phase 1 (worker + supervisor) landed in `b261200`;
 phase 2 followed in three steps — schema and persistence, the first-run scan, and

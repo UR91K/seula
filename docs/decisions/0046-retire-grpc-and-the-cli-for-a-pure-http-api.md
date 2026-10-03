@@ -1,6 +1,6 @@
 # 0046. Retire the gRPC server and the CLI, interactive mode included; HTTP is the only surface
 
-- **Status:** Accepted, not yet implemented
+- **Status:** Accepted in part, not yet implemented: removing the CLI is superseded by 0050 (a CLI client over HTTP replaces it); the gRPC removal stands
 - **Recognized:** 2026-09-16, recorded then as the tentative direction in ADR-0028
 - **Decided:** 2026-09-24
 - **Recorded:** 2026-09-24
