@@ -3,7 +3,7 @@
 The single source of truth for what is done, in progress, deliberately out of scope, or
 known-broken. If status appears anywhere else in this repo, that copy is wrong.
 
-Last reviewed: 2026-09-24.
+Last reviewed: 2026-10-04.
 
 ## Subsystems
 
@@ -30,7 +30,7 @@ Last reviewed: 2026-09-24.
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |
 | `plugins` table restructure | **Done** | ADR-0007, ADR-0009, ADR-0010, ADR-0011; tri-state `installed` is ADR-0012 |
-| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029 and ADR-0047 (Solid, not React; one screen is built in both Solid and Svelte 5 before the first view, not done yet), Tauri-only thin shell over the tray daemon ADR-0048 (the Tauri trial is not run yet), preferences ADR-0031, shell and density ADR-0032. Static mockups come before any framework code. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round, as review boards (ADR-0036): shell and projects approved; plugins (`mockup/plugins.html`), samples (`mockup/samples.html`), collections (`mockup/collections.html`, ADR-0044) and stats (`mockup/stats.html`, ADR-0045) awaiting review |
+| Web frontend | **Not started, specified** | Shape in `docs/architecture/frontend.md`. Stack ADR-0029 and ADR-0047 (Solid, not React; one screen is built in both Solid and Svelte 5 before the first view, not done yet), Tauri-only thin shell over the tray daemon ADR-0048 (the Tauri trial passed 2026-10-04: opens about as fast as the same page in a browser tab, judged by the maintainer, no numbers taken; shell on branch `tauri-trial` in `web/src-tauri/`, outside the Cargo workspace; the browser build is not needed), preferences ADR-0031, shell and density ADR-0032. Static mockups come before any framework code. The first round was rejected for inconsistency and is kept on the `old-mockups` branch. Second round, as review boards (ADR-0036): all approved (2026-10-04): shell, projects, plugins, samples, collections (ADR-0044) and stats (ADR-0045) |
 | Version control for projects | **Not started** | Aspiration only |
 | macOS / Linux support | **Out of scope for now** | Paths exist, untested. Windows-first |
 
