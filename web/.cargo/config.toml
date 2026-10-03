@@ -1,0 +1,4 @@
+# Both Tauri shells build into one target directory, so the Tauri dependency tree is
+# compiled once. Resolved relative to web/.
+[build]
+target-dir = "target"

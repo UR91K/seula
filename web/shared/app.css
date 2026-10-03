@@ -1,0 +1,7 @@
+/* What the app needs on top of the approved mockup stylesheets (colors.css, shell.css,
+ * components.css), which are imported unchanged: the window fills the viewport instead
+ * of a board frame. */
+
+html, body, #app { height: 100%; }
+.win { width: 100%; height: 100%; border: 0; }
+.error-banner { padding: var(--u) calc(var(--u) * 4); color: var(--danger); }

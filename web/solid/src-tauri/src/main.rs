@@ -1,4 +1,4 @@
-//! The Tauri trial shell (ADR-0048). A window around the mockups plus one OS call.
+//! The Tauri shell (ADR-0048): a window around the web page, plus the OS calls.
 //!
 //! The Tauri side holds no state and never touches the API. Try the command from the
 //! webview's devtools console:

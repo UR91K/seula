@@ -1,7 +1,7 @@
 # Deliberately NOT a member of the root workspace (ADR-0048): Tauri's dependency tree is
-# large, and `cargo build/test --workspace` should not compile it. Own lockfile, own target.
+# large, and `cargo build/test --workspace` should not compile it. Own lockfile; the target directory is shared (web/.cargo/config.toml).
 [package]
-name = "seula-shell"
+name = "seula-shell-svelte"
 version = "0.0.0"
 edition = "2021"
 
