@@ -21,8 +21,9 @@ export const fmtVersion = (v: AbletonVersion) => `${v.major}.${v.minor}.${v.patc
 /** The API sends both spellings (ADR-0035); the sharp/flat switch picks one. */
 export const fmtKey = (key: Key | null, spelling: KeySpelling) => (key ? key[spelling] : "");
 
-/** File name of an .als path, without extension. */
-export const fileStem = (path: string) => (path.split("\\").pop() ?? path).replace(/\.als$/i, "");
+/** The .als file's own name. A project starts out named exactly this, and the name keeps
+ *  the extension until the user renames it (ADR-0051). */
+export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 /** Split a path at its last backslash, for the middle-truncating path chip. */
 export function splitPath(path: string): { head: string; tail: string } {

@@ -2,7 +2,7 @@
 // the existing row nodes, and an edit to one project touches only its own cells.
 
 import { For, Show, createMemo, onCleanup } from "solid-js";
-import { fileStem } from "../../shared/format";
+import { fileName } from "../../shared/format";
 import { COLUMNS, columnById, missingPlugins, missingSamples, nextSort, type Column } from "../../shared/projects";
 import type { Project } from "../../shared/types";
 import { Cb, Icon, TagChip } from "./parts";
@@ -25,7 +25,7 @@ function SortTh(props: { id: string; label: string; w: number; num?: boolean }) 
 }
 
 function NameCell(props: { p: Project }) {
-  const stem = () => fileStem(props.p.path);
+  const file = () => fileName(props.p.path);
   let done = false;   // Enter or Escape has settled it; the blur that follows must not commit again
   const finish = (commit: boolean, value: string) => {
     if (done) return;
@@ -38,7 +38,7 @@ function NameCell(props: { p: Project }) {
       <Show when={ui.renaming === props.p.id}
         fallback={<>
           <span class="n">{props.p.name}</span>
-          <Show when={stem() !== props.p.name}><span class="f">{stem()}.als</span></Show>
+          <Show when={file() !== props.p.name}><span class="f">{file()}</span></Show>
           <span class="edit" title="Rename (F2)"
             onClick={(e) => { e.stopPropagation(); selectOnly(props.p.id); setUi("renaming", props.p.id); }}>
             <Icon name="edit" />
