@@ -4,7 +4,8 @@
 import { For, Show, type JSX } from "solid-js";
 import { LOGO_PATH, LOGO_TRANSFORM, LOGO_VIEWBOX } from "../../../shared/logo";
 import { plural } from "../../../shared/projects";
-import { Icon, TbBtn } from "./parts";
+import { inTauri } from "../../../shared/os";
+import { Icon, TbBtn, WindowControls } from "./parts";
 import { counts, notice, route, scan, setRoute, setShell, shell, system, type RouteId } from "./shell";
 import type { View } from "./view";
 
@@ -21,7 +22,7 @@ export function Topbar(props: { view: View }) {
   // Search waits for typing to pause, then asks the server (FTS5, ADR-0024).
   const onInput = (value: string) => { clearTimeout(timer); timer = setTimeout(() => props.view.setQuery(value.trim()), 250); };
   return (
-    <header class="topbar">
+    <header class="topbar" data-tauri-drag-region>
       <svg class="logo" viewBox={LOGO_VIEWBOX} role="img" aria-label="Seula">
         <path fill="currentColor" transform={LOGO_TRANSFORM} d={LOGO_PATH} />
       </svg>
@@ -32,7 +33,9 @@ export function Topbar(props: { view: View }) {
           onInput={(e) => onInput(e.currentTarget.value)} />
       </label>
       <TbBtn icon="settings" title="Settings" />
-      <span style={{ width: "calc(var(--u) * 2)" }} />
+      <Show when={inTauri()} fallback={<span style={{ width: "calc(var(--u) * 2)" }} />}>
+        <WindowControls />
+      </Show>
     </header>
   );
 }

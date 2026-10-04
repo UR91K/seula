@@ -101,17 +101,22 @@ export async function* sse<T>(url: string, init: RequestInit): AsyncGenerator<T>
   if (!res.ok) throw new Error(`${init.method ?? "GET"} ${url}: ${res.status} ${await res.text()}`);
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) return;
-    buf += value;
-    let end: number;
-    while ((end = buf.indexOf("\n\n")) >= 0) {
-      const block = buf.slice(0, end);
-      buf = buf.slice(end + 2);
-      const data = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trimStart()).join("\n");
-      if (data) yield JSON.parse(data) as T;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buf += value;
+      let end: number;
+      while ((end = buf.indexOf("\n\n")) >= 0) {
+        const block = buf.slice(0, end);
+        buf = buf.slice(end + 2);
+        const data = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trimStart()).join("\n");
+        if (data) yield JSON.parse(data) as T;
+      }
     }
+  } finally {
+    // The consumer may stop early; release the connection rather than leave it open.
+    await reader.cancel().catch(() => {});
   }
 }
 

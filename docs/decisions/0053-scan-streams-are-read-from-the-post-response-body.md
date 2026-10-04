@@ -1,11 +1,11 @@
 # 0053. A scan's stream is read from the response body of the POST that starts it
 
-- **Status:** Proposed — implemented on branch `tauri-app`, awaiting the maintainer's review
+- **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-04, ADR-0047's "Not decided here" note on the client layer
-- **Decided:** not yet; proposed 2026-10-04
+- **Decided:** 2026-10-04, accepted by the maintainer after review (proposed the same day)
 - **Recorded:** 2026-10-04
-- **Confidence:** proposed by the assistant while implementing, verified against a real
-  plugin scan, not reviewed
+- **Confidence:** decided now; drafted by the assistant while implementing, verified
+  against a real plugin scan, reviewed against the code and accepted by the maintainer
 - **Evidence:** ADR-0047 (names this exact choice); ADR-0038 (one scan at a time, in the
   background); ADR-0024 (the SSE endpoints); `web/shared/api.ts` (`sse`, `Api.scan`);
   `src/http/handlers/system.rs` (`scan_directories` answers 409 when a scan runs)
@@ -16,6 +16,8 @@ The project scan, the plugin scan and the sample check each start with a `POST` 
 response is the progress stream (ADR-0024). The browser's `EventSource` makes only `GET`
 requests, so it cannot read them. ADR-0047 named the two ways out: read the stream from a
 `fetch` response body, or add a `GET` route to the daemon that follows a running scan.
+Of the three streams (project scan, plugin scan, sample check), `Api.scan` covers the
+first two today; see Notes.
 
 The window can be closed while a scan runs, because the daemon outlives it (ADR-0048). A
 reopened window would have no stream to read.
@@ -32,7 +34,10 @@ the status bar reads.
 stream is open, and the daemon answers `409` to a start from anywhere else. The client
 shows that error in the status bar. It does not check ahead.
 
-**No `GET` follow route is added.** The daemon does not grow an endpoint for this.
+**No `GET` follow stream is added.** The daemon does not grow an endpoint for this. It
+already has `GET /api/v1/system/scan-status`, a JSON snapshot of the running scan's
+progress, which the plugin scan handler documents as the way for a client that did not
+start the scan to follow it. The client does not read it today.
 
 ## Rejected alternatives
 
@@ -40,7 +45,8 @@ shows that error in the status bar. It does not check ahead.
   closes and reopens mid-scan: the window could attach to whatever is running. Rejected
   for now because it changes the daemon for a case no screen needs yet, and because it
   would let a stream be read by more than one client, which nothing has designed or
-  tested. This is the first thing to reach for if re-attaching is wanted.
+  tested. If re-attaching is wanted, the first thing to reach for is polling the existing
+  `scan-status` snapshot, which needs no daemon change; a follow stream comes after that.
 - **`EventSource` on a `GET` that starts the scan.** A `GET` that changes state, which
   caches and prefetchers are allowed to repeat. Rejected.
 - **A library for reading SSE over `fetch`.** The parser is thirty lines. Rejected as a
@@ -53,8 +59,9 @@ disabled while it ran, the final message reached the status bar, and the list an
 inspector reloaded afterwards.
 
 If the window is closed and reopened during a scan, the scan keeps running in the daemon
-but the new window shows nothing of it and can start no second one (it gets a 409). This is
-the cost of rejecting the follow route.
+but the new window shows nothing of it and can start no second one (it gets a 409). The
+daemon does not force this: the client simply does not read `scan-status` on startup.
+Polling it would show the running scan's progress with no daemon change.
 
 The parser handles `data:` lines only: no event names, ids or retry fields, because the
 daemon sends none. A change to the daemon's stream format has to change `sse()` with it.

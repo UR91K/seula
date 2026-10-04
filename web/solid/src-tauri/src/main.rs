@@ -8,6 +8,9 @@
 //! ```
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod snap;
+
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -36,9 +39,22 @@ fn reveal_in_explorer(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep the snap-layout overlay over the page's maximise button (ADR-0054). The rectangle is
+/// in physical pixels, relative to the window's client area. A no-op off Windows.
+#[tauri::command]
+fn set_snap_bounds(window: tauri::WebviewWindow, x: i32, y: i32, width: i32, height: i32) -> Result<(), String> {
+    #[cfg(windows)]
+    return snap::set_bounds(&window, x, y, width, height);
+    #[cfg(not(windows))]
+    {
+        let _ = (window, x, y, width, height);
+        Ok(())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![reveal_in_explorer])
+        .invoke_handler(tauri::generate_handler![reveal_in_explorer, set_snap_bounds])
         .run(tauri::generate_context!())
         .expect("error while running the Seula shell");
 }
