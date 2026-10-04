@@ -87,11 +87,12 @@ pub enum FileError {
         source: io::Error,
     },
 
-    /// The file opens with the bytes `AB 1E 56 78`, not a gzip header. It holds Live
-    /// class names and UTF-16 strings, so it is a Live document in a serialisation this
-    /// project does not understand. Not gzipped XML, so nothing here can read it.
-    #[error("Unsupported Live file format (starts with AB 1E 56 78, not gzipped XML) for {path:?}")]
-    UnsupportedFormat { path: PathBuf },
+    /// The file opens with the bytes `AB 1E 56 78`, not a gzip header. Live sets from
+    /// before Live 8.2 use that binary container instead of gzipped XML (abletoolz
+    /// documents the same cut-off), and nothing here can read it. The cut-off is taken
+    /// from abletoolz, not confirmed against a dated file; see `docs/status.md`.
+    #[error("Unsupported Live version: sets from before Live 8.2 are not supported (file starts AB 1E 56 78, not gzipped XML) for {path:?}")]
+    UnsupportedVersion { path: PathBuf },
 }
 
 #[derive(Error, Debug)]
