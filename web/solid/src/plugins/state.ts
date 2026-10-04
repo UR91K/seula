@@ -9,8 +9,7 @@ import {
 } from "../../../shared/plugins";
 import { PAGE_SIZE, lastPage, pageOf } from "../../../shared/projects";
 import type { FormatRollup, PluginDetails, PluginRow, Project, Sort, VendorRollup } from "../../../shared/types";
-import { setQuery as showInProjects } from "../projects/state";
-import { api, closePopups, loadChrome, runScan, setCounts, setNotice, setRoute } from "../shell/shell";
+import { api, closePopups, loadChrome, runScan, setCounts, setNotice, showProjectsMatching } from "../shell/shell";
 
 export const [pui, setPui] = createStore({
   query: "",
@@ -114,10 +113,7 @@ async function reloadAfterScan() {
 }
 
 /** Hand off to the projects view, searching for the projects that use this plugin. */
-export function showProjectsUsing(p: PluginRow) {
-  batch(() => { closePopups(); setRoute("projects"); });
-  showInProjects(`plugin:"${p.name.replace(/"/g, "")}"`);
-}
+export const showProjectsUsing = (p: PluginRow) => showProjectsMatching(`plugin:"${p.name.replace(/"/g, "")}"`);
 
 export async function copyName(p: PluginRow) {
   try { await navigator.clipboard.writeText(p.name); closePopups(); }

@@ -2,12 +2,13 @@ import { Show, onMount } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { pluginsView } from "./plugins/view";
 import { projectsView } from "./projects/view";
+import { samplesView } from "./samples/view";
 import { TbBtn } from "./shell/parts";
 import { Sidebar, Statusbar, Topbar } from "./shell/Frame";
 import { closePopups, loadChrome, route, setShell, shell, type RouteId } from "./shell/shell";
 import type { View } from "./shell/view";
 
-const VIEWS: Record<RouteId, View> = { projects: projectsView, plugins: pluginsView };
+const VIEWS: Record<RouteId, View> = { projects: projectsView, plugins: pluginsView, samples: samplesView };
 
 export function App() {
   onMount(loadChrome);

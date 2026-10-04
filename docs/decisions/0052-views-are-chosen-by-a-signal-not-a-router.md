@@ -75,6 +75,13 @@ noticeable on the 240-project mock library; it is unmeasured on a large one.
 
 ## Notes
 
+2026-10-05, building the samples view, the third to hand off to the projects view: the
+crossing now goes through one function in the shell, `showProjectsMatching(query)`, which
+closes the popups, switches the route and runs the projects search. The projects state
+registers its search with the shell, so the plugins and samples states no longer import
+the projects state. The plugins and samples views also share their toolbar's filter
+dropdown and pager, which live in the shell directory.
+
 ADR-0044 has a collection open into its own view, which needs a parameter (which
 collection). The first step is to widen `route` from a name to `{ view, id }`, still a
 signal. This is small but not free: `RouteId`, the `counts` store keyed by it, and the

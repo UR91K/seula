@@ -30,3 +30,10 @@ export function splitPath(path: string): { head: string; tail: string } {
   const cut = path.lastIndexOf("\\");
   return { head: path.slice(0, cut + 1), tail: path.slice(cut + 1) };
 }
+
+/** A file size in decimal units, as the reference screens show it. */
+export function fmtBytes(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+  return `${Math.round(n / 1e3)} KB`;
+}

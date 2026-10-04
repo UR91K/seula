@@ -1,18 +1,20 @@
 # web/
 
 The frontend: a Solid app in a Tauri shell over the daemon's HTTP API (ADR-0047, ADR-0048).
-Right now it holds two views, projects and plugins, built from the approved mockups against the
-real API.
+Right now it holds three views, projects, plugins and samples, built from the approved mockups
+against the real API.
 It was first built twice, in Solid and in Svelte 5, for the comparison ADR-0047 asked for;
 Solid won and the Svelte copy was removed (see `docs/status.md`).
 
 ```
 shared/    framework-free TypeScript: DTO types, the HTTP and SSE client, the projects and
-           plugins rules (columns, sorting, filtering, grouping), formatting, popover placement
+           plugins and samples rules (columns, sorting, filtering, grouping), formatting,
+           popover placement
 solid/     Solid + Vite; src-tauri/ is the Tauri shell
   src/shell/     the frame, the route signal, the scan runner (ADR-0052, ADR-0053)
   src/projects/  the projects view
   src/plugins/   the plugins view
+  src/samples/   the samples view
 ```
 
 The stylesheets are the mockup's (`../mockup/colors.css`, `shell.css`, `components.css`),
@@ -57,13 +59,22 @@ it" switches to the projects view with a `plugin:"name"` search. The status bar'
 are computed from the rows the filters list, not requested from `/plugins/stats` on every
 change; the route counts the same rows.
 
-**Push-speed state** is a scan's progress in the status bar, for the project scan and the
-plugin scan alike. The daemon's real scan
+**Samples.** Table with sort, a Format filter (AIFF covers `.aif`, `.aiff` and `.aifc`) and
+a Status filter (present or missing); server-side search; an inspector with the file as the
+last check measured it and the projects using the sample; a context menu (Show in Explorer,
+show the projects using it, Copy path). A missing sample keeps the size it last had, dimmed.
+"Show the projects using it" searches `sample:"name"`. The status bar's size says it is not
+measured until a check has run. "Check samples" runs `POST /api/v1/samples/check`. There is
+no Play item: it needs a Tauri command and an ADR first. The `scope` preference is not
+exposed, so used-in lists stay on the daemon's default (active projects).
+
+**Push-speed state** is a scan's progress in the status bar, for the project scan, the
+plugin scan and the sample check alike. The daemon's real scan
 finishes at once on the mock library (it has no project folders), so **Simulate** streams
 600 events at about 40 a second in the real stream's shape. **Scan** runs the real one.
 
 Not built: tag, collection and archive edits (the batch buttons are the mockup's, disabled),
-audition playback, drag to reorder columns, the collections, samples and stats views, and ADR-0032's custom
+audition playback, drag to reorder columns, the collections and stats views, and ADR-0032's custom
 window controls (the shell uses the native frame). The CSP is `null` and the icon font loads
 from Google Fonts, both fine for a trial and neither for shipping.
 

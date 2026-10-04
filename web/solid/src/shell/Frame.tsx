@@ -13,7 +13,7 @@ const NAV: { id: RouteId | null; label: string; icon: string }[] = [
   { id: "projects", label: "Projects", icon: "audio_file" },
   { id: null, label: "Collections", icon: "album" },
   { id: "plugins", label: "Plugins", icon: "plug_connect" },
-  { id: null, label: "Samples", icon: "earthquake" },
+  { id: "samples", label: "Samples", icon: "earthquake" },
   { id: null, label: "Stats", icon: "bar_chart" },
 ];
 

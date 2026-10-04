@@ -5,14 +5,14 @@
 // The project list itself is a store too, reconciled by id, so an edit to one project's
 // notes touches only the nodes that show that project's notes.
 
-import { batch, createMemo, createSignal } from "solid-js";
+import { batch, createMemo, createSignal, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import {
   DEFAULT_COLUMNS, DEFAULT_SORT, clickRow, collectionsOf, lastPage, pageOf, sortRows, toggleAll, toggleRow,
   type Selection,
 } from "../../../shared/projects";
 import type { Collection, Project, Scope, Sort } from "../../../shared/types";
-import { api, closePopups, setCounts, setNotice, setShell, shell } from "../shell/shell";
+import { api, closePopups, onProjectsSearch, setCounts, setNotice, setShell, shell } from "../shell/shell";
 
 // ---------------------------------------------------------------- click-speed state
 
@@ -90,6 +90,10 @@ export function setQuery(query: string) {
     resetView();
   });
 }
+
+// Other views reach this through the shell (ADR-0052); `untrack` because they may call it
+// from inside a tracked scope, and a search must not subscribe that scope to our query.
+onProjectsSearch((query) => untrack(() => setQuery(query)));
 
 export function sortBy(next: Sort) { batch(() => { setUi({ sort: next, page: 0 }); }); }
 

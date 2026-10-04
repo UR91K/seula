@@ -1,7 +1,8 @@
 // The daemon's HTTP client: plain fetch, as ADR-0048 says. No Tauri IPC for data.
 
 import type {
-  Collection, FormatRollup, PluginDetails, PluginRow, Project, ScanProgress, Scope, SystemInfo, VendorRollup,
+  Collection, FormatRollup, PluginDetails, PluginRow, Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope,
+  SystemInfo, VendorRollup,
 } from "./types";
 
 /** The mock daemon `mockup/data/generate.py` seeds (its HTTP_PORT). The real default is
@@ -49,7 +50,7 @@ export class Api {
   }
 
   /** The total the daemon reports for a list route, without fetching the list. */
-  async count(route: "projects" | "plugins"): Promise<number> {
+  async count(route: "projects" | "plugins" | "samples"): Promise<number> {
     return (await this.json<{ total_count: number }>(`/api/v1/${route}?limit=1`)).total_count;
   }
 
@@ -80,13 +81,37 @@ export class Api {
     return (await this.json<{ projects: Project[] }>(`/api/v1/plugins/${id}/projects?${BIG}`)).projects;
   }
 
+  // ---------------------------------------------------------------- samples
+
+  async samples(): Promise<SampleRow[]> {
+    return (await this.json<{ samples: SampleRow[] }>(`/api/v1/samples?${BIG}`)).samples;
+  }
+
+  async searchSamples(query: string): Promise<SampleRow[]> {
+    return (await this.json<{ samples: SampleRow[] }>(
+      `/api/v1/samples/search?query=${encodeURIComponent(query)}&${BIG}`)).samples;
+  }
+
+  async sampleFormats(): Promise<SampleFormat[]> {
+    return (await this.json<{ formats: SampleFormat[] }>("/api/v1/samples/formats")).formats;
+  }
+
+  /** The file record the last check made; null when no check has found the file. */
+  async sampleFile(id: string): Promise<SampleFile | null> {
+    return (await this.json<{ file: SampleFile | null }>(`/api/v1/samples/${id}`)).file;
+  }
+
+  async sampleProjects(id: string): Promise<Project[]> {
+    return (await this.json<{ projects: Project[] }>(`/api/v1/samples/${id}/projects?${BIG}`)).projects;
+  }
+
   // ---------------------------------------------------------------- scans
 
   /** Start a scan and follow it. A scan's `POST` answers with the SSE stream itself, which
    *  `EventSource` cannot read (it only makes GET requests), so the body is read by hand
    *  (ADR-0053). A scan that is already running answers 409 and this throws. */
-  scan(kind: "projects" | "plugins", signal?: AbortSignal): AsyncGenerator<ScanProgress> {
-    const route = kind === "projects" ? "/api/v1/system/scan" : "/api/v1/plugins/scan";
+  scan(kind: "projects" | "plugins" | "samples", signal?: AbortSignal): AsyncGenerator<ScanProgress> {
+    const route = { projects: "/api/v1/system/scan", plugins: "/api/v1/plugins/scan", samples: "/api/v1/samples/check" }[kind];
     return sse<ScanProgress>(this.base + route, { method: "POST", signal });
   }
 }

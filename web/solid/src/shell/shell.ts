@@ -15,8 +15,18 @@ export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
 
 // ---------------------------------------------------------------- routing (ADR-0052)
 
-export type RouteId = "projects" | "plugins";
+export type RouteId = "projects" | "plugins" | "samples";
 export const [route, setRoute] = createSignal<RouteId>("projects");
+
+/** The one way a view hands off to the projects view: switch to it and search. The projects
+ *  state registers its search here, so no view imports another's state. */
+let searchProjects: (query: string) => void = () => {};
+export const onProjectsSearch = (fn: (query: string) => void) => { searchProjects = fn; };
+export function showProjectsMatching(query: string) {
+  setShell({ menu: null, popover: null });
+  setRoute("projects");
+  searchProjects(query);
+}
 
 // ---------------------------------------------------------------- click-speed state
 
@@ -36,13 +46,16 @@ export const [notice, setNotice] = createSignal<string | null>(null);
 export const [system, setSystem] = createSignal<SystemInfo | null>(null);
 
 /** Sidebar counts. A view keeps its own up to date once it has loaded its list. */
-export const [counts, setCounts] = createStore<Record<RouteId, number | null>>({ projects: null, plugins: null });
+export const [counts, setCounts] = createStore<Record<RouteId, number | null>>({ projects: null, plugins: null, samples: null });
 
 export async function loadChrome() {
-  const [s, p, q] = await Promise.allSettled([api.systemInfo(), api.count("projects"), api.count("plugins")]);
+  const [s, p, q, r] = await Promise.allSettled([
+    api.systemInfo(), api.count("projects"), api.count("plugins"), api.count("samples"),
+  ]);
   if (s.status === "fulfilled") setSystem(s.value);
   if (p.status === "fulfilled") setCounts("projects", p.value);
   if (q.status === "fulfilled") setCounts("plugins", q.value);
+  if (r.status === "fulfilled") setCounts("samples", r.value);
 }
 
 // ---------------------------------------------------------------- push-speed state

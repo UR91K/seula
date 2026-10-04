@@ -45,7 +45,7 @@ export interface ScanProgress {
 }
 
 /** Which scan a stream belongs to. Only one runs at a time, of any kind (ADR-0038). */
-export type ScanKind = "projects" | "plugins" | "simulated";
+export type ScanKind = "projects" | "plugins" | "samples" | "simulated";
 
 // ---------------------------------------------------------------- plugins
 
@@ -88,3 +88,21 @@ export interface PluginDetails {
 export type Scope = "active" | "archived";
 export type KeySpelling = "sharp" | "flat";
 export interface Sort { col: string; desc: boolean }
+
+// ---------------------------------------------------------------- samples
+
+/** A sample as the list routes send it (SampleDto). `size_bytes` is null until a check has
+ *  found the file, and a missing sample keeps the size it last had (ADR-0041). */
+export interface SampleRow {
+  id: string; name: string; path: string; is_present: boolean; project_count: number;
+  size_bytes: number | null;
+}
+
+/** GET /samples/:id `file`: what the last check found. */
+export interface SampleFile { size_bytes: number; modified_at: number | null; checked_at: number }
+
+/** GET /samples/formats: every known format, empty ones included (ADR-0039). */
+export interface SampleFormat {
+  format: string; name: string; extensions: string[]; count: number; present_count: number;
+  missing_count: number; total_size_bytes: number;
+}
