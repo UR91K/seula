@@ -2,10 +2,11 @@
 // the existing row nodes, and an edit to one project touches only its own cells.
 
 import { For, Show, createMemo, onCleanup } from "solid-js";
-import { fileName } from "../../shared/format";
-import { COLUMNS, columnById, missingPlugins, missingSamples, nextSort, type Column } from "../../shared/projects";
-import type { Project } from "../../shared/types";
-import { Cb, Icon, TagChip } from "./parts";
+import { fileName } from "../../../shared/format";
+import { COLUMNS, columnById, missingPlugins, missingSamples, nextSort, type Column } from "../../../shared/projects";
+import type { Project } from "../../../shared/types";
+import { Cb, Icon, TagChip } from "../shell/parts";
+import { setShell, shell } from "../shell/shell";
 import {
   checkAll, isSelected, pageIds, pageRows, renameProject, rowCheck, rowClick, selectOnly, setUi, sortBy, ui,
 } from "./state";
@@ -67,9 +68,9 @@ function DataCell(props: { p: Project; c: Column }) {
   return (
     <td classList={{ dim: props.c.dim, num: props.c.num, count: !!props.c.count, hot: hot() }}
       data-hover={props.c.count}
-      onMouseEnter={() => { if (props.c.count && props.c.text(props.p, ui.spelling)) { holdHover(); setUi("hot", { id: props.p.id, kind: props.c.count }); } }}
+      onMouseEnter={() => { if (props.c.count && props.c.text(props.p, shell.spelling)) { holdHover(); setUi("hot", { id: props.p.id, kind: props.c.count }); } }}
       onMouseLeave={() => { if (props.c.count) releaseHover(); }}>
-      {props.c.text(props.p, ui.spelling)}
+      {props.c.text(props.p, shell.spelling)}
       <Show when={missing()}><span class="miss" title={`${missing()} missing`}><Icon name="error" /></span></Show>
     </td>
   );
@@ -83,7 +84,8 @@ function Row(props: { p: Project; cols: Column[] }) {
         e.preventDefault();
         selectOnly(props.p.id);
         const win = (e.currentTarget as HTMLElement).closest(".win")!.getBoundingClientRect();
-        setUi({ hot: null, popover: null, menu: { id: props.p.id, x: e.clientX - win.left, y: e.clientY - win.top } });
+        setUi("hot", null);
+        setShell({ popover: null, menu: { id: props.p.id, x: e.clientX - win.left, y: e.clientY - win.top } });
       }}>
       <td class="lead check" onClick={(e) => { e.stopPropagation(); rowCheck(props.p.id); }}><Cb state={isSelected(props.p.id)} /></td>
       <td class="lead">

@@ -1,7 +1,7 @@
 // Small shared pieces: icon, checkbox, toolbar button, path chip, tag chip.
 
 import { Show } from "solid-js";
-import { splitPath } from "../../shared/format";
+import { splitPath } from "../../../shared/format";
 
 export function Icon(props: { name: string; fill?: boolean; class?: string }) {
   return <span class={`ms ${props.fill ? "fill" : ""} ${props.class ?? ""}`}>{props.name}</span>;

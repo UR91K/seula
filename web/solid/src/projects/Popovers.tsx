@@ -2,12 +2,13 @@
 // Each is placed against the window once it is in the DOM (shared/place.ts).
 
 import { For, Show, onMount } from "solid-js";
-import { COLUMNS, missingPlugins, missingSamples } from "../../shared/projects";
-import { place, type Placement } from "../../shared/place";
-import type { Project } from "../../shared/types";
-import { Cb, Icon } from "./parts";
+import { COLUMNS, missingPlugins, missingSamples } from "../../../shared/projects";
+import { place, type Placement } from "../../../shared/place";
+import type { Project } from "../../../shared/types";
+import { Cb, Icon } from "../shell/parts";
 import { holdHover, releaseHover } from "./Table";
-import { projects, selectedProjects, setUi, showInExplorer, toggleColumn, ui } from "./state";
+import { setShell, showInExplorer } from "../shell/shell";
+import { projects, selectedProjects, setUi, toggleColumn, ui } from "./state";
 
 /** Mount-time placement: find the window and put the popover where it belongs. */
 function placed(at: () => Placement | null) {
@@ -23,7 +24,7 @@ export function ContextMenu(props: { menu: { id: string; x: number; y: number } 
   const many = () => selectedProjects().length > 1;
   const project = () => projects.find((p) => p.id === m().id);
   const item = (icon: string, label: string, opts: { off?: boolean; kbd?: string; act?: () => void } = {}) => (
-    <div class="mi" classList={{ off: opts.off }} onClick={() => { opts.act?.(); setUi("menu", null); }}>
+    <div class="mi" classList={{ off: opts.off }} onClick={() => { opts.act?.(); setShell("menu", null); }}>
       <Icon name={icon} /><span class="lbl">{label}</span>
       <Show when={opts.kbd}><span class="kbd">{opts.kbd}</span></Show>
     </div>

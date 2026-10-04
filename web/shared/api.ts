@@ -1,6 +1,8 @@
 // The daemon's HTTP client: plain fetch, as ADR-0048 says. No Tauri IPC for data.
 
-import type { Collection, Project, ScanProgress, Scope, SystemInfo } from "./types";
+import type {
+  Collection, FormatRollup, PluginDetails, PluginRow, Project, ScanProgress, Scope, SystemInfo, VendorRollup,
+} from "./types";
 
 /** The mock daemon `mockup/data/generate.py` seeds (its HTTP_PORT). The real default is
  *  50052; override with VITE_SEULA_URL. */
@@ -46,10 +48,46 @@ export class Api {
     await this.send(`/api/v1/projects/${id}/name`, put({ name }));
   }
 
-  /** Start a project scan and follow it. `POST` answers with the SSE stream itself, which
-   *  `EventSource` cannot read (it only makes GET requests), so the body is read by hand. */
-  scan(signal?: AbortSignal): AsyncGenerator<ScanProgress> {
-    return sse<ScanProgress>(this.base + "/api/v1/system/scan", { method: "POST", signal });
+  /** The total the daemon reports for a list route, without fetching the list. */
+  async count(route: "projects" | "plugins"): Promise<number> {
+    return (await this.json<{ total_count: number }>(`/api/v1/${route}?limit=1`)).total_count;
+  }
+
+  // ---------------------------------------------------------------- plugins
+
+  async plugins(): Promise<PluginRow[]> {
+    return (await this.json<{ plugins: PluginRow[] }>(`/api/v1/plugins?${BIG}`)).plugins;
+  }
+
+  async searchPlugins(query: string): Promise<PluginRow[]> {
+    return (await this.json<{ plugins: PluginRow[] }>(
+      `/api/v1/plugins/search?query=${encodeURIComponent(query)}&${BIG}`)).plugins;
+  }
+
+  async vendors(): Promise<VendorRollup[]> {
+    return (await this.json<{ vendors: VendorRollup[] }>(`/api/v1/plugins/vendors?${BIG}`)).vendors;
+  }
+
+  async formats(): Promise<FormatRollup[]> {
+    return (await this.json<{ formats: FormatRollup[] }>("/api/v1/plugins/formats")).formats;
+  }
+
+  async pluginDetails(id: string): Promise<PluginDetails> {
+    return (await this.json<{ details: PluginDetails }>(`/api/v1/plugins/${id}`)).details;
+  }
+
+  async pluginProjects(id: string): Promise<Project[]> {
+    return (await this.json<{ projects: Project[] }>(`/api/v1/plugins/${id}/projects?${BIG}`)).projects;
+  }
+
+  // ---------------------------------------------------------------- scans
+
+  /** Start a scan and follow it. A scan's `POST` answers with the SSE stream itself, which
+   *  `EventSource` cannot read (it only makes GET requests), so the body is read by hand
+   *  (ADR-0053). A scan that is already running answers 409 and this throws. */
+  scan(kind: "projects" | "plugins", signal?: AbortSignal): AsyncGenerator<ScanProgress> {
+    const route = kind === "projects" ? "/api/v1/system/scan" : "/api/v1/plugins/scan";
+    return sse<ScanProgress>(this.base + route, { method: "POST", signal });
   }
 }
 

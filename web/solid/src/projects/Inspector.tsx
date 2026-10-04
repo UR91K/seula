@@ -4,11 +4,12 @@
 // while a scan streams in.
 
 import { For, Show, type JSX } from "solid-js";
-import { fmtDate, fmtKey, fmtLength, fmtTempo, fmtVersion } from "../../shared/format";
-import { common, commonCollections, missingPlugins, missingSamples } from "../../shared/projects";
-import type { Plugin, Project, Sample } from "../../shared/types";
-import { Icon, PathChip, TagChip } from "./parts";
-import { collectionById, collectionsFor, editNotes, selectedProjects, ui } from "./state";
+import { fmtDate, fmtKey, fmtLength, fmtTempo, fmtVersion } from "../../../shared/format";
+import { common, commonCollections, missingPlugins, missingSamples } from "../../../shared/projects";
+import type { Plugin, Project, Sample } from "../../../shared/types";
+import { Icon, PathChip, TagChip } from "../shell/parts";
+import { shell } from "../shell/shell";
+import { collectionById, collectionsFor, editNotes, selectedProjects } from "./state";
 
 const PluginDot = (p: { installed: boolean | null }) => (
   <span class="status-dot" classList={{ "is-ok": p.installed === true, "is-missing": p.installed === false, "is-unknown": p.installed == null }}>
@@ -45,7 +46,7 @@ function Single(props: { p: Project }) {
       <div class="insp-sec"><h3>Project</h3>
         <dl class="props">
           <dt>Tempo</dt><dd>{fmtTempo(p().tempo)} BPM</dd>
-          <dt>Key</dt><dd>{fmtKey(p().key_signature, ui.spelling) || <span class="faint">None detected</span>}</dd>
+          <dt>Key</dt><dd>{fmtKey(p().key_signature, shell.spelling) || <span class="faint">None detected</span>}</dd>
           <dt>Time</dt><dd>{p().time_signature.numerator}/{p().time_signature.denominator}</dd>
           <dt>Length</dt><dd>{fmtLength(p().duration_seconds) || <span class="faint">Unknown</span>}</dd>
           <dt>Live</dt><dd>{fmtVersion(p().ableton_version)}</dd>

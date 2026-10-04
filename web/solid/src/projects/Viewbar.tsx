@@ -1,12 +1,11 @@
 // The projects view's toolbar row: filters and paging, or batch actions at >1 selected.
 
 import { Show } from "solid-js";
-import { plural } from "../../shared/projects";
-import { Icon, TbBtn } from "./parts";
-import {
-  clearSelection, goPage, pageCount, runScan, scan, selectedCount, setQuery, setScope, setUi, total, ui,
-} from "./state";
-import { PAGE_SIZE } from "../../shared/projects";
+import { plural } from "../../../shared/projects";
+import { Icon, TbBtn } from "../shell/parts";
+import { runScan, scan, setShell, shell } from "../shell/shell";
+import { clearSelection, goPage, load, pageCount, selectedCount, setQuery, setScope, total, ui } from "./state";
+import { PAGE_SIZE } from "../../../shared/projects";
 
 function Pager() {
   const from = () => (total() ? ui.page * PAGE_SIZE + 1 : 0);
@@ -62,10 +61,10 @@ export function Viewbar() {
           <h1>Projects</h1>
           <Filters />
           <span class="sep" />
-          <TbBtn icon="view_column" title="Columns" keep on={ui.popover === "columns"}
-            onClick={() => setUi("popover", ui.popover === "columns" ? null : "columns")} />
-          <TbBtn icon="refresh" label="Scan" title="Scan the project folders" disabled={!!scan()} onClick={() => runScan(false)} />
-          <TbBtn icon="speed" label="Simulate" title="A stand-in scan of 600 events at 40 a second" disabled={!!scan()} onClick={() => runScan(true)} />
+          <TbBtn icon="view_column" title="Columns" keep on={shell.popover === "columns"}
+            onClick={() => setShell("popover", shell.popover === "columns" ? null : "columns")} />
+          <TbBtn icon="refresh" label="Scan" title="Scan the project folders" disabled={!!scan()} onClick={() => runScan("projects", load)} />
+          <TbBtn icon="speed" label="Simulate" title="A stand-in scan of 600 events at 40 a second" disabled={!!scan()} onClick={() => runScan("simulated", load)} />
           <span class="grow" />
           <Pager />
         </>}>

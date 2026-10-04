@@ -1,24 +1,18 @@
-// All of the screen's state, split by the speed it changes at (ADR-0047):
-//
-//   click-speed  `ui`, a store: each property is tracked on its own, so a component that
-//                reads only the sort is not asked to re-run when the scope changes.
-//   push-speed   `scan`, its own signal, read only by the status bar. It never goes in
-//                the store, so nothing that reads the store is asked about a scan tick.
+// The projects view's state. Click-speed state is `ui`, a store: each property is
+// tracked on its own, so a component that reads only the sort is not asked to re-run when
+// the scope changes. The window's state and the scan's are in ../shell/shell.ts.
 //
 // The project list itself is a store too, reconciled by id, so an edit to one project's
 // notes touches only the nodes that show that project's notes.
 
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { Api, DEFAULT_URL, simulatedScan } from "../../shared/api";
 import {
   DEFAULT_COLUMNS, DEFAULT_SORT, clickRow, collectionsOf, lastPage, pageOf, sortRows, toggleAll, toggleRow,
   type Selection,
-} from "../../shared/projects";
-import { revealInExplorer } from "../../shared/os";
-import type { Collection, KeySpelling, Project, ScanProgress, Scope, Sort, SystemInfo } from "../../shared/types";
-
-export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
+} from "../../../shared/projects";
+import type { Collection, Project, Scope, Sort } from "../../../shared/types";
+import { api, closePopups, setCounts, setNotice, setShell, shell } from "../shell/shell";
 
 // ---------------------------------------------------------------- click-speed state
 
@@ -28,12 +22,7 @@ export const [ui, setUi] = createStore({
   sort: DEFAULT_SORT as Sort | null,   // null while a search is showing: by relevance
   page: 0,
   columns: DEFAULT_COLUMNS,
-  inspectorOpen: true,
-  sidebarCollapsed: false,
-  spelling: "sharp" as KeySpelling,
-  popover: null as null | "columns",
   renaming: null as string | null,
-  menu: null as null | { id: string; x: number; y: number },
   hot: null as null | { id: string; kind: "plugins" | "samples" },
 });
 
@@ -45,11 +34,7 @@ export const selectedCount = () => selection().selected.size;
 
 export const [projects, setProjects] = createStore<Project[]>([]);
 export const [loadError, setLoadError] = createSignal<string | null>(null);
-export const [notice, setNotice] = createSignal<string | null>(null);
 export const [collections, setCollections] = createSignal<Collection[]>([]);
-export const [system, setSystem] = createSignal<SystemInfo | null>(null);
-/** The active project count, kept while the list shows archived ones or a search. */
-export const [activeTotal, setActiveTotal] = createSignal<number | null>(null);
 
 export const collectionById = createMemo(() => new Map(collections().map((c) => [c.id, c])));
 const projectById = createMemo(() => new Map(projects.map((p) => [p.id, p])));
@@ -63,7 +48,7 @@ export async function load() {
     if (token !== loadToken) return;   // a newer load has started
     batch(() => {
       setProjects(reconcile(list, { key: "id" }));
-      if (!ui.query && ui.scope === "active") setActiveTotal(list.length);
+      if (!ui.query && ui.scope === "active") setCounts("projects", list.length);
       setLoadError(null);
     });
   } catch (e) {
@@ -71,15 +56,13 @@ export async function load() {
   }
 }
 
-export async function loadSidecars() {
-  const [c, s] = await Promise.allSettled([api.collections(), api.systemInfo()]);
-  if (c.status === "fulfilled") setCollections(c.value);
-  if (s.status === "fulfilled") setSystem(s.value);
+export async function loadCollections() {
+  try { setCollections(await api.collections()); } catch { /* the inspector shows none */ }
 }
 
 // ---------------------------------------------------------------- derived
 
-export const sorted = createMemo(() => sortRows(projects, ui.sort, ui.spelling));
+export const sorted = createMemo(() => sortRows(projects, ui.sort, shell.spelling));
 export const total = () => sorted().length;
 export const pageRows = createMemo(() => pageOf(sorted(), ui.page));
 export const pageIds = createMemo(() => pageRows().map((p) => p.id));
@@ -93,7 +76,7 @@ export const selectedProjects = createMemo(() =>
 export function clearSelection() { setSelection({ selected: new Set(), anchor: null }); }
 
 function resetView() {
-  batch(() => { clearSelection(); setUi({ page: 0, menu: null, hot: null, popover: null, renaming: null }); });
+  batch(() => { clearSelection(); setUi({ page: 0, hot: null, renaming: null }); closePopups(); });
 }
 
 export function setScope(scope: Scope) {
@@ -111,11 +94,11 @@ export function setQuery(query: string) {
 export function sortBy(next: Sort) { batch(() => { setUi({ sort: next, page: 0 }); }); }
 
 export function goPage(delta: number) {
-  batch(() => { setUi("page", (p) => p + delta); setUi({ menu: null, hot: null }); });
+  batch(() => { setUi("page", (p) => p + delta); setUi("hot", null); setShell("menu", null); });
 }
 
 export function rowClick(id: string, mods: { ctrl: boolean; shift: boolean }) {
-  batch(() => { setSelection((cur) => clickRow(cur, id, pageIds(), mods)); setUi({ menu: null, popover: null }); });
+  batch(() => { setSelection((cur) => clickRow(cur, id, pageIds(), mods)); closePopups(); });
 }
 export function rowCheck(id: string) { setSelection((cur) => toggleRow(cur, id)); }
 export function checkAll() { setSelection((cur) => toggleAll(cur, pageIds())); }
@@ -147,31 +130,4 @@ export async function renameProject(id: string, name: string) {
   setProjects((x) => x.id === id, "name", name);
   try { await api.setName(id, name); }
   catch (e) { setProjects((x) => x.id === id, "name", before); setNotice(String(e)); }
-}
-
-export async function showInExplorer(path: string) {
-  try { await revealInExplorer(path); setNotice(null); }
-  catch (e) { setNotice(e instanceof Error ? e.message : String(e)); }
-}
-
-// ---------------------------------------------------------------- push-speed state
-
-export const [scan, setScan] = createSignal<ScanProgress | null>(null);
-let scanAbort: AbortController | null = null;
-
-/** Follow a scan to its end, writing each event to `scan` and nothing else. */
-export async function runScan(simulate: boolean) {
-  if (scanAbort) return;
-  scanAbort = new AbortController();
-  const { signal } = scanAbort;
-  try {
-    const events = simulate ? simulatedScan(600, 40, signal) : api.scan(signal);
-    for await (const ev of events) setScan(ev);
-    await load();
-  } catch (e) {
-    if (!signal.aborted) setNotice(String(e));
-  } finally {
-    scanAbort = null;
-    setTimeout(() => { if (!scanAbort) setScan(null); }, 1500);
-  }
 }
