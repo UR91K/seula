@@ -86,6 +86,12 @@ pub enum FileError {
         #[source]
         source: io::Error,
     },
+
+    /// The file opens with the bytes `AB 1E 56 78`, not a gzip header. It holds Live
+    /// class names and UTF-16 strings, so it is a Live document in a serialisation this
+    /// project does not understand. Not gzipped XML, so nothing here can read it.
+    #[error("Unsupported Live file format (starts with AB 1E 56 78, not gzipped XML) for {path:?}")]
+    UnsupportedFormat { path: PathBuf },
 }
 
 #[derive(Error, Debug)]

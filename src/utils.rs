@@ -189,6 +189,20 @@ pub fn format_file_size(size: u64) -> String {
     formatted
 }
 
+/// The first four bytes of a Live document in a format that is not gzipped XML. Seen on
+/// one real project, `4-DUNE.als`; see `docs/status.md`. Its origin is unknown.
+pub const UNSUPPORTED_MAGIC: [u8; 4] = [0xAB, 0x1E, 0x56, 0x78];
+
+/// Whether the file starts with [`UNSUPPORTED_MAGIC`]. A file that cannot be read says
+/// no, so the ordinary open and decompress errors still report it.
+fn has_unsupported_magic(file_path: &Path) -> bool {
+    let mut head = [0u8; 4];
+    File::open(file_path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && head == UNSUPPORTED_MAGIC
+}
+
 /// Decompresses a gzip file and returns its contents as a byte vector.
 ///
 /// # Examples
@@ -202,6 +216,11 @@ pub fn format_file_size(size: u64) -> String {
 /// println!("Decompressed {} bytes", decompressed_data.len());
 /// ```
 pub fn decompress_gzip_file(file_path: &Path) -> Result<Vec<u8>, FileError> {
+    if has_unsupported_magic(file_path) {
+        return Err(FileError::UnsupportedFormat {
+            path: file_path.to_path_buf(),
+        });
+    }
     trace!("Attempting to extract gzipped data from: {:?}", file_path);
     trace!("Opening file for gzip decompression");
 
