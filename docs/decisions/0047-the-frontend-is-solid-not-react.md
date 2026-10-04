@@ -1,6 +1,6 @@
 # 0047. The frontend is built with Solid, not React, with Svelte 5 trialled against it first
 
-- **Status:** Accepted, with a Solid and Svelte 5 comparison pending
+- **Status:** Accepted. The Solid and Svelte 5 comparison was run on the projects screen and favoured Solid (2026-10-04); the verdict is in `docs/status.md`
 - **Recognized:** 2026-09-24, from the mockups' redraw workarounds
 - **Decided:** 2026-09-24
 - **Recorded:** 2026-09-24

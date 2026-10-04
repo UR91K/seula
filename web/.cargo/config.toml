@@ -1,4 +1,4 @@
-# Both Tauri shells build into one target directory, so the Tauri dependency tree is
-# compiled once. Resolved relative to web/.
+# The Tauri shell builds into its own target directory, outside the root workspace's, so
+# the Tauri dependency tree is compiled once. Resolved relative to web/.
 [build]
 target-dir = "target"

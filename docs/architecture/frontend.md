@@ -22,8 +22,7 @@ in. No Solid code exists yet. See `docs/status.md` for where things stand.
 
 ## What it is
 
-A Solid + TypeScript single-page app, built by Vite, in `web/` (ADR-0047). Solid is
-checked against Svelte 5 on one screen before the first view is written. It ships in
+A Solid + TypeScript single-page app, built by Vite, in `web/` (ADR-0047). It ships in
 one target, a Tauri app, which is a thin shell (ADR-0048). All data moves over the HTTP
 API from ADR-0024 on `http_port`, served by the tray daemon, which runs separately and
 keeps running when the window closes. Tauri's own IPC carries only the OS calls listed

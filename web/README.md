@@ -1,19 +1,19 @@
 # web/
 
-The frontend, in Tauri shells over the daemon's HTTP API (ADR-0048). Right now it holds the
-Solid and Svelte 5 comparison that ADR-0047 asks for: the projects screen built twice, from
-the approved mockup, against the real API.
+The frontend: a Solid app in a Tauri shell over the daemon's HTTP API (ADR-0047, ADR-0048).
+Right now it holds the projects screen, built from the approved mockup against the real API.
+It was first built twice, in Solid and in Svelte 5, for the comparison ADR-0047 asked for;
+Solid won and the Svelte copy was removed (see `docs/status.md`).
 
 ```
-shared/    framework-free TypeScript both apps import: DTO types, the HTTP and SSE client,
+shared/    framework-free TypeScript: DTO types, the HTTP and SSE client,
            columns / sorting / paging / selection rules, formatting, popover placement
 solid/     Solid + Vite; src/ and src-tauri/
-svelte/    Svelte 5 + Vite; src/ and src-tauri/
 ```
 
 The stylesheets are the mockup's (`../mockup/colors.css`, `shell.css`, `components.css`),
-imported unchanged. Because the logic is shared, the two `src/` folders differ only in how
-state is held and how the DOM is updated, which is what the comparison is about.
+imported unchanged. The logic lives in `shared/`, framework-free, so `solid/src/` holds only
+how state is held and how the DOM is updated.
 
 ## Running
 
@@ -26,17 +26,16 @@ cargo build --bin seula                      # needs protoc (PROTOC=...)
 target/debug/seula --config mockup/data/mock-config.toml --server
 ```
 
-`mock-config.toml` is written by `generate.py`'s `write_config`. Then, in `solid/` or
-`svelte/`:
+`mock-config.toml` is written by `generate.py`'s `write_config`. Then, in `solid/`:
 
 ```bash
 npm install
-npm run dev            # in a browser, http://localhost:1420 (solid) or :1421 (svelte)
+npm run dev            # in a browser, http://localhost:1420
 npm run tauri dev      # in the Tauri shell
 ```
 
-Both shells build into one target directory, `web/target/` (`.cargo/config.toml`), and are
-not part of the root Cargo workspace, so `cargo build --workspace` never compiles Tauri.
+The shell builds into `web/target/` (`.cargo/config.toml`) and is not part of the root Cargo
+workspace, so `cargo build --workspace` never compiles Tauri.
 
 ## What the screen covers
 
