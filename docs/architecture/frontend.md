@@ -18,7 +18,8 @@ one review board per view, one view at a time, drawn from shared component rende
 (ADR-0036). Colours live only in `mockup/colors.css`, which the maintainer edits by
 hand. Mockup data is a snapshot of the real HTTP API over a seeded database, made by
 `mockup/data/generate.py` from the same `src/database/schema.sql` the program compiles
-in. No Solid code exists yet. See `docs/status.md` for where things stand.
+in. Solid code exists in `web/solid` for the projects and plugins views; the other three
+are not built. See `docs/status.md` for where things stand.
 
 ## What it is
 
