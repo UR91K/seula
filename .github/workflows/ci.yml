@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR supersedes the run still in flight.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # Build and test the root workspace (seula + crates/vst-meta). Windows because that is
+  # the platform the code is written for; macOS/Linux paths exist but are untested.
+  rust:
+    name: Rust (build + test)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # build.rs compiles proto/ through tonic-build, which shells out to protoc.
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace --locked
+
+      # Not `cargo test --test X`: that skips examples, and tests/plugin_scanner_tests.rs
+      # needs one. --no-fail-fast so one broken binary can't hide the others.
+      # The #[ignore]d tests are deliberately not run: they scan the maintainer's real
+      # project folders and cannot pass on a runner.
+      - name: Test
+        run: cargo test --workspace --no-fail-fast --locked
+
+  # Advisory for now: lint debt would otherwise make the required check permanently red.
+  # Drop continue-on-error once these are clean.
+  lint:
+    name: Rust (fmt + clippy, advisory)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: lint
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked
+
+  # The Solid frontend. Cheap, and independent of the Rust jobs.
+  web:
+    name: Web (typecheck, lint, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web/solid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/solid/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # `build` is `tsc --noEmit && vite build`, so this is the typecheck too.
+      - run: npm run build
+
+  # The Tauri shell is deliberately outside the root workspace (ADR-0048), so the jobs
+  # above never compile it. Type-check it here so it can't rot unnoticed.
+  tauri-shell:
+    name: Tauri shell (cargo check)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/solid/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Own lockfile, and its target dir is web/target (web/.cargo/config.toml).
+          workspaces: web/solid/src-tauri -> ../../target
+
+      # tauri-build needs frontendDist (web/solid/dist) to exist.
+      - name: Build frontend
+        working-directory: web/solid
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check shell
+        working-directory: web/solid/src-tauri
+        run: cargo check --locked
