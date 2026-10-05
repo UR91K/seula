@@ -219,7 +219,14 @@ fn test_search_full_timestamp() {
     setup("error");
     let (mut db, edm_created, _, _, _) = setup_test_projects();
 
-    let date_query = SearchQuery::parse("dc:2024-01-01 08:00:00");
+    // The FTS index stores timestamps in UTC (schema.sql), so build the query the same
+    // way instead of hardcoding the hour for one machine's UTC offset.
+    let date_query = SearchQuery::parse(&format!(
+        "dc:{}",
+        edm_created
+            .with_timezone(&chrono::Utc)
+            .format("%Y-%m-%d %H:%M:%S")
+    ));
     let results = db.search_fts(&date_query).expect("Search failed");
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].project.created_time, edm_created);

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use crate::{common::setup, scan::parser::macos_sample_paths};
 
 #[test]
+#[ignore = "hardcoded to a real project path on the maintainer's machine; run with --ignored"]
 fn test_play_project_unicode_encoding() {
     setup("error");
     // Path to the problematic project

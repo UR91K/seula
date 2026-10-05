@@ -39,12 +39,15 @@ cargo test --workspace --no-fail-fast
                                 # first failing binary; three broken tests in scan_tests
                                 # hid behind an earlier failure for a month that way.
 cargo test --workspace --no-fail-fast --tests -- --ignored
-                                # The heavy pass. Five tests are `#[ignore]`d: three scan
+                                # The heavy pass. Seven tests are `#[ignore]`d: three scan
                                 # and parse every .als under your real configured project
-                                # paths, and two (test_load_real_project,
-                                # test_parse_performance) are hardcoded to specific
-                                # project files on the maintainer's machine and cannot
-                                # run anywhere else. All expensive, all environment-
+                                # paths; three (test_load_real_project,
+                                # test_parse_performance,
+                                # test_play_project_unicode_encoding) are hardcoded to
+                                # specific project files on the maintainer's machine and
+                                # cannot run anywhere else; and test_config_validation
+                                # needs a real config.toml with project paths, which CI
+                                # runners lack. All expensive or environment-
                                 # dependent. Run this before relying on scan/parse
                                 # changes, not on every edit.
                                 # --tests here is load-bearing, not optional: several

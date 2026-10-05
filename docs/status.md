@@ -85,8 +85,10 @@ every open — and a bump discards the user's database (ADR-0011).
 
 ## Known issues
 
-Five tests are `#[ignore]`d as of 2026-09-16 — three scan the real configured project
-folders, two are hardcoded to paths on the maintainer's machine.
+Seven tests are `#[ignore]`d as of 2026-10-06 — three scan the real configured project
+folders, three are hardcoded to paths on the maintainer's machine, and
+`test_config_validation` needs a real `config.toml` with project paths. The last two
+were found by the first CI run on a clean runner.
 `cargo test --workspace` no longer runs them; use
 `cargo test --workspace --tests -- --ignored` for the heavy pass. See CLAUDE.md.
 

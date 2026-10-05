@@ -6,6 +6,7 @@ use seula::error::ConfigError;
 use crate::common::setup;
 
 #[test]
+#[ignore = "asserts the real config.toml has at least one project path, which a fresh machine or CI runner does not; run with --ignored"]
 fn test_config_validation() {
     setup("error");
     // Test that the global config loads successfully
