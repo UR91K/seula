@@ -14,7 +14,7 @@ const NAV: { id: RouteId | null; label: string; icon: string }[] = [
   { id: "collections", label: "Collections", icon: "album" },
   { id: "plugins", label: "Plugins", icon: "plug_connect" },
   { id: "samples", label: "Samples", icon: "earthquake" },
-  { id: null, label: "Stats", icon: "bar_chart" },
+  { id: "stats", label: "Stats", icon: "bar_chart" },
 ];
 
 export function Topbar(props: { view: View }) {
@@ -50,7 +50,7 @@ export function Sidebar() {
             onClick={() => { if (v.id) { setShell({ menu: null, popover: null }); setRoute(v.id); } }}>
             <Icon name={v.icon} fill={active()} />
             <span class="label">{v.label}</span>
-            <span class="count">{v.id ? (counts[v.id] ?? "") : ""}</span>
+            <span class="count">{v.id && v.id !== "stats" ? (counts[v.id] ?? "") : ""}</span>
           </div>
         );
       }}</For>

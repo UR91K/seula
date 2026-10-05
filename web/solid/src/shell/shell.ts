@@ -9,13 +9,15 @@ import { createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Api, DEFAULT_URL, simulatedScan } from "../../../shared/api";
 import { revealInExplorer } from "../../../shared/os";
-import type { Collection, KeySpelling, ScanKind, ScanProgress, SystemInfo } from "../../../shared/types";
+import type { Collection, KeySpelling, ScanKind, ScanProgress, StatsScope, SystemInfo } from "../../../shared/types";
 
 export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
 
 // ---------------------------------------------------------------- routing (ADR-0052)
 
-export type RouteId = "projects" | "collections" | "plugins" | "samples";
+export type RouteId = "projects" | "collections" | "plugins" | "samples" | "stats";
+/** The routes that list things, and so carry a count in the sidebar. */
+export type CountedRoute = Exclude<RouteId, "stats">;
 export const [route, setRoute] = createSignal<RouteId>("projects");
 
 /** The one way a view hands off to the projects view: switch to it and search. The projects
@@ -40,6 +42,11 @@ export const [shell, setShell] = createStore({
   menu: null as null | { id: string; x: number; y: number },
 });
 
+/** Which projects the library-wide figures count (ADR-0045). The stats view is its first
+ *  reader; it is held here so the other views can share it. In memory only, until the
+ *  preferences endpoint exists (ADR-0059). */
+export const [projectScope, setProjectScope] = createSignal<StatsScope>("active");
+
 export const closePopups = () => setShell({ menu: null, popover: null });
 
 /** Every collection's id and name, for the project inspector's "Collections" lists. The
@@ -54,7 +61,7 @@ export const [notice, setNotice] = createSignal<string | null>(null);
 export const [system, setSystem] = createSignal<SystemInfo | null>(null);
 
 /** Sidebar counts. A view keeps its own up to date once it has loaded its list. */
-export const [counts, setCounts] = createStore<Record<RouteId, number | null>>({ projects: null, collections: null, plugins: null, samples: null });
+export const [counts, setCounts] = createStore<Record<CountedRoute, number | null>>({ projects: null, collections: null, plugins: null, samples: null });
 
 export async function loadChrome() {
   const [s, p, c, q, r] = await Promise.allSettled([

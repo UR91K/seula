@@ -2,7 +2,7 @@
 
 import type {
   Collection, CollectionRow, CollectionSortKey, CollectionStats, CollectionTask, FormatRollup, PluginDetails, PluginRow,
-  Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope, SystemInfo, VendorRollup,
+  Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope, Statistics, StatsScope, SystemInfo, VendorRollup,
 } from "./types";
 
 /** The mock daemon `mockup/data/generate.py` seeds (its HTTP_PORT). The real default is
@@ -40,6 +40,12 @@ export class Api {
   }
 
   systemInfo() { return this.json<SystemInfo>("/api/v1/system/info"); }
+
+  /** The library's figures in a project scope (ADR-0045). */
+  statistics(scope: StatsScope) { return this.json<Statistics>(`/api/v1/system/statistics?scope=${scope}`); }
+
+  /** Where the same figures download as CSV. */
+  statisticsExportUrl(scope: StatsScope) { return `${this.base}/api/v1/system/statistics/export?scope=${scope}`; }
 
   async setNotes(id: string, notes: string) {
     await this.send(`/api/v1/projects/${id}/notes`, put({ notes }));

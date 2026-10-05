@@ -132,3 +132,40 @@ export interface CollectionTask {
 
 /** What the server sorts the list by (`sort_by`). */
 export type CollectionSortKey = "name" | "project_count" | "total_duration" | "created_at" | "modified_at";
+
+// ---------------------------------------------------------------- stats
+
+/** The project scope the statistics count in (ADR-0045). */
+export type StatsScope = "active" | "all";
+
+/** GET /system/statistics: each count with its split (ADR-0045). Series come oldest first,
+ *  empty periods as zero. */
+export interface Statistics {
+  projects: { total: number; active: number; archived: number };
+  plugins: { total: number; installed: number; missing: number; not_scanned: number };
+  samples: { total: number; present: number; missing: number };
+  collections: { total: number; with_projects: number; empty: number };
+  tags: { total: number; in_use: number; unused: number };
+  tasks: { total: number; completed: number; pending: number; completion_rate: number };
+  top_plugins: { name: string; vendor: string; usage_count: number }[];
+  top_vendors: { vendor: string; plugin_count: number; usage_count: number }[];
+  tempo_distribution: { tempo: number; count: number }[];
+  key_distribution: { key: Key | null; count: number }[];
+  time_signature_distribution: (TimeSignature & { count: number })[];
+  projects_per_year: { year: number; count: number }[];
+  projects_per_month: { year: number; month: number; count: number }[];
+  average_monthly_projects: number;
+  average_project_duration_seconds: number;
+  projects_under_40_seconds: number;
+  longest_project: Project | null;
+  most_complex_projects: { project: Project; plugin_count: number; sample_count: number; complexity_score: number }[];
+  average_plugins_per_project: number;
+  average_samples_per_project: number;
+  top_samples: { name: string; path: string; usage_count: number }[];
+  top_tags: { name: string; usage_count: number }[];
+  recent_activity: { year: number; month: number; day: number; projects_created: number; projects_modified: number }[];
+  ableton_versions: { version: string; count: number }[];
+  average_projects_per_collection: number;
+  largest_collection: CollectionRow | null;
+  task_completion_trends: { year: number; month: number; completed_tasks: number; total_tasks: number; completion_rate: number }[];
+}

@@ -4,13 +4,14 @@ import { collectionsView } from "./collections/view";
 import { pluginsView } from "./plugins/view";
 import { projectsView } from "./projects/view";
 import { samplesView } from "./samples/view";
+import { statsView } from "./stats/view";
 import { TbBtn } from "./shell/parts";
 import { Sidebar, Statusbar, Topbar } from "./shell/Frame";
 import { closePopups, loadChrome, route, setShell, shell, type RouteId } from "./shell/shell";
 import type { View } from "./shell/view";
 
 const VIEWS: Record<RouteId, View> = {
-  projects: projectsView, collections: collectionsView, plugins: pluginsView, samples: samplesView,
+  projects: projectsView, collections: collectionsView, plugins: pluginsView, samples: samplesView, stats: statsView,
 };
 
 export function App() {
