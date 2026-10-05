@@ -1,0 +1,4 @@
+# Formatting-only commits. Enable with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# cargo fmt --all
+f11b32eed8a6d1253c9444819c3ef523375a2619
