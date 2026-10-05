@@ -1,13 +1,13 @@
 //! Visual tests for CLI output formatting
-//! 
+//!
 //! These tests are designed to be run manually to visually inspect the output formatting
 //! capabilities of the CLI system. They generate various table structures and data types
 //! to demonstrate how the output looks in different scenarios.
 
-use seula::cli::output::{OutputFormatter, SimpleTable, TableDisplay, MessageType};
-use seula::cli::{OutputFormat, CliError};
-use serde::Serialize;
 use colored::Colorize;
+use serde::Serialize;
+use seula::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
+use seula::cli::{CliError, OutputFormat};
 
 #[allow(unused)]
 mod common;
@@ -77,8 +77,18 @@ impl TableDisplay for MockProjectData {
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         writer.write_record(&[
-            "ID", "Name", "Path", "BPM", "Time Signature", "Key", "Version",
-            "Plugins", "Samples", "Created", "Size (MB)", "Status"
+            "ID",
+            "Name",
+            "Path",
+            "BPM",
+            "Time Signature",
+            "Key",
+            "Version",
+            "Plugins",
+            "Samples",
+            "Created",
+            "Size (MB)",
+            "Status",
         ])?;
 
         for project in &self.projects {
@@ -128,7 +138,7 @@ impl TableDisplay for MockPluginData {
             "Vendor".to_string(),
             "Format".to_string(),
             "Version".to_string(),
-            "OK".to_string(),  // Shorter header for installed status
+            "OK".to_string(), // Shorter header for installed status
             "Usage".to_string(),
             "Last Used".to_string(),
             "Category".to_string(),
@@ -175,7 +185,14 @@ impl TableDisplay for MockPluginData {
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         writer.write_record(&[
-            "Name", "Vendor", "Format", "Version", "Installed", "Usage", "Last Used", "Category"
+            "Name",
+            "Vendor",
+            "Format",
+            "Version",
+            "Installed",
+            "Usage",
+            "Last Used",
+            "Category",
         ])?;
 
         for plugin in &self.plugins {
@@ -267,7 +284,9 @@ impl TableDisplay for MockTagData {
         for tag in &self.tags {
             table.add_row(vec![
                 tag.name.clone(),
-                format!("● {}", tag.color).color(tag.color.as_str()).to_string(),
+                format!("● {}", tag.color)
+                    .color(tag.color.as_str())
+                    .to_string(),
                 tag.projects.to_string(),
             ]);
         }
@@ -305,7 +324,8 @@ impl TableDisplay for MockWideData {
         let mut table = SimpleTable::new(vec![
             "ID".to_string(),
             "Very Long File Path That Exceeds Normal Width".to_string(),
-            "Extremely Long Description That Should Be Truncated When Terminal Width Is Limited".to_string(),
+            "Extremely Long Description That Should Be Truncated When Terminal Width Is Limited"
+                .to_string(),
             "Short".to_string(),
         ]);
 
@@ -323,10 +343,10 @@ impl TableDisplay for MockWideData {
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         writer.write_record(&[
-            "ID", 
-            "Very Long File Path", 
-            "Extremely Long Description", 
-            "Short"
+            "ID",
+            "Very Long File Path",
+            "Extremely Long Description",
+            "Short",
         ])?;
 
         for entry in &self.entries {
@@ -599,11 +619,11 @@ fn create_mock_wide_data() -> MockWideData {
 #[test]
 fn test_visual_project_table() {
     common::setup("error");
-    
+
     println!("\n=== PROJECT TABLE TEST ===");
     let data = create_mock_project_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("Testing project table display:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
@@ -614,12 +634,15 @@ fn test_visual_project_table() {
 #[test]
 fn test_visual_plugin_table() {
     common::setup("error");
-    
+
     println!("\n=== PLUGIN TABLE TEST ===");
     let data = create_mock_plugin_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
-    formatter.print_message("Testing plugin table with status indicators:", MessageType::Info);
+
+    formatter.print_message(
+        "Testing plugin table with status indicators:",
+        MessageType::Info,
+    );
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
     }
@@ -629,11 +652,11 @@ fn test_visual_plugin_table() {
 #[test]
 fn test_visual_stats_table() {
     common::setup("error");
-    
+
     println!("\n=== SYSTEM STATS TABLE TEST ===");
     let data = create_mock_system_stats();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("Testing system statistics table:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
@@ -644,11 +667,11 @@ fn test_visual_stats_table() {
 #[test]
 fn test_visual_narrow_table() {
     common::setup("error");
-    
+
     println!("\n=== NARROW TABLE TEST ===");
     let data = create_mock_tag_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("Testing narrow table with few columns:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
@@ -659,11 +682,11 @@ fn test_visual_narrow_table() {
 #[test]
 fn test_visual_wide_table() {
     common::setup("error");
-    
+
     println!("\n=== WIDE TABLE TEST (Truncation) ===");
     let data = create_mock_wide_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("Testing wide table with truncation:", MessageType::Warning);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
@@ -674,11 +697,11 @@ fn test_visual_wide_table() {
 #[test]
 fn test_visual_no_color_table() {
     common::setup("error");
-    
+
     println!("\n=== NO COLOR TABLE TEST ===");
     let data = create_mock_project_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, true);
-    
+
     formatter.print_message("Testing table without colors:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
@@ -689,11 +712,11 @@ fn test_visual_no_color_table() {
 #[test]
 fn test_visual_json_output() {
     common::setup("error");
-    
+
     println!("\n=== JSON OUTPUT TEST ===");
     let data = create_mock_project_data();
     let formatter = OutputFormatter::new(OutputFormat::Json, false);
-    
+
     formatter.print_message("Testing JSON output format:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing JSON: {}", e);
@@ -704,11 +727,11 @@ fn test_visual_json_output() {
 #[test]
 fn test_visual_csv_output() {
     common::setup("error");
-    
+
     println!("\n=== CSV OUTPUT TEST ===");
     let data = create_mock_project_data();
     let formatter = OutputFormatter::new(OutputFormat::Csv, false);
-    
+
     formatter.print_message("Testing CSV output format:", MessageType::Info);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing CSV: {}", e);
@@ -719,11 +742,11 @@ fn test_visual_csv_output() {
 #[test]
 fn test_visual_empty_table() {
     common::setup("error");
-    
+
     println!("\n=== EMPTY TABLE TEST ===");
     let data = MockProjectData { projects: vec![] };
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("Testing empty table:", MessageType::Warning);
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing empty table: {}", e);
@@ -735,15 +758,15 @@ fn test_visual_empty_table() {
 #[test]
 fn test_visual_message_types() {
     common::setup("error");
-    
+
     println!("\n=== MESSAGE TYPES TEST ===");
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
+
     formatter.print_message("This is an info message", MessageType::Info);
     formatter.print_message("This is a success message", MessageType::Success);
     formatter.print_message("This is a warning message", MessageType::Warning);
     formatter.print_message("This is an error message", MessageType::Error);
-    
+
     println!("\n--- Same messages without color ---");
     let no_color_formatter = OutputFormatter::new(OutputFormat::Table, true);
     no_color_formatter.print_message("This is an info message (no color)", MessageType::Info);
@@ -756,10 +779,10 @@ fn test_visual_message_types() {
 #[test]
 fn test_visual_comprehensive() {
     common::setup("error");
-    
+
     println!("\n=== COMPREHENSIVE VISUAL TEST ===");
     println!("This test runs all visual scenarios in sequence.\n");
-    
+
     // Run all individual tests
     test_visual_project_table();
     test_visual_plugin_table();
@@ -771,7 +794,7 @@ fn test_visual_comprehensive() {
     test_visual_csv_output();
     test_visual_empty_table();
     test_visual_message_types();
-    
+
     println!("\n=== COMPREHENSIVE TEST COMPLETE ===");
 }
 
@@ -779,35 +802,43 @@ fn test_visual_comprehensive() {
 #[test]
 fn test_visual_different_widths() {
     common::setup("error");
-    
+
     println!("\n=== DIFFERENT TERMINAL WIDTHS TEST ===");
     println!("Note: Actual width depends on your terminal. These tests show the same data:");
-    
+
     let data = create_mock_project_data();
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
-    formatter.print_message("Project table (your current terminal width):", MessageType::Info);
+
+    formatter.print_message(
+        "Project table (your current terminal width):",
+        MessageType::Info,
+    );
     if let Err(e) = formatter.print(&data) {
         eprintln!("Error printing table: {}", e);
     }
-    
-    println!("\nTip: Resize your terminal and run this test again to see different truncation behavior!");
+
+    println!(
+        "\nTip: Resize your terminal and run this test again to see different truncation behavior!"
+    );
 }
 
 /// Test column alignment specifically
 #[test]
 fn test_visual_alignment() {
     common::setup("error");
-    
+
     println!("\n=== COLUMN ALIGNMENT TEST ===");
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
-    formatter.print_message("Testing improved plugin table alignment:", MessageType::Info);
+
+    formatter.print_message(
+        "Testing improved plugin table alignment:",
+        MessageType::Info,
+    );
     let plugin_data = create_mock_plugin_data();
     if let Err(e) = formatter.print(&plugin_data) {
         eprintln!("Error printing plugin table: {}", e);
     }
-    
+
     println!("\n");
     formatter.print_message("Testing project table alignment:", MessageType::Info);
     let project_data = create_mock_project_data();
@@ -820,22 +851,25 @@ fn test_visual_alignment() {
 #[test]
 fn test_visual_unicode_alignment() {
     common::setup("error");
-    
+
     println!("\n=== UNICODE ALIGNMENT TEST ===");
     let formatter = OutputFormatter::new(OutputFormat::Table, false);
-    
-    formatter.print_message("Testing Unicode character alignment with various character types:", MessageType::Info);
-    
+
+    formatter.print_message(
+        "Testing Unicode character alignment with various character types:",
+        MessageType::Info,
+    );
+
     // Create test data with various Unicode characters
     let unicode_data = MockProjectData {
         projects: vec![
             MockProject {
                 id: "unicode_1".to_string(),
-                name: "🎵 Music Project".to_string(),  // Emoji (2 columns wide)
-                path: "/Users/测试/Music.als".to_string(),  // CJK characters (2 columns each)
+                name: "🎵 Music Project".to_string(), // Emoji (2 columns wide)
+                path: "/Users/测试/Music.als".to_string(), // CJK characters (2 columns each)
                 tempo: 120.0,
                 time_signature: "4/4".to_string(),
-                key: Some("C♯m".to_string()),  // Musical symbol
+                key: Some("C♯m".to_string()), // Musical symbol
                 version: "11.2.0".to_string(),
                 plugin_count: 5,
                 sample_count: 10,
@@ -845,8 +879,8 @@ fn test_visual_unicode_alignment() {
             },
             MockProject {
                 id: "unicode_2".to_string(),
-                name: "Café Ambient 🌙".to_string(),  // Accented chars + emoji
-                path: "/Volumes/Ñoño/Música/Ambient.als".to_string(),  // Various accents
+                name: "Café Ambient 🌙".to_string(), // Accented chars + emoji
+                path: "/Volumes/Ñoño/Música/Ambient.als".to_string(), // Various accents
                 tempo: 85.0,
                 time_signature: "3/4".to_string(),
                 key: Some("F♯".to_string()),
@@ -859,8 +893,8 @@ fn test_visual_unicode_alignment() {
             },
             MockProject {
                 id: "unicode_3".to_string(),
-                name: "Ｈｅｌｌｏ Ｗｏｒｌｄ".to_string(),  // Full-width characters (2 columns each)
-                path: "/home/user/こんにちは.als".to_string(),  // Japanese hiragana
+                name: "Ｈｅｌｌｏ Ｗｏｒｌｄ".to_string(), // Full-width characters (2 columns each)
+                path: "/home/user/こんにちは.als".to_string(), // Japanese hiragana
                 tempo: 140.0,
                 time_signature: "7/8".to_string(),
                 key: Some("A♭".to_string()),
@@ -873,7 +907,7 @@ fn test_visual_unicode_alignment() {
             },
             MockProject {
                 id: "normal".to_string(),
-                name: "Normal ASCII Project".to_string(),  // Regular ASCII for comparison
+                name: "Normal ASCII Project".to_string(), // Regular ASCII for comparison
                 path: "/Users/producer/Normal.als".to_string(),
                 tempo: 128.0,
                 time_signature: "4/4".to_string(),
@@ -887,49 +921,60 @@ fn test_visual_unicode_alignment() {
             },
         ],
     };
-    
+
     if let Err(e) = formatter.print(&unicode_data) {
         eprintln!("Error printing Unicode table: {}", e);
     }
-    
-    formatter.print_message("Note: Columns should be properly aligned despite different character widths", MessageType::Info);
+
+    formatter.print_message(
+        "Note: Columns should be properly aligned despite different character widths",
+        MessageType::Info,
+    );
 }
 
 /// Test Unicode width calculation directly (demonstrating the fix)
 #[test]
 fn test_visual_unicode_width_demo() {
     common::setup("error");
-    
+
     println!("\n=== UNICODE WIDTH CALCULATION DEMO ===");
-    
+
     // Test various Unicode strings and their display widths
     let test_strings = vec![
         ("Hello, world!", "Regular ASCII text"),
-        ("Ｈｅｌｌｏ, ｗｏｒｌｄ!", "Full-width characters (each char = 2 columns)"),
+        (
+            "Ｈｅｌｌｏ, ｗｏｒｌｄ!",
+            "Full-width characters (each char = 2 columns)",
+        ),
         ("🎵🎶🎸🎹", "Emojis (each emoji = 2 columns)"),
         ("测试文本", "CJK characters (each char = 2 columns)"),
         ("Café naïve résumé", "Accented characters (1 column each)"),
         ("♫ ♪ ♬ ♩", "Musical symbols (1 column each)"),
         ("C♯m F♯ A♭", "Musical notation with sharps/flats"),
-        ("こんにちは世界", "Japanese hiragana + kanji (2 columns each)"),
+        (
+            "こんにちは世界",
+            "Japanese hiragana + kanji (2 columns each)",
+        ),
     ];
-    
+
     use unicode_width::UnicodeWidthStr;
-    
+
     println!("String width analysis:");
-    println!("{:<35} | {:<8} | {:<8} | Description", "Text", "Bytes", "Columns");
+    println!(
+        "{:<35} | {:<8} | {:<8} | Description",
+        "Text", "Bytes", "Columns"
+    );
     println!("{:-<35}-+-{:-<8}-+-{:-<8}-+{:-<50}", "", "", "", "");
-    
+
     for (text, description) in test_strings {
         let byte_length = text.len();
         let display_width = text.width();
-        println!("{:<35} | {:<8} | {:<8} | {}", 
-                text, 
-                byte_length, 
-                display_width, 
-                description);
+        println!(
+            "{:<35} | {:<8} | {:<8} | {}",
+            text, byte_length, display_width, description
+        );
     }
-    
+
     println!("\nThis demonstrates why using .len() for table alignment fails with Unicode!");
     println!("Our table formatter now uses .width() for proper alignment.");
 }

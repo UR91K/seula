@@ -312,7 +312,9 @@ impl Spawner {
                             return; // Supervisor stopped listening.
                         }
                     }
-                    Err(e) => tracing::warn!("Unparseable line from plugin scanner: {} ({})", line, e),
+                    Err(e) => {
+                        tracing::warn!("Unparseable line from plugin scanner: {} ({})", line, e)
+                    }
                 }
             }
         });

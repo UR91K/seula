@@ -1,7 +1,7 @@
-use tracing::info;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use tracing::info;
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuId, MenuItem},
     Icon, TrayIconBuilder, TrayIconEvent,

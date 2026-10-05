@@ -88,14 +88,16 @@ pub fn default_vst_scan_timeout_secs() -> u64 {
 pub fn default_vst_search_paths() -> Vec<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        let program_files = std::env::var("ProgramFiles")
-            .unwrap_or_else(|_| r"C:\Program Files".to_string());
+        let program_files =
+            std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".to_string());
         let common = std::path::PathBuf::from(&program_files).join("Common Files");
         vec![
             common.join("VST3"),
             common.join("VST2"),
             std::path::PathBuf::from(&program_files).join("VSTPlugins"),
-            std::path::PathBuf::from(&program_files).join("Steinberg").join("VSTPlugins"),
+            std::path::PathBuf::from(&program_files)
+                .join("Steinberg")
+                .join("VSTPlugins"),
         ]
     }
     #[cfg(target_os = "macos")]
@@ -146,4 +148,4 @@ pub fn default_database_path() -> Option<String> {
 
 pub fn default_log_level() -> String {
     DEFAULT_LOG_LEVEL.to_string()
-} 
+}

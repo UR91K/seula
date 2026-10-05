@@ -66,14 +66,8 @@ fn test_config_constants() {
     assert_eq!(seula::config::DEFAULT_LOG_LEVEL, "error");
 
     // Test media module constants
-    assert_eq!(
-        seula::media::DEFAULT_MAX_COVER_ART_SIZE_MB,
-        10
-    );
-    assert_eq!(
-        seula::media::DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
-        50
-    );
+    assert_eq!(seula::media::DEFAULT_MAX_COVER_ART_SIZE_MB, 10);
+    assert_eq!(seula::media::DEFAULT_MAX_AUDIO_FILE_SIZE_MB, 50);
 
     // Test format arrays (now in media module)
     assert!(seula::media::ALLOWED_IMAGE_FORMATS.contains(&"jpg"));
@@ -171,21 +165,12 @@ fn test_path_length_validation() {
 fn test_windows_path_validation() {
     setup("error");
     // Test valid Windows paths
-    assert!(
-        seula::config::Config::validate_windows_path("C:\\path\\to\\file").is_ok()
-    );
-    assert!(
-        seula::config::Config::validate_windows_path("\\\\server\\share\\file")
-            .is_ok()
-    );
-    assert!(
-        seula::config::Config::validate_windows_path("relative\\path").is_ok()
-    );
+    assert!(seula::config::Config::validate_windows_path("C:\\path\\to\\file").is_ok());
+    assert!(seula::config::Config::validate_windows_path("\\\\server\\share\\file").is_ok());
+    assert!(seula::config::Config::validate_windows_path("relative\\path").is_ok());
 
     // Test invalid Unix-style paths
-    assert!(
-        seula::config::Config::validate_windows_path("/unix/style/path").is_err()
-    );
+    assert!(seula::config::Config::validate_windows_path("/unix/style/path").is_err());
 }
 
 #[test]

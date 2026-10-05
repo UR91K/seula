@@ -1,8 +1,8 @@
-use tracing::{debug, error, info};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::{debug, error, info};
 
 use super::super::common::*;
 use super::super::scanning::*;
@@ -242,7 +242,10 @@ impl SystemHandler {
         match req.format() {
             ExportFormat::ExportCsv => {
                 let csv_data = self.generate_csv_export(stats).await?;
-                let filename = format!("statistics_{}.csv", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+                let filename = format!(
+                    "statistics_{}.csv",
+                    chrono::Utc::now().format("%Y%m%d_%H%M%S")
+                );
 
                 Ok(Response::new(ExportStatisticsResponse {
                     data: csv_data,
@@ -308,7 +311,11 @@ impl SystemHandler {
         csv_content.push_str("Key Distribution\n");
         csv_content.push_str("Key,Count\n");
         for key in stats.key_distribution {
-            csv_content.push_str(&format!("{},{}\n", key.key.as_deref().unwrap_or("No key"), key.count));
+            csv_content.push_str(&format!(
+                "{},{}\n",
+                key.key.as_deref().unwrap_or("No key"),
+                key.count
+            ));
         }
 
         Ok(csv_content.into_bytes())

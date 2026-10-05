@@ -44,14 +44,14 @@
 //! - Memory-efficient state tracking
 //! - Early termination for specific data extraction
 
-#[allow(unused_imports)]
-use tracing::{debug, trace, warn};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::sync::Arc;
+#[allow(unused_imports)]
+use tracing::{debug, trace, warn};
 use uuid::Uuid;
 
 use crate::error::LiveSetError;
@@ -1301,10 +1301,12 @@ impl Parser {
                                             value,
                                             device_id
                                         );
-                                        
+
                                         // Only check for blank plugin names after confirming this is a valid plugin
                                         if value.trim().is_empty() {
-                                            let file_info = self.current_file.as_ref()
+                                            let file_info = self
+                                                .current_file
+                                                .as_ref()
                                                 .map(|f| format!(" in file: {}", f))
                                                 .unwrap_or_default();
                                             warn_fn!(
@@ -1317,7 +1319,7 @@ impl Parser {
                                                 file_info
                                             );
                                         }
-                                        
+
                                         let plugin_info = PluginInfo {
                                             name: value,
                                             dev_identifier: device_id.clone(),

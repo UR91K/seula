@@ -70,7 +70,9 @@ fn month_start_epoch(year: i32, month: u32) -> i64 {
 }
 
 fn day_epoch(day: NaiveDate) -> i64 {
-    day.and_hms_opt(0, 0, 0).map(|dt| dt.and_utc().timestamp()).unwrap_or(0)
+    day.and_hms_opt(0, 0, 0)
+        .map(|dt| dt.and_utc().timestamp())
+        .unwrap_or(0)
 }
 
 impl ProjectDatabase {
@@ -249,7 +251,10 @@ impl ProjectDatabase {
 
     /// Equal `TEMPO_BIN`-wide bins, each labelled by its lower edge, from the lowest
     /// tempo used to the highest, with empty bins as zero.
-    pub fn get_tempo_distribution(&self, scope: ProjectScope) -> Result<Vec<(f64, i32)>, DatabaseError> {
+    pub fn get_tempo_distribution(
+        &self,
+        scope: ProjectScope,
+    ) -> Result<Vec<(f64, i32)>, DatabaseError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT CAST(p.tempo / {TEMPO_BIN} AS INTEGER) * {TEMPO_BIN} as bin, COUNT(*)
              FROM projects p
@@ -344,7 +349,10 @@ impl ProjectDatabase {
 
     /// Every year from the first project's to the last's, oldest first, with empty
     /// years as zero.
-    pub fn get_projects_per_year(&self, scope: ProjectScope) -> Result<Vec<(i32, i32)>, DatabaseError> {
+    pub fn get_projects_per_year(
+        &self,
+        scope: ProjectScope,
+    ) -> Result<Vec<(i32, i32)>, DatabaseError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT
                 CAST(strftime('%Y', datetime(p.created_at, 'unixepoch')) AS INTEGER) as year,
@@ -366,7 +374,9 @@ impl ProjectDatabase {
         let (Some(&first), Some(&last)) = (found.keys().next(), found.keys().next_back()) else {
             return Ok(Vec::new());
         };
-        Ok((first..=last).map(|y| (y, found.get(&y).copied().unwrap_or(0))).collect())
+        Ok((first..=last)
+            .map(|y| (y, found.get(&y).copied().unwrap_or(0)))
+            .collect())
     }
 
     /// The `months` calendar months ending with `today`'s, oldest first, with empty
@@ -393,7 +403,11 @@ impl ProjectDatabase {
         ))?;
 
         let rows = stmt.query_map([month_start_epoch(start_year, start_month)], |row| {
-            Ok((row.get::<_, i32>(0)?, row.get::<_, u32>(1)?, row.get::<_, i32>(2)?))
+            Ok((
+                row.get::<_, i32>(0)?,
+                row.get::<_, u32>(1)?,
+                row.get::<_, i32>(2)?,
+            ))
         })?;
         let mut found = std::collections::HashMap::new();
         for row in rows {
@@ -533,7 +547,11 @@ impl ProjectDatabase {
         Ok(samples)
     }
 
-    pub fn get_top_tags(&self, limit: i32, scope: ProjectScope) -> Result<Vec<(String, i32)>, DatabaseError> {
+    pub fn get_top_tags(
+        &self,
+        limit: i32,
+        scope: ProjectScope,
+    ) -> Result<Vec<(String, i32)>, DatabaseError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT t.name, COUNT(*) as usage_count
              FROM tags t
@@ -558,7 +576,10 @@ impl ProjectDatabase {
 
     /// Completed and pending tasks on projects in scope, and the completed share as a
     /// fraction from 0 to 1, the same unit as the monthly trends.
-    pub fn get_task_statistics(&self, scope: ProjectScope) -> Result<(i32, i32, f64), DatabaseError> {
+    pub fn get_task_statistics(
+        &self,
+        scope: ProjectScope,
+    ) -> Result<(i32, i32, f64), DatabaseError> {
         let counts = self.get_library_counts(scope)?;
         let (completed_tasks, pending_tasks) = (counts.tasks_completed, counts.tasks_pending);
 
@@ -600,7 +621,11 @@ impl ProjectDatabase {
         ))?;
 
         let rows = stmt.query_map([day_epoch(start)], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i32>(2)?,
+            ))
         })?;
         let mut found = std::collections::HashMap::new();
         for row in rows {
@@ -615,12 +640,21 @@ impl ProjectDatabase {
             .take_while(|d| *d <= today)
             .map(|d| {
                 let (created, modified) = found.get(&d).copied().unwrap_or((0, 0));
-                (d.year(), d.month() as i32, d.day() as i32, created, modified)
+                (
+                    d.year(),
+                    d.month() as i32,
+                    d.day() as i32,
+                    created,
+                    modified,
+                )
             })
             .collect())
     }
 
-    pub fn get_ableton_version_stats(&self, scope: ProjectScope) -> Result<Vec<(String, i32)>, DatabaseError> {
+    pub fn get_ableton_version_stats(
+        &self,
+        scope: ProjectScope,
+    ) -> Result<Vec<(String, i32)>, DatabaseError> {
         // daw_version_display already includes the beta suffix (ADR-0015,
         // AbletonVersion::Display), so no per-column reconstruction is needed here.
         let mut stmt = self.conn.prepare(&format!(
@@ -654,7 +688,9 @@ impl ProjectDatabase {
             return Ok((0.0, None));
         }
         let join = scope.join("cp.project_id");
-        let memberships = self.count(&format!("SELECT COUNT(*) FROM collection_projects cp {join}"))?;
+        let memberships = self.count(&format!(
+            "SELECT COUNT(*) FROM collection_projects cp {join}"
+        ))?;
 
         let largest_collection_id: Option<String> = self
             .conn
@@ -670,7 +706,10 @@ impl ProjectDatabase {
             )
             .optional()?;
 
-        Ok((memberships as f64 / collections as f64, largest_collection_id))
+        Ok((
+            memberships as f64 / collections as f64,
+            largest_collection_id,
+        ))
     }
 
     // Project-specific statistics methods
@@ -728,17 +767,23 @@ impl ProjectDatabase {
         // most not), so the version filter must not require any of them to add
         // project_ableton_metadata to their own FROM clause.
         if let Some(major) = ableton_version_major {
-            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_major = ?)");
+            conditions.push(
+                "id IN (SELECT project_id FROM project_ableton_metadata WHERE version_major = ?)",
+            );
             params.push(Box::new(major));
         }
 
         if let Some(minor) = ableton_version_minor {
-            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_minor = ?)");
+            conditions.push(
+                "id IN (SELECT project_id FROM project_ableton_metadata WHERE version_minor = ?)",
+            );
             params.push(Box::new(minor));
         }
 
         if let Some(patch) = ableton_version_patch {
-            conditions.push("id IN (SELECT project_id FROM project_ableton_metadata WHERE version_patch = ?)");
+            conditions.push(
+                "id IN (SELECT project_id FROM project_ableton_metadata WHERE version_patch = ?)",
+            );
             params.push(Box::new(patch));
         }
 
@@ -783,11 +828,15 @@ impl ProjectDatabase {
         let projects_without_audio_files = total_projects - projects_with_audio_files;
 
         // Musical statistics
-        let (average_tempo, min_tempo, max_tempo): (Option<f64>, Option<f64>, Option<f64>) = self.conn.query_row(
-            &format!("SELECT AVG(tempo), MIN(tempo), MAX(tempo) FROM projects {}", where_clause),
-            rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let (average_tempo, min_tempo, max_tempo): (Option<f64>, Option<f64>, Option<f64>) =
+            self.conn.query_row(
+                &format!(
+                    "SELECT AVG(tempo), MIN(tempo), MAX(tempo) FROM projects {}",
+                    where_clause
+                ),
+                rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?;
 
         // Duration statistics
         let (average_duration, min_duration, max_duration): (Option<f64>, Option<f64>, Option<f64>) = self.conn.query_row(
@@ -844,12 +893,16 @@ impl ProjectDatabase {
 
         // Get distributions
         let tempo_distribution = self.get_project_tempo_distribution(&where_clause, &params)?;
-        let key_signature_distribution = self.get_project_key_signature_distribution(&where_clause, &params)?;
-        let time_signature_distribution = self.get_project_time_signature_distribution(&where_clause, &params)?;
-        let ableton_version_distribution = self.get_project_ableton_version_distribution(&where_clause, &params)?;
+        let key_signature_distribution =
+            self.get_project_key_signature_distribution(&where_clause, &params)?;
+        let time_signature_distribution =
+            self.get_project_time_signature_distribution(&where_clause, &params)?;
+        let ableton_version_distribution =
+            self.get_project_ableton_version_distribution(&where_clause, &params)?;
         let projects_per_year = self.get_project_year_distribution(&where_clause, &params)?;
         let projects_per_month = self.get_project_month_distribution(&where_clause, &params)?;
-        let most_complex_projects = self.get_project_complexity_statistics(&where_clause, &params)?;
+        let most_complex_projects =
+            self.get_project_complexity_statistics(&where_clause, &params)?;
 
         Ok(ProjectStatistics {
             total_projects,
@@ -961,7 +1014,13 @@ impl ProjectDatabase {
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
-            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?)),
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)?,
+                    row.get::<_, i32>(1)?,
+                    row.get::<_, i32>(2)?,
+                ))
+            },
         )?;
 
         let mut distribution = Vec::new();
@@ -1113,14 +1172,16 @@ impl ProjectDatabase {
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
-            |row| Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i32>(2)?,
-                row.get::<_, i32>(3)?,
-                row.get::<_, i32>(4)?,
-                row.get::<_, f64>(5)?,
-            )),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, i32>(3)?,
+                    row.get::<_, i32>(4)?,
+                    row.get::<_, f64>(5)?,
+                ))
+            },
         )?;
 
         let mut statistics = Vec::new();

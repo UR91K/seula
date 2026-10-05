@@ -684,10 +684,10 @@ async fn test_get_projects_with_enhanced_filtering() {
         .unwrap();
 
     let projects = response.into_inner().projects;
-    
+
     // Should find the test project (assuming it has a tempo in the 80-120 range)
     assert!(!projects.is_empty());
-    
+
     // Verify the project ID is in the results
     let found_project = projects.iter().find(|p| p.id == project_id);
     assert!(found_project.is_some());
@@ -725,15 +725,15 @@ async fn test_get_project_statistics() {
         .unwrap();
 
     let stats = response.into_inner();
-    
+
     // Should have at least one project
     assert!(stats.total_projects > 0);
-    
+
     // Basic statistics should be present
     assert!(stats.average_tempo >= 0.0);
     assert!(stats.min_tempo >= 0.0);
     assert!(stats.max_tempo >= 0.0);
-    
+
     // Complexity statistics should be present
     assert!(stats.average_plugins_per_project >= 0.0);
     assert!(stats.average_samples_per_project >= 0.0);
@@ -764,9 +764,14 @@ async fn test_rescan_project() {
     // Should return failure because test project file doesn't exist
     assert!(!response.success);
     assert!(response.error_message.is_some());
-    assert!(response.error_message.unwrap().contains("Project file not found"));
+    assert!(response
+        .error_message
+        .unwrap()
+        .contains("Project file not found"));
     assert!(!response.was_updated);
-    assert!(response.scan_summary.contains("Project file no longer exists"));
+    assert!(response
+        .scan_summary
+        .contains("Project file no longer exists"));
 
     // Test rescanning with force_rescan = true (should also fail for same reason)
     let request = Request::new(RescanProjectRequest {
@@ -782,9 +787,14 @@ async fn test_rescan_project() {
     // Should return failure even with force rescan because file doesn't exist
     assert!(!response.success);
     assert!(response.error_message.is_some());
-    assert!(response.error_message.unwrap().contains("Project file not found"));
+    assert!(response
+        .error_message
+        .unwrap()
+        .contains("Project file not found"));
     assert!(!response.was_updated);
-    assert!(response.scan_summary.contains("Project file no longer exists"));
+    assert!(response
+        .scan_summary
+        .contains("Project file no longer exists"));
 }
 
 #[tokio::test]

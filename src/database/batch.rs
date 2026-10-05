@@ -1,15 +1,15 @@
 use chrono::Local;
-use tracing::{debug, info, warn};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::project::Project;
 use crate::models::{Plugin, PluginKey, Sample};
+use crate::project::Project;
 
 /// Ableton's name for a reference, recovering it from the identifier when the project
 /// file's `<Name>` element was blank.
@@ -45,8 +45,8 @@ struct BatchTransaction<'a> {
     /// of them found the file. Only these rows are written, and this value replaces
     /// the stored one, so a rescan can mark a sample missing.
     batch_presence: HashMap<String, bool>,
-    plugin_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
-    sample_id_map: HashMap<String, String>,  // old_uuid -> canonical_uuid
+    plugin_id_map: HashMap<String, String>, // old_uuid -> canonical_uuid
+    sample_id_map: HashMap<String, String>, // old_uuid -> canonical_uuid
     stats: BatchStats,
 }
 
@@ -163,7 +163,9 @@ impl<'a> BatchTransaction<'a> {
 
         // Keep non-null values from new plugin if they exist
         // Merge name: use new name if existing name is empty or if new name is non-empty
-        if !new.name.trim().is_empty() && (existing.name.trim().is_empty() || existing.name != new.name) {
+        if !new.name.trim().is_empty()
+            && (existing.name.trim().is_empty() || existing.name != new.name)
+        {
             existing.name = new.name.clone();
         }
         if new.vendor.is_some() {
@@ -191,8 +193,7 @@ impl<'a> BatchTransaction<'a> {
             for plugin in &live_set.plugins {
                 let old_id = plugin.id.to_string();
 
-                let Some(ref_key) = PluginKey::from_dev_identifier(&plugin.dev_identifier)
-                else {
+                let Some(ref_key) = PluginKey::from_dev_identifier(&plugin.dev_identifier) else {
                     // The parser only emits references whose identifier parsed, so
                     // this means the two disagree about the format's shape.
                     warn!(

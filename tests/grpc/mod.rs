@@ -18,22 +18,22 @@ pub mod tasks;
 
 // Common imports for gRPC tests
 use seula::database::ProjectDatabase;
-use seula::grpc::projects::*;
 use seula::grpc::collections::*;
-use seula::grpc::tags::*;
-use seula::grpc::search::*;
 use seula::grpc::media::*;
-use seula::grpc::system::*;
 use seula::grpc::plugins::*;
+use seula::grpc::projects::*;
 use seula::grpc::samples::*;
 use seula::grpc::scanning::*;
+use seula::grpc::search::*;
+use seula::grpc::system::*;
+use seula::grpc::tags::*;
 
 // Import all service traits
 use seula::grpc::collections::collection_service_server::CollectionService;
-use seula::grpc::tags::tag_service_server::TagService;
-use seula::grpc::scanning::scanning_service_server::ScanningService;
 use seula::grpc::plugins::plugin_service_server::PluginService;
 use seula::grpc::samples::sample_service_server::SampleService;
+use seula::grpc::scanning::scanning_service_server::ScanningService;
+use seula::grpc::tags::tag_service_server::TagService;
 // use crate::common;
 use std::sync::Arc;
 use tokio::sync::Mutex;

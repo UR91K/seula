@@ -2,10 +2,10 @@ use crate::error::DatabaseError;
 use crate::project::Project;
 use crate::{AbletonVersion, KeySignature, Sample, TimeSignature};
 use chrono::{Local, TimeZone};
-use tracing::debug;
 use rusqlite::{types::ToSql, OptionalExtension};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::ProjectDatabase;
@@ -129,7 +129,8 @@ impl SearchQuery {
                         let mut cleaned_value = Self::strip_quotes(value);
                         if cleaned_value.len() == value.trim().len() {
                             // Unterminated: only the opening quote to drop.
-                            cleaned_value = cleaned_value.trim_start_matches(['"', '\'']).to_string();
+                            cleaned_value =
+                                cleaned_value.trim_start_matches(['"', '\'']).to_string();
                         }
                         match operator {
                             "path" => query.path = Some(cleaned_value),

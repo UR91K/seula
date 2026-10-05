@@ -1,8 +1,8 @@
-use tracing::{debug, trace};
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use tracing::{debug, trace};
 
 use crate::error::LiveSetError;
 use crate::project::Project;

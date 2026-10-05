@@ -1,8 +1,8 @@
 //! Tests for configuration and startup scenarios
 
+use seula::config::Config;
 use std::fs;
 use tempfile::TempDir;
-use seula::config::Config;
 
 /// Helper function to escape Windows paths for TOML
 fn escape_path_for_toml(path: &std::path::Path) -> String {
@@ -14,7 +14,7 @@ fn escape_path_for_toml(path: &std::path::Path) -> String {
 #[test]
 fn test_all_config_startup_scenarios() {
     println!("=== Running all config startup scenarios in sequence ===");
-    
+
     // Run each test scenario in order
     test_config_loads_with_empty_paths_impl();
     test_config_validation_with_empty_paths_impl();
@@ -23,7 +23,7 @@ fn test_all_config_startup_scenarios() {
     test_config_path_manipulation_impl();
     test_scanning_with_empty_paths_impl();
     test_config_reload_impl();
-    
+
     println!("=== All config startup scenarios completed successfully ===");
 }
 
@@ -39,23 +39,35 @@ fn test_config_loads_with_empty_paths_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let config_content = format!(r#"
+    let config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     // This should not panic or crash
     let result = Config::new();
-    assert!(result.is_ok(), "Config should load successfully with empty paths");
+    assert!(
+        result.is_ok(),
+        "Config should load successfully with empty paths"
+    );
 
     let config = result.unwrap();
-    assert!(config.needs_setup(), "Config should indicate setup is needed");
-    assert!(!config.is_ready_for_operation(), "Config should not be ready for operation");
+    assert!(
+        config.needs_setup(),
+        "Config should indicate setup is needed"
+    );
+    assert!(
+        !config.is_ready_for_operation(),
+        "Config should not be ready for operation"
+    );
     assert_eq!(config.paths.len(), 0, "Config should have no paths");
 
     // Clean up
@@ -73,12 +85,15 @@ fn test_config_validation_with_empty_paths_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let config_content = format!(r#"
+    let config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
@@ -86,12 +101,22 @@ media_storage_dir = "{}"
     let config = Config::new().unwrap();
     let validation_result = config.validate();
 
-    assert!(validation_result.is_ok(), "Validation should succeed with empty paths");
-    
+    assert!(
+        validation_result.is_ok(),
+        "Validation should succeed with empty paths"
+    );
+
     let warnings = validation_result.unwrap();
-    assert!(!warnings.is_empty(), "Should have warnings about empty paths");
-    assert!(warnings.iter().any(|w| w.contains("No project paths configured")), 
-            "Should warn about no paths configured");
+    assert!(
+        !warnings.is_empty(),
+        "Should have warnings about empty paths"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("No project paths configured")),
+        "Should warn about no paths configured"
+    );
 
     // Clean up
     std::env::remove_var("SEULA_CONFIG");
@@ -110,19 +135,29 @@ fn test_config_with_valid_paths_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let config_content = format!(r#"
+    let config_content = format!(
+        r#"
 paths = ["{}"]
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&test_project_dir),
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let config = Config::new().unwrap();
-    assert!(!config.needs_setup(), "Config should not need setup with valid paths");
-    assert!(config.is_ready_for_operation(), "Config should be ready for operation");
+    assert!(
+        !config.needs_setup(),
+        "Config should not need setup with valid paths"
+    );
+    assert!(
+        config.is_ready_for_operation(),
+        "Config should be ready for operation"
+    );
     assert_eq!(config.paths.len(), 1, "Config should have one path");
 
     // Clean up
@@ -141,20 +176,29 @@ fn test_config_status_messages_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let empty_config_content = format!(r#"
+    let empty_config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     let config = Config::new().unwrap();
     let status = config.get_status_message();
-    assert!(status.contains("Configuration incomplete"), "Should indicate incomplete configuration");
-    assert!(status.contains("No project paths specified"), "Should mention no paths");
+    assert!(
+        status.contains("Configuration incomplete"),
+        "Should indicate incomplete configuration"
+    );
+    assert!(
+        status.contains("No project paths specified"),
+        "Should mention no paths"
+    );
 
     // Test with paths
     let test_project_dir = temp_dir.path().join("projects");
@@ -163,20 +207,31 @@ media_storage_dir = "{}"
     let another_path = temp_dir.path().join("another_path");
     fs::create_dir_all(&another_path).unwrap();
 
-    let config_with_paths = format!(r#"
+    let config_with_paths = format!(
+        r#"
 paths = ["{}", "{}"]
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&another_path), escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&test_project_dir),
+        escape_path_for_toml(&another_path),
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, config_with_paths).unwrap();
-    
+
     // Use reload instead of new() to avoid lazy static caching issues
     let (config, _warnings) = Config::reload().unwrap();
     let status = config.get_status_message();
-    assert!(status.contains("Configuration ready"), "Should indicate ready configuration");
-    assert!(status.contains("2 project path(s)"), "Should mention number of paths");
+    assert!(
+        status.contains("Configuration ready"),
+        "Should indicate ready configuration"
+    );
+    assert!(
+        status.contains("2 project path(s)"),
+        "Should mention number of paths"
+    );
 
     // Clean up
     std::env::remove_var("SEULA_CONFIG");
@@ -198,12 +253,15 @@ fn test_config_path_manipulation_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let empty_config_content = format!(r#"
+    let empty_config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
@@ -214,7 +272,10 @@ media_storage_dir = "{}"
     // Add a path
     let result = config.add_path(test_project_dir1.to_string_lossy().to_string());
     assert!(result.is_ok(), "Should be able to add path");
-    assert!(!config.needs_setup(), "Should not need setup after adding path");
+    assert!(
+        !config.needs_setup(),
+        "Should not need setup after adding path"
+    );
 
     // Add another path
     let result = config.add_path(test_project_dir2.to_string_lossy().to_string());
@@ -225,7 +286,10 @@ media_storage_dir = "{}"
     let result = config.add_path(test_project_dir1.to_string_lossy().to_string());
     assert!(result.is_ok(), "Should handle duplicate path gracefully");
     let warnings = result.unwrap();
-    assert!(warnings.iter().any(|w| w.contains("already exists")), "Should warn about duplicate");
+    assert!(
+        warnings.iter().any(|w| w.contains("already exists")),
+        "Should warn about duplicate"
+    );
 
     // Remove a path
     let result = config.remove_path(&test_project_dir1.to_string_lossy());
@@ -235,7 +299,10 @@ media_storage_dir = "{}"
     // Remove last path
     let result = config.remove_path(&test_project_dir2.to_string_lossy());
     assert!(result.is_ok(), "Should be able to remove last path");
-    assert!(config.needs_setup(), "Should need setup after removing all paths");
+    assert!(
+        config.needs_setup(),
+        "Should need setup after removing all paths"
+    );
 
     // Clean up
     std::env::remove_var("SEULA_CONFIG");
@@ -254,19 +321,25 @@ fn test_scanning_with_empty_paths_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let empty_config_content = format!(r#"
+    let empty_config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
 
     // This should not panic or crash, but return Ok(()) indicating setup is needed
     let result = process_projects();
-    assert!(result.is_ok(), "process_projects should handle empty paths gracefully");
+    assert!(
+        result.is_ok(),
+        "process_projects should handle empty paths gracefully"
+    );
 
     // Clean up
     std::env::remove_var("SEULA_CONFIG");
@@ -284,12 +357,15 @@ fn test_config_reload_impl() {
     fs::create_dir_all(&live_db_dir).unwrap();
     fs::create_dir_all(&media_dir).unwrap();
 
-    let empty_config_content = format!(r#"
+    let empty_config_content = format!(
+        r#"
 paths = []
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, empty_config_content).unwrap();
     std::env::set_var("SEULA_CONFIG", config_path.to_str().unwrap());
@@ -297,24 +373,34 @@ media_storage_dir = "{}"
     // Test reload
     let (config, warnings) = Config::reload().unwrap();
     assert!(config.needs_setup(), "Reloaded config should need setup");
-    assert!(!warnings.is_empty(), "Should have warnings about empty paths");
+    assert!(
+        !warnings.is_empty(),
+        "Should have warnings about empty paths"
+    );
 
     // Update config file
     let test_project_dir = temp_dir.path().join("projects");
     fs::create_dir_all(&test_project_dir).unwrap();
 
-    let updated_config_content = format!(r#"
+    let updated_config_content = format!(
+        r#"
 paths = ["{}"]
 grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
-"#, escape_path_for_toml(&test_project_dir), escape_path_for_toml(&media_dir));
+"#,
+        escape_path_for_toml(&test_project_dir),
+        escape_path_for_toml(&media_dir)
+    );
 
     fs::write(&config_path, updated_config_content).unwrap();
 
     // Reload again
     let (config, _) = Config::reload().unwrap();
-    assert!(!config.needs_setup(), "Reloaded config should not need setup");
+    assert!(
+        !config.needs_setup(),
+        "Reloaded config should not need setup"
+    );
     assert_eq!(config.paths.len(), 1, "Should have one path after reload");
 
     // Clean up

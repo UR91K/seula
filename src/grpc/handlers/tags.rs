@@ -1,9 +1,9 @@
-use tracing::debug;
 use tonic::{Request, Response, Status};
+use tracing::debug;
 
-use crate::services::TagsService;
-use super::super::tags::*;
 use super::super::common::*;
+use super::super::tags::*;
+use crate::services::TagsService;
 
 #[derive(Clone)]
 pub struct TagsHandler {
@@ -17,7 +17,11 @@ impl TagsHandler {
 
     fn to_proto(row: (String, String, i64)) -> Tag {
         let (id, name, created_at) = row;
-        Tag { id, name, created_at }
+        Tag {
+            id,
+            name,
+            created_at,
+        }
     }
 
     pub async fn get_tags(
@@ -129,9 +133,11 @@ impl TagsHandler {
             .batch_tag_projects(&req.project_ids, &req.tag_ids)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -160,9 +166,11 @@ impl TagsHandler {
             .batch_untag_projects(&req.project_ids, &req.tag_ids)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -326,6 +334,9 @@ impl TagsHandler {
             })
             .collect();
 
-        Ok(Response::new(GetAllTagsWithUsageResponse { tags, total_count }))
+        Ok(Response::new(GetAllTagsWithUsageResponse {
+            tags,
+            total_count,
+        }))
     }
 }

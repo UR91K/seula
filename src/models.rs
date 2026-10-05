@@ -23,12 +23,11 @@
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 use std::str::{self, FromStr};
 use uuid::Uuid;
-
 
 use crate::error::{SampleError, TimeSignatureError};
 
@@ -445,15 +444,15 @@ impl fmt::Display for Scale {
 /// the rest follow Ableton's scale list and are unverified, which is why an unknown
 /// name falls through to `Scale::Other` instead of being lost.
 const ABLETON_SCALE_NAMES: &[(Scale, &str)] = &[
-    (Scale::Major, "Major"),                      // verified
-    (Scale::Minor, "Minor"),                      // verified
+    (Scale::Major, "Major"), // verified
+    (Scale::Minor, "Minor"), // verified
     (Scale::Dorian, "Dorian"),
-    (Scale::Mixolydian, "Mixolydian"),            // verified
+    (Scale::Mixolydian, "Mixolydian"), // verified
     (Scale::Lydian, "Lydian"),
     (Scale::Phrygian, "Phrygian"),
-    (Scale::Locrian, "Locrian"),                  // verified
+    (Scale::Locrian, "Locrian"), // verified
     (Scale::Aeolian, "Aeolian"),
-    (Scale::WholeTone, "Whole Tone"),             // verified
+    (Scale::WholeTone, "Whole Tone"), // verified
     (Scale::HalfWholeDim, "Half-whole Dim."),
     (Scale::WholeHalfDim, "Whole-half Dim."),
     (Scale::MinorBlues, "Minor Blues"),
@@ -461,7 +460,7 @@ const ABLETON_SCALE_NAMES: &[(Scale, &str)] = &[
     (Scale::MajorPentatonic, "Major Pentatonic"), // verified
     (Scale::HarmonicMinor, "Harmonic Minor"),
     (Scale::HarmonicMajor, "Harmonic Major"),
-    (Scale::Dorian4, "Dorian #4"),                // verified
+    (Scale::Dorian4, "Dorian #4"), // verified
     (Scale::PhrygianDominant, "Phrygian Dominant"),
     (Scale::MelodicMinor, "Melodic Minor"),
     (Scale::LydianAugmented, "Lydian Augmented"),
@@ -470,15 +469,15 @@ const ABLETON_SCALE_NAMES: &[(Scale, &str)] = &[
     (Scale::BToneSpanish, "8-Tone Spanish"),
     (Scale::Bhairav, "Bhairav"),
     (Scale::HungarianMinor, "Hungarian Minor"),
-    (Scale::Hirajoshi, "Hirajoshi"),              // verified
+    (Scale::Hirajoshi, "Hirajoshi"), // verified
     (Scale::InSen, "In-Sen"),
     (Scale::Iwato, "Iwato"),
-    (Scale::Kumoi, "Kumoi"),                      // verified
+    (Scale::Kumoi, "Kumoi"), // verified
     (Scale::PelogSelisir, "Pelog Selisir"),
     (Scale::PelogTembung, "Pelog Tembung"),
     (Scale::Messiaen1, "Messiaen 1"),
     (Scale::Messiaen2, "Messiaen 2"),
-    (Scale::Messiaen3, "Messiaen 3"),             // verified
+    (Scale::Messiaen3, "Messiaen 3"), // verified
     (Scale::Messiaen4, "Messiaen 4"),
     (Scale::Messiaen5, "Messiaen 5"),
     (Scale::Messiaen6, "Messiaen 6"),
@@ -1002,7 +1001,6 @@ impl Plugin {
             installed: None,
         }
     }
-
 }
 
 /// What a project file says about a plugin, before anything is resolved.
@@ -1083,12 +1081,36 @@ pub struct SampleFormat {
 
 /// The formats Ableton Live can load.
 pub const SAMPLE_FORMATS: &[SampleFormat] = &[
-    SampleFormat { id: "wav", name: "WAV", extensions: &["wav", "wave"] },
-    SampleFormat { id: "aiff", name: "AIFF", extensions: &["aif", "aiff", "aifc"] },
-    SampleFormat { id: "flac", name: "FLAC", extensions: &["flac"] },
-    SampleFormat { id: "mp3", name: "MP3", extensions: &["mp3"] },
-    SampleFormat { id: "ogg", name: "Ogg Vorbis", extensions: &["ogg"] },
-    SampleFormat { id: "aac", name: "AAC", extensions: &["m4a", "aac"] },
+    SampleFormat {
+        id: "wav",
+        name: "WAV",
+        extensions: &["wav", "wave"],
+    },
+    SampleFormat {
+        id: "aiff",
+        name: "AIFF",
+        extensions: &["aif", "aiff", "aifc"],
+    },
+    SampleFormat {
+        id: "flac",
+        name: "FLAC",
+        extensions: &["flac"],
+    },
+    SampleFormat {
+        id: "mp3",
+        name: "MP3",
+        extensions: &["mp3"],
+    },
+    SampleFormat {
+        id: "ogg",
+        name: "Ogg Vorbis",
+        extensions: &["ogg"],
+    },
+    SampleFormat {
+        id: "aac",
+        name: "AAC",
+        extensions: &["m4a", "aac"],
+    },
 ];
 
 /// The id of samples in no listed format.
@@ -1106,7 +1128,11 @@ impl SampleFormat {
     /// SQL that is true when `column` (a path) ends in one of this format's extensions.
     /// SQLite's LIKE ignores ASCII case. Binds nothing: the patterns are constants.
     pub fn sql_matches(&self, column: &str) -> String {
-        let any: Vec<String> = self.extensions.iter().map(|e| format!("{} LIKE '%.{}'", column, e)).collect();
+        let any: Vec<String> = self
+            .extensions
+            .iter()
+            .map(|e| format!("{} LIKE '%.{}'", column, e))
+            .collect();
         format!("({})", any.join(" OR "))
     }
 
@@ -1123,7 +1149,10 @@ impl SampleFormat {
     /// extensions, or `other`. `None` for a value that is none of those.
     pub fn sql_filter(value: &str, column: &str) -> Option<String> {
         if value.eq_ignore_ascii_case(OTHER_SAMPLE_FORMAT) {
-            let known: Vec<String> = SAMPLE_FORMATS.iter().map(|f| f.sql_matches(column)).collect();
+            let known: Vec<String> = SAMPLE_FORMATS
+                .iter()
+                .map(|f| f.sql_matches(column))
+                .collect();
             return Some(format!("NOT ({})", known.join(" OR ")));
         }
         Self::find(value).map(|f| f.sql_matches(column))
@@ -1467,13 +1496,22 @@ mod plugin_key_tests {
     #[test]
     fn malformed_uids_are_rejected_rather_than_truncated() {
         assert_eq!(PluginKey::from_uid_hex(""), None);
-        assert_eq!(PluginKey::from_uid_hex("72c4db71"), Some(PluginKey::Vst2(0x72c4db71)));
+        assert_eq!(
+            PluginKey::from_uid_hex("72c4db71"),
+            Some(PluginKey::Vst2(0x72c4db71))
+        );
         // Right length, not hex.
         assert_eq!(PluginKey::from_uid_hex("zzzzzzzz"), None);
         assert_eq!(PluginKey::from_uid_hex(&"z".repeat(32)), None);
         // Wrong length: a truncated or over-long uid must not silently match.
-        assert_eq!(PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39"), None);
-        assert_eq!(PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39dff"), None);
+        assert_eq!(
+            PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39"),
+            None
+        );
+        assert_eq!(
+            PluginKey::from_uid_hex("72c4db717a4d459ab97e51745d84b39dff"),
+            None
+        );
     }
 
     #[test]
@@ -1561,19 +1599,31 @@ mod key_name_tests {
 
     #[test]
     fn keys_have_sharp_and_flat_names_with_real_symbols() {
-        let key = KeySignature { tonic: Tonic::FSharp, scale: Scale::HarmonicMinor };
+        let key = KeySignature {
+            tonic: Tonic::FSharp,
+            scale: Scale::HarmonicMinor,
+        };
         assert_eq!(key.sharp_name(), "F\u{266F} Harmonic Minor");
         assert_eq!(key.flat_name(), "G\u{266D} Harmonic Minor");
 
         // A scale name keeps its own sharp in flat mode, as in Ableton.
-        let key = KeySignature { tonic: Tonic::ASharp, scale: Scale::Dorian4 };
+        let key = KeySignature {
+            tonic: Tonic::ASharp,
+            scale: Scale::Dorian4,
+        };
         assert_eq!(key.sharp_name(), "A\u{266F} Dorian \u{266F}4");
         assert_eq!(key.flat_name(), "B\u{266D} Dorian \u{266F}4");
 
-        let natural = KeySignature { tonic: Tonic::C, scale: Scale::Major };
+        let natural = KeySignature {
+            tonic: Tonic::C,
+            scale: Scale::Major,
+        };
         assert_eq!(natural.sharp_name(), natural.flat_name());
 
-        let tonic_only = KeySignature { tonic: Tonic::D, scale: Scale::Empty };
+        let tonic_only = KeySignature {
+            tonic: Tonic::D,
+            scale: Scale::Empty,
+        };
         assert_eq!(tonic_only.sharp_name(), "D");
     }
 }

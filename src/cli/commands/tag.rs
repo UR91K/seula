@@ -1,5 +1,5 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, TagCommands};
 use crate::services::TagsService;
 use crate::{colored_cell, simple_table_row};
@@ -29,15 +29,21 @@ impl CliCommand for TagCommands {
                 formatter.print(&tags_list)?;
             }
             TagCommands::Create { name, color } => {
-                let create_result = self.create_tag(&ctx.services.tags, name, color.as_deref()).await?;
+                let create_result = self
+                    .create_tag(&ctx.services.tags, name, color.as_deref())
+                    .await?;
                 formatter.print(&create_result)?;
             }
             TagCommands::Assign { project_id, tag_id } => {
-                let assign_result = self.assign_tag(&ctx.services.tags, project_id, tag_id).await?;
+                let assign_result = self
+                    .assign_tag(&ctx.services.tags, project_id, tag_id)
+                    .await?;
                 formatter.print(&assign_result)?;
             }
             TagCommands::Remove { project_id, tag_id } => {
-                let remove_result = self.remove_tag(&ctx.services.tags, project_id, tag_id).await?;
+                let remove_result = self
+                    .remove_tag(&ctx.services.tags, project_id, tag_id)
+                    .await?;
                 formatter.print(&remove_result)?;
             }
             TagCommands::Search { tag } => {
@@ -52,7 +58,9 @@ impl CliCommand for TagCommands {
 
 impl TagCommands {
     async fn get_tags_list(&self, tags: &TagsService) -> Result<TagsList, CliError> {
-        let (tags, total_count) = tags.get_all_tags_with_usage(None, None, None, None, None).await?;
+        let (tags, total_count) = tags
+            .get_all_tags_with_usage(None, None, None, None, None)
+            .await?;
 
         let displayed = tags
             .into_iter()
@@ -119,7 +127,11 @@ impl TagCommands {
         })
     }
 
-    async fn search_by_tag(&self, tags: &TagsService, tag: &str) -> Result<TagSearchResults, CliError> {
+    async fn search_by_tag(
+        &self,
+        tags: &TagsService,
+        tag: &str,
+    ) -> Result<TagSearchResults, CliError> {
         // First try to find the tag by name or ID
         let tag_id = if tag.len() == 8 || tag.len() == 36 {
             // Looks like a UUID (shortened or full)
@@ -161,7 +173,10 @@ impl TagCommands {
                 name: project.name,
                 path: project.file_path.to_string_lossy().to_string(),
                 tempo: project.tempo,
-                key: project.key_signature.map(|k| k.to_string()).unwrap_or_else(|| "Unknown".to_string()),
+                key: project
+                    .key_signature
+                    .map(|k| k.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string()),
             })
             .collect::<Vec<_>>();
 
@@ -192,7 +207,12 @@ pub struct TagsList {
 
 impl TableDisplay for TagsList {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["ID".to_string(), "Name".to_string(), "Projects".to_string(), "Usage %".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Projects".to_string(),
+            "Usage %".to_string(),
+        ]);
 
         for row in &self.displayed {
             let usage_cell = if row.project_count > 0 {
@@ -221,7 +241,9 @@ impl TableDisplay for TagsList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "name", "project_count", "usage_percentage"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", "name", "project_count", "usage_percentage"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -261,10 +283,25 @@ impl TableDisplay for TagCreateResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["result", if self.success { "Tag Created" } else { "Failed" }]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["name", &self.name]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "result",
+                if self.success {
+                    "Tag Created"
+                } else {
+                    "Failed"
+                },
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["name", &self.name])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -287,7 +324,7 @@ impl TableDisplay for TagAssignResult {
         } else {
             format!("{} Failed", self.action)
         };
-        
+
         let result_cell = if self.success {
             colored_cell!(result_text, green)
         } else {
@@ -304,12 +341,24 @@ impl TableDisplay for TagAssignResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_id", &self.project_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["tag_id", &self.tag_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["tag_name", &self.tag_name]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["action", &self.action]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["success", &self.success.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_id", &self.project_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["tag_id", &self.tag_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["tag_name", &self.tag_name])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["action", &self.action])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["success", &self.success.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -341,7 +390,7 @@ impl TableDisplay for TagSearchResults {
                 "Key".to_string(),
                 "Path".to_string(),
             ]);
-            
+
             // Add tag info header
             table.add_row(vec![
                 format!("Tag: {}", tag_name),
@@ -350,7 +399,13 @@ impl TableDisplay for TagSearchResults {
                 "".to_string(),
                 "".to_string(),
             ]);
-            table.add_row(vec!["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()]); // Separator
+            table.add_row(vec![
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
+            ]); // Separator
 
             for project in &self.projects {
                 table.add_row(vec![
@@ -361,35 +416,56 @@ impl TableDisplay for TagSearchResults {
                     project.path.clone(),
                 ]);
             }
-            
+
             table
         } else {
-            let mut table = SimpleTable::new(vec!["Search Result".to_string(), "Details".to_string()]);
+            let mut table =
+                SimpleTable::new(vec!["Search Result".to_string(), "Details".to_string()]);
             simple_table_row!(table, "Query", self.query);
-            simple_table_row!(table, colored_cell!("Result", red), "No tag found matching query");
+            simple_table_row!(
+                table,
+                colored_cell!("Result", red),
+                "No tag found matching query"
+            );
             table
         }
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         if let Some(ref tag_name) = self.tag_name {
-            writer.write_record(["query", "tag_name", "project_id", "project_name", "tempo", "key", "path"]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([
+                    "query",
+                    "tag_name",
+                    "project_id",
+                    "project_name",
+                    "tempo",
+                    "key",
+                    "path",
+                ])
+                .map_err(|e| -> CliError { e.into() })?;
             for project in &self.projects {
-                writer.write_record([
-                    &self.query,
-                    tag_name,
-                    &project.id,
-                    &project.name,
-                    &project.tempo.to_string(),
-                    &project.key,
-                    &project.path,
-                ]).map_err(|e| -> CliError { e.into() })?;
+                writer
+                    .write_record([
+                        &self.query,
+                        tag_name,
+                        &project.id,
+                        &project.name,
+                        &project.tempo.to_string(),
+                        &project.key,
+                        &project.path,
+                    ])
+                    .map_err(|e| -> CliError { e.into() })?;
             }
         } else {
-            writer.write_record(["query", "result"]).map_err(|e| -> CliError { e.into() })?;
-            writer.write_record([&self.query, "No tag found"]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record(["query", "result"])
+                .map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([&self.query, "No tag found"])
+                .map_err(|e| -> CliError { e.into() })?;
         }
-        
+
         Ok(())
     }
 }

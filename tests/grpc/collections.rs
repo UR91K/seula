@@ -21,8 +21,8 @@ use crate::common::setup;
 use super::*;
 // use crate::common::setup;
 use seula::grpc::collections::collection_service_server::CollectionService;
-use seula::grpc::SeulaServer;
 use seula::grpc::projects::project_service_server::ProjectService;
+use seula::grpc::SeulaServer;
 
 #[tokio::test]
 async fn test_get_collections_empty() {
@@ -618,21 +618,30 @@ async fn test_reorder_collection() {
         project_id: project1_id.clone(),
         position: None,
     });
-    server.add_project_to_collection(add_request1).await.unwrap();
+    server
+        .add_project_to_collection(add_request1)
+        .await
+        .unwrap();
 
     let add_request2 = Request::new(AddProjectToCollectionRequest {
         collection_id: collection_id.clone(),
         project_id: project2_id.clone(),
         position: None,
     });
-    server.add_project_to_collection(add_request2).await.unwrap();
+    server
+        .add_project_to_collection(add_request2)
+        .await
+        .unwrap();
 
     let add_request3 = Request::new(AddProjectToCollectionRequest {
         collection_id: collection_id.clone(),
         project_id: project3_id.clone(),
         position: None,
     });
-    server.add_project_to_collection(add_request3).await.unwrap();
+    server
+        .add_project_to_collection(add_request3)
+        .await
+        .unwrap();
 
     // Get collection to verify initial order
     let get_request = Request::new(GetCollectionRequest {
@@ -640,7 +649,7 @@ async fn test_reorder_collection() {
     });
     let get_response = server.get_collection(get_request).await.unwrap();
     let collection = get_response.into_inner().collection.unwrap();
-    
+
     let initial_order = collection.project_ids.clone();
     assert_eq!(initial_order.len(), 3);
     assert_eq!(initial_order[0], project1_id);
@@ -667,7 +676,7 @@ async fn test_reorder_collection() {
     });
     let get_response = server.get_collection(get_request).await.unwrap();
     let collection = get_response.into_inner().collection.unwrap();
-    
+
     let new_order = collection.project_ids;
     assert_eq!(new_order.len(), 3);
     assert_eq!(new_order[0], project3_id);
@@ -714,7 +723,7 @@ async fn test_reorder_collection_invalid_project_ids() {
 
     let reorder_response = server.reorder_collection(reorder_request).await;
     assert!(reorder_response.is_err());
-    
+
     let status = reorder_response.unwrap_err();
     assert_eq!(status.code(), tonic::Code::InvalidArgument);
     assert!(status.message().contains("Project IDs must match exactly"));
@@ -733,7 +742,7 @@ async fn test_reorder_collection_nonexistent_collection() {
 
     let reorder_response = server.reorder_collection(reorder_request).await;
     assert!(reorder_response.is_err());
-    
+
     let status = reorder_response.unwrap_err();
     assert_eq!(status.code(), tonic::Code::NotFound);
     assert!(status.message().contains("Collection not found"));
@@ -764,7 +773,7 @@ async fn test_get_collections_pagination() {
 
     let response = server.get_collections(request).await.unwrap();
     let collections_response = response.into_inner();
-    
+
     assert_eq!(collections_response.collections.len(), 3);
     assert_eq!(collections_response.total_count, 5);
 
@@ -778,7 +787,7 @@ async fn test_get_collections_pagination() {
 
     let response = server.get_collections(request).await.unwrap();
     let collections_response = response.into_inner();
-    
+
     assert_eq!(collections_response.collections.len(), 2);
     assert_eq!(collections_response.total_count, 5);
 
@@ -792,13 +801,26 @@ async fn test_get_collections_pagination() {
 
     let response = server.get_collections(request).await.unwrap();
     let collections_response = response.into_inner();
-    
+
     assert_eq!(collections_response.collections.len(), 5);
     assert_eq!(collections_response.total_count, 5);
-    
+
     // Verify descending order by name
-    let names: Vec<&str> = collections_response.collections.iter().map(|c| c.name.as_str()).collect();
-    assert_eq!(names, vec!["Collection 4", "Collection 3", "Collection 2", "Collection 1", "Collection 0"]);
+    let names: Vec<&str> = collections_response
+        .collections
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        vec![
+            "Collection 4",
+            "Collection 3",
+            "Collection 2",
+            "Collection 1",
+            "Collection 0"
+        ]
+    );
 }
 
 #[tokio::test]
@@ -844,7 +866,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 1);
     assert_eq!(search_response.total_count, 1);
     assert_eq!(search_response.collections[0].name, "Electronic Music");
@@ -858,7 +880,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 1);
     assert_eq!(search_response.total_count, 1);
     assert_eq!(search_response.collections[0].name, "Jazz Standards");
@@ -872,7 +894,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 1);
     assert_eq!(search_response.total_count, 1);
     assert_eq!(search_response.collections[0].name, "Film Scoring");
@@ -886,7 +908,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 2);
     assert_eq!(search_response.total_count, 4); // "Electronic Music", "Rock Band Projects", "Jazz Standards", "Film Scoring"
 
@@ -899,7 +921,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 1);
     assert_eq!(search_response.total_count, 4);
 
@@ -912,7 +934,7 @@ async fn test_search_collections() {
 
     let response = server.search_collections(search_request).await.unwrap();
     let search_response = response.into_inner();
-    
+
     assert_eq!(search_response.collections.len(), 0);
     assert_eq!(search_response.total_count, 0);
 }
@@ -954,7 +976,10 @@ async fn test_get_collection_statistics() {
         collection_id: collection_id.clone(),
     });
 
-    let response = server.get_collection_statistics(stats_request).await.unwrap();
+    let response = server
+        .get_collection_statistics(stats_request)
+        .await
+        .unwrap();
     let stats = response.into_inner();
 
     // Verify basic statistics
@@ -970,14 +995,24 @@ async fn test_get_collection_statistics() {
         notes: None,
     });
 
-    let empty_collection_response = server.create_collection(empty_collection_request).await.unwrap();
-    let empty_collection_id = empty_collection_response.into_inner().collection.unwrap().id;
+    let empty_collection_response = server
+        .create_collection(empty_collection_request)
+        .await
+        .unwrap();
+    let empty_collection_id = empty_collection_response
+        .into_inner()
+        .collection
+        .unwrap()
+        .id;
 
     let empty_stats_request = Request::new(GetCollectionStatisticsRequest {
         collection_id: empty_collection_id,
     });
 
-    let empty_response = server.get_collection_statistics(empty_stats_request).await.unwrap();
+    let empty_response = server
+        .get_collection_statistics(empty_stats_request)
+        .await
+        .unwrap();
     let empty_stats = empty_response.into_inner();
 
     // Verify empty collection statistics
@@ -1042,7 +1077,11 @@ async fn test_duplicate_collection() {
     server
         .reorder_collection(Request::new(ReorderCollectionRequest {
             collection_id: original_collection.id.clone(),
-            project_ids: vec![project3.id.clone(), project1.id.clone(), project2.id.clone()],
+            project_ids: vec![
+                project3.id.clone(),
+                project1.id.clone(),
+                project2.id.clone(),
+            ],
         }))
         .await
         .unwrap();
@@ -1055,13 +1094,22 @@ async fn test_duplicate_collection() {
         new_notes: None, // Use original notes
     });
 
-    let duplicate_response = server.duplicate_collection(duplicate_request).await.unwrap();
+    let duplicate_response = server
+        .duplicate_collection(duplicate_request)
+        .await
+        .unwrap();
     let duplicated_collection = duplicate_response.into_inner().collection.unwrap();
 
     // Verify the duplicated collection
     assert_eq!(duplicated_collection.name, "Duplicated Collection");
-    assert_eq!(duplicated_collection.description, Some("New description".to_string()));
-    assert_eq!(duplicated_collection.notes, Some("Original notes".to_string())); // Should inherit original notes
+    assert_eq!(
+        duplicated_collection.description,
+        Some("New description".to_string())
+    );
+    assert_eq!(
+        duplicated_collection.notes,
+        Some("Original notes".to_string())
+    ); // Should inherit original notes
     assert_ne!(duplicated_collection.id, original_collection.id);
     assert_eq!(duplicated_collection.project_ids.len(), 3);
     assert_eq!(duplicated_collection.project_count, 3);
@@ -1078,7 +1126,10 @@ async fn test_duplicate_collection() {
         .unwrap();
 
     // Verify both collections have the same projects in the same order
-    assert_eq!(refreshed_original.project_ids, duplicated_collection.project_ids);
+    assert_eq!(
+        refreshed_original.project_ids,
+        duplicated_collection.project_ids
+    );
 
     // Get both collections to verify project order
     let original_response = server
@@ -1137,13 +1188,22 @@ async fn test_duplicate_collection_with_all_new_metadata() {
         new_notes: Some("Completely new notes".to_string()),
     });
 
-    let duplicate_response = server.duplicate_collection(duplicate_request).await.unwrap();
+    let duplicate_response = server
+        .duplicate_collection(duplicate_request)
+        .await
+        .unwrap();
     let duplicated_collection = duplicate_response.into_inner().collection.unwrap();
 
     // Verify all metadata is new
     assert_eq!(duplicated_collection.name, "Fully New Collection");
-    assert_eq!(duplicated_collection.description, Some("Completely new description".to_string()));
-    assert_eq!(duplicated_collection.notes, Some("Completely new notes".to_string()));
+    assert_eq!(
+        duplicated_collection.description,
+        Some("Completely new description".to_string())
+    );
+    assert_eq!(
+        duplicated_collection.notes,
+        Some("Completely new notes".to_string())
+    );
     assert_ne!(duplicated_collection.id, original_collection.id);
     assert_eq!(duplicated_collection.project_ids.len(), 1);
     assert_eq!(duplicated_collection.project_ids[0], project.id);
@@ -1169,7 +1229,7 @@ async fn create_test_project(server: &SeulaServer, _: &str) -> seula::grpc::comm
     // Create a test project directly in the database
     let db = server.db();
     let project_id = create_test_project_in_db(db).await;
-    
+
     // Get the project
     let projects_response = server
         .get_projects(Request::new(GetProjectsRequest {
@@ -1197,5 +1257,8 @@ async fn create_test_project(server: &SeulaServer, _: &str) -> seula::grpc::comm
         .unwrap();
 
     let projects = projects_response.into_inner().projects;
-    projects.into_iter().find(|p| p.id == project_id).expect("Test project not found")
+    projects
+        .into_iter()
+        .find(|p| p.id == project_id)
+        .expect("Test project not found")
 }

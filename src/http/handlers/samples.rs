@@ -11,18 +11,18 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::database::samples::SampleFilter;
 
-use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
-use crate::http::dto::samples::{
-    sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery, SampleDto,
-    SampleCheckEventDto, SampleDetailDto, SampleFileDto, SampleFormatDto, SampleFormatListResponse, SampleListResponse,
-    SampleStatsQuery, ScopeQuery, SearchSamplesQuery,
-};
 use crate::database::ProjectScope;
 use crate::http::dto::parse_project_scope;
-use crate::models::{OTHER_SAMPLE_FORMAT, SAMPLE_FORMATS};
-use crate::models::Sample;
+use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
+use crate::http::dto::samples::{
+    sample_sort_key, ByPresenceQuery, GetAllSamplesQuery, ProjectsBySampleQuery,
+    SampleCheckEventDto, SampleDetailDto, SampleDto, SampleFileDto, SampleFormatDto,
+    SampleFormatListResponse, SampleListResponse, SampleStatsQuery, ScopeQuery, SearchSamplesQuery,
+};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
+use crate::models::Sample;
+use crate::models::{OTHER_SAMPLE_FORMAT, SAMPLE_FORMATS};
 use crate::services::system::send_scan_update;
 
 /// Attach each sample's project count (ADR-0034), counting the projects in `scope`
@@ -87,13 +87,17 @@ pub async fn get_sample(
         .ok_or_else(|| ApiError::NotFound(format!("Sample not found with ID: {}", sample_id)))?;
 
     let mut dtos = with_counts(&state, vec![sample], scope).await?;
-    let file = state
-        .services
-        .samples
-        .file(&sample_id)
-        .await?
-        .map(|(size_bytes, modified_at, checked_at)| SampleFileDto { size_bytes, modified_at, checked_at });
-    Ok(Json(SampleDetailDto { sample: dtos.remove(0), file }))
+    let file = state.services.samples.file(&sample_id).await?.map(
+        |(size_bytes, modified_at, checked_at)| SampleFileDto {
+            size_bytes,
+            modified_at,
+            checked_at,
+        },
+    );
+    Ok(Json(SampleDetailDto {
+        sample: dtos.remove(0),
+        file,
+    }))
 }
 
 pub async fn get_samples_by_presence(
@@ -126,7 +130,13 @@ pub async fn search_samples(
     let (samples, total_count) = state
         .services
         .samples
-        .search_samples(&query.query, query.limit, query.offset, query.present_only, query.format_filter)
+        .search_samples(
+            &query.query,
+            query.limit,
+            query.offset,
+            query.present_only,
+            query.format_filter,
+        )
         .await?;
 
     Ok(Json(SampleListResponse {
@@ -145,7 +155,11 @@ pub async fn get_sample_stats(
         format: query.format_filter,
         present: query.present_only.or(query.missing_only.map(|m| !m)),
     };
-    let stats = state.services.samples.get_sample_stats_filtered(&filter).await?;
+    let stats = state
+        .services
+        .samples
+        .get_sample_stats_filtered(&filter)
+        .await?;
     Ok(Json(stats))
 }
 
@@ -180,7 +194,11 @@ pub async fn check_samples(
 pub async fn get_all_sample_usage_numbers(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let usage_info = state.services.samples.get_all_sample_usage_numbers().await?;
+    let usage_info = state
+        .services
+        .samples
+        .get_all_sample_usage_numbers()
+        .await?;
     Ok(Json(usage_info))
 }
 
@@ -192,7 +210,12 @@ pub async fn get_projects_by_sample(
     let (projects, total_count) = state
         .services
         .samples
-        .get_projects_by_sample(&sample_id, query.limit, query.offset, parse_project_scope(query.scope.as_deref())?)
+        .get_projects_by_sample(
+            &sample_id,
+            query.limit,
+            query.offset,
+            parse_project_scope(query.scope.as_deref())?,
+        )
         .await?;
 
     let db_arc = state.services.samples.db_handle();
@@ -202,23 +225,34 @@ pub async fn get_projects_by_sample(
         .map(|p| project_to_dto(p, &mut db))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(Json(ProjectListResponse { projects, total_count }))
+    Ok(Json(ProjectListResponse {
+        projects,
+        total_count,
+    }))
 }
 
 pub async fn refresh_sample_presence_status(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let result = state.services.samples.refresh_sample_presence_status().await?;
+    let result = state
+        .services
+        .samples
+        .refresh_sample_presence_status()
+        .await?;
     Ok(Json(result))
 }
 
-pub async fn get_sample_analytics(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+pub async fn get_sample_analytics(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
     let analytics = state.services.samples.get_sample_analytics().await?;
     Ok(Json(analytics))
 }
 
 /// The format dropdown: every format Live loads, with its counts, then `other`.
-pub async fn get_sample_formats(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+pub async fn get_sample_formats(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
     let mut counts = state.services.samples.get_sample_extensions().await?;
     let mut formats: Vec<SampleFormatDto> = SAMPLE_FORMATS
         .iter()
@@ -271,13 +305,19 @@ mod tests {
             db.conn
                 .execute(
                     "INSERT INTO samples (id, name, path, is_present) VALUES (?, 'kick.wav', ?, 1)",
-                    rusqlite::params![format!("sample-{i}"), format!("Z:/nowhere/folder {i}/kick.wav")],
+                    rusqlite::params![
+                        format!("sample-{i}"),
+                        format!("Z:/nowhere/folder {i}/kick.wav")
+                    ],
                 )
                 .unwrap();
         }
         let db = Arc::new(Mutex::new(db));
         let media_dir = tempfile::tempdir().unwrap();
-        let media = Arc::new(MediaStorageManager::new(media_dir.path().to_path_buf(), MediaConfig::default()).unwrap());
+        let media = Arc::new(
+            MediaStorageManager::new(media_dir.path().to_path_buf(), MediaConfig::default())
+                .unwrap(),
+        );
         let status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
         let system = SystemService::new(
             Arc::clone(&db),
@@ -289,10 +329,17 @@ mod tests {
         );
         let state = AppState::new(Services::new(db, media), system);
 
-        let mut body = check_samples(State(state)).await.unwrap().into_response().into_body();
+        let mut body = check_samples(State(state))
+            .await
+            .unwrap()
+            .into_response()
+            .into_body();
 
         let deadline = Instant::now() + Duration::from_secs(30);
-        while !matches!(*status.lock().await, ScanStatus::ScanCompleted | ScanStatus::ScanError) {
+        while !matches!(
+            *status.lock().await,
+            ScanStatus::ScanCompleted | ScanStatus::ScanError
+        ) {
             assert!(Instant::now() < deadline, "the check never finished");
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
@@ -303,8 +350,15 @@ mod tests {
         while let Some(chunk) = body.data().await {
             text.push_str(&String::from_utf8_lossy(&chunk.unwrap()));
         }
-        let last = text.lines().filter_map(|l| l.strip_prefix("data:")).last().unwrap();
+        let last = text
+            .lines()
+            .filter_map(|l| l.strip_prefix("data:"))
+            .last()
+            .unwrap();
         let last: serde_json::Value = serde_json::from_str(last.trim()).unwrap();
-        assert!(!last["result"].is_null(), "the last update received is not the final one: {last}");
+        assert!(
+            !last["result"].is_null(),
+            "the last update received is not the final one: {last}"
+        );
     }
 }

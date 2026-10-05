@@ -1,5 +1,5 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, CollectionCommands};
 use crate::models::CollectionStatistics;
 use crate::services::CollectionsService;
@@ -29,19 +29,37 @@ impl CliCommand for CollectionCommands {
                 formatter.print(&collections_list)?;
             }
             CollectionCommands::Show { id } => {
-                let collection_details = self.get_collection_details(&ctx.services.collections, id).await?;
+                let collection_details = self
+                    .get_collection_details(&ctx.services.collections, id)
+                    .await?;
                 formatter.print(&collection_details)?;
             }
             CollectionCommands::Create { name, description } => {
-                let create_result = self.create_collection(&ctx.services.collections, name, description.as_deref()).await?;
+                let create_result = self
+                    .create_collection(&ctx.services.collections, name, description.as_deref())
+                    .await?;
                 formatter.print(&create_result)?;
             }
-            CollectionCommands::Add { collection_id, project_id } => {
-                let add_result = self.add_project_to_collection(&ctx.services.collections, collection_id, project_id).await?;
+            CollectionCommands::Add {
+                collection_id,
+                project_id,
+            } => {
+                let add_result = self
+                    .add_project_to_collection(&ctx.services.collections, collection_id, project_id)
+                    .await?;
                 formatter.print(&add_result)?;
             }
-            CollectionCommands::Remove { collection_id, project_id } => {
-                let remove_result = self.remove_project_from_collection(&ctx.services.collections, collection_id, project_id).await?;
+            CollectionCommands::Remove {
+                collection_id,
+                project_id,
+            } => {
+                let remove_result = self
+                    .remove_project_from_collection(
+                        &ctx.services.collections,
+                        collection_id,
+                        project_id,
+                    )
+                    .await?;
                 formatter.print(&remove_result)?;
             }
         }
@@ -51,15 +69,28 @@ impl CliCommand for CollectionCommands {
 }
 
 impl CollectionCommands {
-    async fn get_collections_list(&self, collections: &CollectionsService) -> Result<CollectionsList, CliError> {
-        let (list, total_count) = collections.list_collections(None, None, None, None, crate::database::ProjectScope::default()).await?;
+    async fn get_collections_list(
+        &self,
+        collections: &CollectionsService,
+    ) -> Result<CollectionsList, CliError> {
+        let (list, total_count) = collections
+            .list_collections(
+                None,
+                None,
+                None,
+                None,
+                crate::database::ProjectScope::default(),
+            )
+            .await?;
 
         let displayed = list
             .into_iter()
             .map(|c| CollectionRow {
                 id: c.id[..8].to_string(), // Show only first 8 chars of UUID
                 name: c.name,
-                description: c.description.unwrap_or_else(|| "No description".to_string()),
+                description: c
+                    .description
+                    .unwrap_or_else(|| "No description".to_string()),
             })
             .collect();
 
@@ -74,23 +105,31 @@ impl CollectionCommands {
         collections: &CollectionsService,
         collection_id: &str,
     ) -> Result<CollectionDetails, CliError> {
-        let detail = collections.get_collection(collection_id, crate::database::ProjectScope::default()).await?.ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Collection {} not found", collection_id)
-            )) as CliError
-        })?;
+        let detail = collections
+            .get_collection(collection_id, crate::database::ProjectScope::default())
+            .await?
+            .ok_or_else(|| {
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Collection {} not found", collection_id),
+                )) as CliError
+            })?;
 
-        let stats = collections.get_collection_statistics(collection_id, crate::database::ProjectScope::default()).await?;
+        let stats = collections
+            .get_collection_statistics(collection_id, crate::database::ProjectScope::default())
+            .await?;
 
-        let projects = collections.get_collection_projects(collection_id, crate::database::ProjectScope::default()).await?;
+        let projects = collections
+            .get_collection_projects(collection_id, crate::database::ProjectScope::default())
+            .await?;
         let project_rows = projects
             .into_iter()
             .map(|project| ProjectInCollectionRow {
                 id: project.id.to_string()[..8].to_string(),
                 name: project.name,
                 tempo: project.tempo,
-                duration: project.estimated_duration
+                duration: project
+                    .estimated_duration
                     .map(|d| format!("{:.1}s", d.num_seconds() as f64))
                     .unwrap_or_else(|| "Unknown".to_string()),
             })
@@ -99,7 +138,9 @@ impl CollectionCommands {
         Ok(CollectionDetails {
             id: detail.id[..8].to_string(),
             name: detail.name,
-            description: detail.description.unwrap_or_else(|| "No description".to_string()),
+            description: detail
+                .description
+                .unwrap_or_else(|| "No description".to_string()),
             notes: detail.notes.unwrap_or_else(|| "No notes".to_string()),
             created_at: detail.created_at,
             modified_at: detail.modified_at,
@@ -114,12 +155,16 @@ impl CollectionCommands {
         name: &str,
         description: Option<&str>,
     ) -> Result<CollectionCreateResult, CliError> {
-        let detail = collections.create_collection(name, description, None).await?;
+        let detail = collections
+            .create_collection(name, description, None)
+            .await?;
 
         Ok(CollectionCreateResult {
             id: detail.id[..8].to_string(),
             name: name.to_string(),
-            description: description.map(|s| s.to_string()).unwrap_or_else(|| "No description".to_string()),
+            description: description
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "No description".to_string()),
         })
     }
 
@@ -129,7 +174,9 @@ impl CollectionCommands {
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
-        collections.add_project_to_collection(collection_id, project_id).await?;
+        collections
+            .add_project_to_collection(collection_id, project_id)
+            .await?;
 
         Ok(CollectionProjectResult {
             collection_id: collection_id[..8].to_string(),
@@ -145,7 +192,9 @@ impl CollectionCommands {
         collection_id: &str,
         project_id: &str,
     ) -> Result<CollectionProjectResult, CliError> {
-        collections.remove_project_from_collection(collection_id, project_id).await?;
+        collections
+            .remove_project_from_collection(collection_id, project_id)
+            .await?;
 
         Ok(CollectionProjectResult {
             collection_id: collection_id[..8].to_string(),
@@ -171,18 +220,19 @@ pub struct CollectionsList {
 
 impl TableDisplay for CollectionsList {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["ID".to_string(), "Name".to_string(), "Description".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Name".to_string(),
+            "Description".to_string(),
+        ]);
 
         for row in &self.displayed {
-            simple_table_row!(table, 
-                &row.id,
-                &row.name,
-                &row.description,
-            );
+            simple_table_row!(table, &row.id, &row.name, &row.description,);
         }
 
         // Add summary row
-        simple_table_row!(table,
+        simple_table_row!(
+            table,
             "".to_string(),
             format!("Total: {} collections", self.total_count),
             "".to_string()
@@ -192,14 +242,12 @@ impl TableDisplay for CollectionsList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "name", "description"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", "name", "description"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
-                .write_record([
-                    row.id.as_str(),
-                    row.name.as_str(),
-                    row.description.as_str(),
-                ])
+                .write_record([row.id.as_str(), row.name.as_str(), row.description.as_str()])
                 .map_err(|e| -> CliError { e.into() })?;
         }
         Ok(())
@@ -235,7 +283,7 @@ impl TableDisplay for CollectionDetails {
         simple_table_row!(table, "Name", self.name);
         simple_table_row!(table, "Description", self.description);
         simple_table_row!(table, "Notes", self.notes);
-        
+
         // Statistics
         simple_table_row!(table, "Project Count", self.stats.project_count);
         if let Some(duration) = self.stats.total_duration_seconds {
@@ -247,7 +295,7 @@ impl TableDisplay for CollectionDetails {
         simple_table_row!(table, "Total Plugins", self.stats.total_plugins);
         simple_table_row!(table, "Total Samples", self.stats.total_samples);
         simple_table_row!(table, "Total Tags", self.stats.total_tags);
-        
+
         if let Some(key) = &self.stats.most_common_key {
             simple_table_row!(table, "Most Common Key", key);
         }
@@ -259,10 +307,15 @@ impl TableDisplay for CollectionDetails {
         table.add_row(vec!["".to_string(), "".to_string()]);
         table.add_row(vec!["Projects in Collection".to_string(), "".to_string()]);
         table.add_row(vec!["".to_string(), "".to_string()]);
-        
+
         // Projects header
-        table.add_row(vec!["Project ID".to_string(), "Name".to_string(), "Tempo".to_string(), "Duration".to_string()]);
-        
+        table.add_row(vec![
+            "Project ID".to_string(),
+            "Name".to_string(),
+            "Tempo".to_string(),
+            "Duration".to_string(),
+        ]);
+
         for project in &self.projects {
             table.add_row(vec![
                 project.id.clone(),
@@ -277,24 +330,40 @@ impl TableDisplay for CollectionDetails {
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         // Collection info
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["name", &self.name]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["description", &self.description]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_count", &self.stats.project_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["name", &self.name])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["description", &self.description])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_count", &self.stats.project_count.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+
         // Projects
-        writer.write_record(["", ""]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_id", "project_name", "tempo", "duration"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["", ""])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_id", "project_name", "tempo", "duration"])
+            .map_err(|e| -> CliError { e.into() })?;
         for project in &self.projects {
-            writer.write_record([
-                &project.id,
-                &project.name,
-                &project.tempo.to_string(),
-                &project.duration,
-            ]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([
+                    &project.id,
+                    &project.name,
+                    &project.tempo.to_string(),
+                    &project.duration,
+                ])
+                .map_err(|e| -> CliError { e.into() })?;
         }
-        
+
         Ok(())
     }
 }
@@ -319,11 +388,21 @@ impl TableDisplay for CollectionCreateResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["result", "Collection Created"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["name", &self.name]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["description", &self.description]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["result", "Collection Created"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["name", &self.name])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["description", &self.description])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -345,7 +424,7 @@ impl TableDisplay for CollectionProjectResult {
         } else {
             format!("{} Failed", self.action)
         };
-        
+
         let result_cell = if self.success {
             colored_cell!(result_text, green)
         } else {
@@ -361,11 +440,21 @@ impl TableDisplay for CollectionProjectResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["collection_id", &self.collection_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_id", &self.project_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["action", &self.action]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["success", &self.success.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["collection_id", &self.collection_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_id", &self.project_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["action", &self.action])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["success", &self.success.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }

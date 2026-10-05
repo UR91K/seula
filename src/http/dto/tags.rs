@@ -98,9 +98,11 @@ pub struct BatchOperationResponse {
 
 impl BatchOperationResponse {
     pub fn from_results(results: Vec<(String, Result<(), crate::error::DatabaseError>)>) -> Self {
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
 
         let results = results
             .into_iter()

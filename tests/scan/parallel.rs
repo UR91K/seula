@@ -1,15 +1,15 @@
 //! Parallel scanning tests
 
 use colored::*;
+use seula::project::Project;
+use seula::scan::project_scanner::ProjectPathScanner;
+use seula::scan::ParallelParser;
+use seula::{AbletonVersion, CONFIG};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
-use seula::scan::project_scanner::ProjectPathScanner;
-use seula::scan::ParallelParser;
-use seula::project::Project;
-use seula::{AbletonVersion, CONFIG};
 use tempfile::tempdir;
 
 use crate::common::setup;

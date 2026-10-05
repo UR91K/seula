@@ -95,7 +95,13 @@ fn a_hang_is_broken_by_the_timeout_and_the_scan_continues() {
 
 #[test]
 fn several_bad_plugins_in_one_batch_are_each_isolated() {
-    let candidates = paths(&["ok1.vst3", "CRASH-a.vst3", "ok2.vst3", "CRASH-b.vst3", "ok3.vst3"]);
+    let candidates = paths(&[
+        "ok1.vst3",
+        "CRASH-a.vst3",
+        "ok2.vst3",
+        "CRASH-b.vst3",
+        "ok3.vst3",
+    ]);
     let report = spawner(30).scan(&candidates);
 
     assert_eq!(report.results.len(), 5);

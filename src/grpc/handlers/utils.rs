@@ -1,6 +1,8 @@
+use super::super::common::{
+    AbletonVersion, KeySignature, Plugin, Project, Sample, Tag, Task, TimeSignature,
+};
 use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
-use super::super::common::{AbletonVersion, KeySignature, Plugin, Project, Sample, TimeSignature, Task, Tag};
 use crate::project::Project as DomainProject;
 
 pub fn convert_live_set_to_proto(
@@ -27,15 +29,13 @@ pub fn convert_live_set_to_proto(
     let tasks = db
         .get_project_tasks(&project_id)?
         .into_iter()
-        .map(
-            |(task_id, description, completed, created_at)| Task {
-                id: task_id,
-                description,
-                completed,
-                project_id: project_id.clone(), // Add project_id to Task
-                created_at,
-            },
-        )
+        .map(|(task_id, description, completed, created_at)| Task {
+            id: task_id,
+            description,
+            completed,
+            project_id: project_id.clone(), // Add project_id to Task
+            created_at,
+        })
         .collect();
 
     // Convert tags with proper IDs and creation timestamps
@@ -89,7 +89,7 @@ pub fn convert_live_set_to_proto(
                 installed: p.installed,
                 vendor: Some(p.vendor.unwrap_or_default()),
                 version: Some(p.version.unwrap_or_default()),
-                usage_count: None, // Not available in this context
+                usage_count: None,   // Not available in this context
                 project_count: None, // Not available in this context
             })
             .collect(),

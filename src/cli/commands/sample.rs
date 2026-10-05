@@ -1,5 +1,5 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, SampleCommands};
 use crate::models::Sample;
 use crate::services::SamplesService;
@@ -26,11 +26,15 @@ impl CliCommand for SampleCommands {
 
         match self {
             SampleCommands::List { limit, offset } => {
-                let samples_list = self.get_samples_list(&ctx.services.samples, *limit, *offset).await?;
+                let samples_list = self
+                    .get_samples_list(&ctx.services.samples, *limit, *offset)
+                    .await?;
                 formatter.print(&samples_list)?;
             }
             SampleCommands::Search { query, limit } => {
-                let search_results = self.search_samples(&ctx.services.samples, query, *limit).await?;
+                let search_results = self
+                    .search_samples(&ctx.services.samples, query, *limit)
+                    .await?;
                 formatter.print(&search_results)?;
             }
             SampleCommands::Stats => {
@@ -54,18 +58,20 @@ impl SampleCommands {
         limit: usize,
         offset: usize,
     ) -> Result<SamplesList, CliError> {
-        let (samples, total_count) = samples.get_all_samples(
-            Some(limit as i32),
-            Some(offset as i32),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            crate::database::ProjectScope::default(),
-        ).await?;
+        let (samples, total_count) = samples
+            .get_all_samples(
+                Some(limit as i32),
+                Some(offset as i32),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                crate::database::ProjectScope::default(),
+            )
+            .await?;
 
         let displayed = samples
             .into_iter()
@@ -73,7 +79,11 @@ impl SampleCommands {
                 id: sample.id.to_string(),
                 name: sample.name,
                 path: sample.path.to_string_lossy().to_string(),
-                status: if sample.is_present { "Present" } else { "Missing" },
+                status: if sample.is_present {
+                    "Present"
+                } else {
+                    "Missing"
+                },
             })
             .collect();
 
@@ -91,13 +101,9 @@ impl SampleCommands {
         query: &str,
         limit: usize,
     ) -> Result<SamplesSearchResults, CliError> {
-        let (samples, total_count) = samples.search_samples(
-            query,
-            Some(limit as i32),
-            Some(0),
-            None,
-            None,
-        ).await?;
+        let (samples, total_count) = samples
+            .search_samples(query, Some(limit as i32), Some(0), None, None)
+            .await?;
 
         let displayed = samples
             .into_iter()
@@ -105,7 +111,11 @@ impl SampleCommands {
                 id: sample.id.to_string(),
                 name: sample.name,
                 path: sample.path.to_string_lossy().to_string(),
-                status: if sample.is_present { "Present" } else { "Missing" },
+                status: if sample.is_present {
+                    "Present"
+                } else {
+                    "Missing"
+                },
             })
             .collect();
 
@@ -116,17 +126,20 @@ impl SampleCommands {
         })
     }
 
-    async fn get_sample_stats(&self, samples: &SamplesService) -> Result<SampleStatsDisplay, CliError> {
+    async fn get_sample_stats(
+        &self,
+        samples: &SamplesService,
+    ) -> Result<SampleStatsDisplay, CliError> {
         let stats = samples.get_sample_stats().await?;
         let analytics = samples.get_sample_analytics().await?;
 
-        Ok(SampleStatsDisplay {
-            stats,
-            analytics,
-        })
+        Ok(SampleStatsDisplay { stats, analytics })
     }
 
-    async fn check_sample_presence(&self, samples: &SamplesService) -> Result<SamplePresenceCheckResult, CliError> {
+    async fn check_sample_presence(
+        &self,
+        samples: &SamplesService,
+    ) -> Result<SamplePresenceCheckResult, CliError> {
         let refresh_result = samples.refresh_sample_presence_status().await?;
 
         Ok(SamplePresenceCheckResult {
@@ -170,7 +183,8 @@ impl TableDisplay for SamplesList {
                 _ => row.status.to_string(),
             };
 
-            simple_table_row!(table,
+            simple_table_row!(
+                table,
                 &row.id[..8], // Show only first 8 chars of UUID
                 &row.name,
                 &row.path,
@@ -179,10 +193,16 @@ impl TableDisplay for SamplesList {
         }
 
         // Add summary row
-        simple_table_row!(table,
+        simple_table_row!(
+            table,
             "",
             &format!("Total: {} samples", self.total_count),
-            &format!("Showing {}-{} of {}", self.offset + 1, self.offset + self.displayed.len(), self.total_count),
+            &format!(
+                "Showing {}-{} of {}",
+                self.offset + 1,
+                self.offset + self.displayed.len(),
+                self.total_count
+            ),
             ""
         );
 
@@ -190,7 +210,9 @@ impl TableDisplay for SamplesList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "name", "path", "status"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", "name", "path", "status"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -228,16 +250,12 @@ impl TableDisplay for SamplesSearchResults {
                 _ => row.status.to_string(),
             };
 
-            simple_table_row!(table,
-                &row.id[..8],
-                &row.name,
-                &row.path,
-                &status_cell
-            );
+            simple_table_row!(table, &row.id[..8], &row.name, &row.path, &status_cell);
         }
 
         // Add search summary
-        simple_table_row!(table,
+        simple_table_row!(
+            table,
             "",
             &format!("Search: '{}' - {} results", self.query, self.total_count),
             "",
@@ -248,7 +266,9 @@ impl TableDisplay for SamplesSearchResults {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["query", "id", "name", "path", "status"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["query", "id", "name", "path", "status"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -272,12 +292,26 @@ pub struct SampleStatsDisplay {
 
 impl TableDisplay for SampleStatsDisplay {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["Category".to_string(), "Metric".to_string(), "Value".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "Category".to_string(),
+            "Metric".to_string(),
+            "Value".to_string(),
+        ]);
 
         // Basic stats
         simple_table_row!(table, "Overview", "Total Samples", self.stats.total_samples);
-        simple_table_row!(table, "Overview", "Present Samples", self.stats.present_samples);
-        simple_table_row!(table, "Overview", "Missing Samples", self.stats.missing_samples);
+        simple_table_row!(
+            table,
+            "Overview",
+            "Present Samples",
+            self.stats.present_samples
+        );
+        simple_table_row!(
+            table,
+            "Overview",
+            "Missing Samples",
+            self.stats.missing_samples
+        );
         simple_table_row!(table, "Overview", "Unique Paths", self.stats.unique_paths);
 
         // Storage info
@@ -286,41 +320,129 @@ impl TableDisplay for SampleStatsDisplay {
             table,
             "Storage",
             "Total Size",
-            format!("{:.2} GB ({} of {} measured)", total_gb, self.stats.sized_samples, self.stats.present_samples)
+            format!(
+                "{:.2} GB ({} of {} measured)",
+                total_gb, self.stats.sized_samples, self.stats.present_samples
+            )
         );
 
         // Usage distribution
-        simple_table_row!(table, "Usage", "Most Used (≥5)", self.analytics.most_used_samples_count);
-        simple_table_row!(table, "Usage", "Moderately Used (2-4)", self.analytics.moderately_used_samples_count);
-        simple_table_row!(table, "Usage", "Rarely Used (=1)", self.analytics.rarely_used_samples_count);
-        simple_table_row!(table, "Usage", "Unused (=0)", self.analytics.unused_samples_count);
+        simple_table_row!(
+            table,
+            "Usage",
+            "Most Used (≥5)",
+            self.analytics.most_used_samples_count
+        );
+        simple_table_row!(
+            table,
+            "Usage",
+            "Moderately Used (2-4)",
+            self.analytics.moderately_used_samples_count
+        );
+        simple_table_row!(
+            table,
+            "Usage",
+            "Rarely Used (=1)",
+            self.analytics.rarely_used_samples_count
+        );
+        simple_table_row!(
+            table,
+            "Usage",
+            "Unused (=0)",
+            self.analytics.unused_samples_count
+        );
 
         // Presence percentages
-        simple_table_row!(table, "Presence", "Present %", format!("{}%", self.analytics.present_samples_percentage));
-        simple_table_row!(table, "Presence", "Missing %", format!("{}%", self.analytics.missing_samples_percentage));
+        simple_table_row!(
+            table,
+            "Presence",
+            "Present %",
+            format!("{}%", self.analytics.present_samples_percentage)
+        );
+        simple_table_row!(
+            table,
+            "Presence",
+            "Missing %",
+            format!("{}%", self.analytics.missing_samples_percentage)
+        );
 
         // Extension breakdown
         for (ext, analytics) in &self.analytics.extensions {
-            simple_table_row!(table, "Extensions", format!("{} files", ext), analytics.count);
+            simple_table_row!(
+                table,
+                "Extensions",
+                format!("{} files", ext),
+                analytics.count
+            );
         }
 
         table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["category", "metric", "value"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["category", "metric", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
 
         // Basic stats
-        writer.write_record(["Overview", "Total Samples", &self.stats.total_samples.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Present Samples", &self.stats.present_samples.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Missing Samples", &self.stats.missing_samples.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Unique Paths", &self.stats.unique_paths.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Total Samples",
+                &self.stats.total_samples.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Present Samples",
+                &self.stats.present_samples.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Missing Samples",
+                &self.stats.missing_samples.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Unique Paths",
+                &self.stats.unique_paths.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
 
         // Usage distribution
-        writer.write_record(["Usage", "Most Used (≥5)", &self.analytics.most_used_samples_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Usage", "Moderately Used (2-4)", &self.analytics.moderately_used_samples_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Usage", "Rarely Used (=1)", &self.analytics.rarely_used_samples_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Usage", "Unused (=0)", &self.analytics.unused_samples_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Usage",
+                "Most Used (≥5)",
+                &self.analytics.most_used_samples_count.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Usage",
+                "Moderately Used (2-4)",
+                &self.analytics.moderately_used_samples_count.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Usage",
+                "Rarely Used (=1)",
+                &self.analytics.rarely_used_samples_count.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Usage",
+                "Unused (=0)",
+                &self.analytics.unused_samples_count.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
 
         Ok(())
     }
@@ -347,11 +469,21 @@ impl TableDisplay for SamplePresenceCheckResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["result", "count"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["total_checked", &self.total_checked.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["now_present", &self.now_present.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["now_missing", &self.now_missing.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["unchanged", &self.unchanged.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["result", "count"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["total_checked", &self.total_checked.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["now_present", &self.now_present.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["now_missing", &self.now_missing.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["unchanged", &self.unchanged.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }

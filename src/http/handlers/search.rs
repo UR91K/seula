@@ -30,5 +30,8 @@ pub async fn search(
         .map(|r| project_to_dto(r.project, &mut db))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(Json(ProjectListResponse { projects, total_count }))
+    Ok(Json(ProjectListResponse {
+        projects,
+        total_count,
+    }))
 }

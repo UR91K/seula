@@ -103,4 +103,4 @@ pub fn validate_windows_path(path: &str) -> Result<(), ConfigError> {
 
 pub fn validate_single_path(path: &str, path_name: &str) -> Result<(), ConfigError> {
     Config::validate_single_path(path, path_name)
-} 
+}

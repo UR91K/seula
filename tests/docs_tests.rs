@@ -88,7 +88,11 @@ fn documented_paths_still_exist() {
         let Ok(text) = fs::read_to_string(&doc) else {
             continue;
         };
-        let rel_doc = doc.strip_prefix(&root).unwrap_or(&doc).display().to_string();
+        let rel_doc = doc
+            .strip_prefix(&root)
+            .unwrap_or(&doc)
+            .display()
+            .to_string();
 
         for path in referenced_paths(&text) {
             if !root.join(&path).exists() {
@@ -114,7 +118,10 @@ fn every_adr_declares_a_status_and_confidence() {
     let mut checked = 0;
     let mut problems = Vec::new();
 
-    for entry in fs::read_dir(&decisions).expect("docs/decisions must exist").flatten() {
+    for entry in fs::read_dir(&decisions)
+        .expect("docs/decisions must exist")
+        .flatten()
+    {
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "md") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -136,5 +143,9 @@ fn every_adr_declares_a_status_and_confidence() {
     }
 
     assert!(checked > 0, "no ADRs found in docs/decisions");
-    assert!(problems.is_empty(), "Malformed ADRs:\n{}", problems.join("\n"));
+    assert!(
+        problems.is_empty(),
+        "Malformed ADRs:\n{}",
+        problems.join("\n")
+    );
 }

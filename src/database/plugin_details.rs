@@ -93,10 +93,17 @@ pub struct PluginReference {
 
 impl ProjectDatabase {
     /// The scan record for one plugin, or `None` when there is no such plugin.
-    pub fn get_plugin_details(&self, plugin_id: &str) -> Result<Option<PluginDetails>, DatabaseError> {
+    pub fn get_plugin_details(
+        &self,
+        plugin_id: &str,
+    ) -> Result<Option<PluginDetails>, DatabaseError> {
         let Some(mut details) = self
             .conn
-            .query_row("SELECT * FROM plugins WHERE id = ?", params![plugin_id], row_to_details)
+            .query_row(
+                "SELECT * FROM plugins WHERE id = ?",
+                params![plugin_id],
+                row_to_details,
+            )
             .optional()?
         else {
             return Ok(None);

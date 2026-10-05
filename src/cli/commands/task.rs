@@ -1,5 +1,5 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, TaskCommands};
 use crate::services::TasksService;
 use crate::{colored_cell, simple_table_row};
@@ -23,12 +23,23 @@ impl CliCommand for TaskCommands {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
 
         match self {
-            TaskCommands::List { project_id, completed } => {
-                let tasks_list = self.get_tasks_list(&ctx.services.tasks, project_id.as_deref(), *completed).await?;
+            TaskCommands::List {
+                project_id,
+                completed,
+            } => {
+                let tasks_list = self
+                    .get_tasks_list(&ctx.services.tasks, project_id.as_deref(), *completed)
+                    .await?;
                 formatter.print(&tasks_list)?;
             }
-            TaskCommands::Create { project_id, description, priority } => {
-                let create_result = self.create_task(&ctx.services.tasks, project_id, description, *priority).await?;
+            TaskCommands::Create {
+                project_id,
+                description,
+                priority,
+            } => {
+                let create_result = self
+                    .create_task(&ctx.services.tasks, project_id, description, *priority)
+                    .await?;
                 formatter.print(&create_result)?;
             }
             TaskCommands::Complete { id } => {
@@ -57,7 +68,10 @@ impl TaskCommands {
             if show_completed {
                 all_tasks
             } else {
-                all_tasks.into_iter().filter(|(_, _, completed, _)| !completed).collect()
+                all_tasks
+                    .into_iter()
+                    .filter(|(_, _, completed, _)| !completed)
+                    .collect()
             }
         } else {
             // Get all tasks from all projects (this would require a new database method)
@@ -134,12 +148,10 @@ impl TaskCommands {
                     })
                 }
             }
-            None => {
-                Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Task {} not found", task_id)
-                )) as CliError)
-            }
+            None => Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Task {} not found", task_id),
+            )) as CliError),
         }
     }
 
@@ -161,12 +173,10 @@ impl TaskCommands {
                     message: "Task deleted successfully".to_string(),
                 })
             }
-            None => {
-                Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Task {} not found", task_id)
-                )) as CliError)
-            }
+            None => Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Task {} not found", task_id),
+            )) as CliError),
         }
     }
 }
@@ -189,7 +199,12 @@ pub struct TasksList {
 
 impl TableDisplay for TasksList {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["ID".to_string(), "Description".to_string(), "Status".to_string(), "Created".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "ID".to_string(),
+            "Description".to_string(),
+            "Status".to_string(),
+            "Created".to_string(),
+        ]);
 
         for row in &self.displayed {
             let status_cell = match row.status {
@@ -217,7 +232,7 @@ impl TableDisplay for TasksList {
         } else {
             "All Projects".to_string()
         };
-        
+
         let status_info = if self.show_completed {
             "All Tasks".to_string()
         } else {
@@ -235,7 +250,9 @@ impl TableDisplay for TasksList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "description", "status", "created_at", "project_id"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", "description", "status", "created_at", "project_id"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -278,11 +295,28 @@ impl TableDisplay for TaskCreateResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["result", if self.success { "Task Created" } else { "Failed" }]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["task_id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_id", &self.project_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["description", &self.description]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "result",
+                if self.success {
+                    "Task Created"
+                } else {
+                    "Failed"
+                },
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["task_id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_id", &self.project_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["description", &self.description])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -306,7 +340,7 @@ impl TableDisplay for TaskActionResult {
         } else {
             format!("{} Failed", self.action)
         };
-        
+
         let result_cell = if self.success {
             colored_cell!(result_text, green)
         } else {
@@ -324,13 +358,27 @@ impl TableDisplay for TaskActionResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["task_id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_id", &self.project_id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["description", &self.description]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["action", &self.action]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["success", &self.success.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["message", &self.message]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["task_id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_id", &self.project_id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["description", &self.description])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["action", &self.action])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["success", &self.success.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["message", &self.message])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }

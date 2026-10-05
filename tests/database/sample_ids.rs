@@ -23,7 +23,10 @@ fn a_projects_samples_keep_their_stored_ids_across_reads() {
         .unwrap();
 
     for _ in 0..2 {
-        let read = db.get_project_by_id(project).unwrap().expect("project exists");
+        let read = db
+            .get_project_by_id(project)
+            .unwrap()
+            .expect("project exists");
         let ids: Vec<String> = read.samples.iter().map(|s| s.id.to_string()).collect();
         assert_eq!(ids, vec![sample.to_string()]);
     }

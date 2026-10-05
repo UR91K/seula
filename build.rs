@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _proto_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("proto");
-    
+
     println!("cargo:rerun-if-changed=proto/");
-    
+
     // Compile common.proto first
     tonic_build::configure()
         .build_server(true)
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Compile each service separately
     let services = [
         "projects",
-        "collections", 
+        "collections",
         "tasks",
         "search",
         "tags",
@@ -25,13 +25,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "samples",
         "scanning",
         "watcher",
-        "config"
+        "config",
     ];
 
     for service in &services {
         let proto_file = format!("proto/services/{}.proto", service);
         println!("cargo:rerun-if-changed={}", proto_file);
-        
+
         tonic_build::configure()
             .build_server(true)
             .build_client(false)

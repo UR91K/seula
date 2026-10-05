@@ -92,7 +92,11 @@ impl TagsService {
     /// method (`INSERT OR IGNORE`), which silently no-ops on a nonexistent tag or
     /// project. Returns the tag row so callers that need the name (e.g. CLI display)
     /// don't have to fetch it again.
-    pub async fn tag_project(&self, project_id: &str, tag_id: &str) -> Result<TagRow, DatabaseError> {
+    pub async fn tag_project(
+        &self,
+        project_id: &str,
+        tag_id: &str,
+    ) -> Result<TagRow, DatabaseError> {
         let mut db = self.db.lock().await;
         Self::require_project(&mut db, project_id)?;
         let tag = Self::require_tag(&mut db, tag_id)?;
@@ -100,7 +104,11 @@ impl TagsService {
         Ok(tag)
     }
 
-    pub async fn untag_project(&self, project_id: &str, tag_id: &str) -> Result<TagRow, DatabaseError> {
+    pub async fn untag_project(
+        &self,
+        project_id: &str,
+        tag_id: &str,
+    ) -> Result<TagRow, DatabaseError> {
         let mut db = self.db.lock().await;
         Self::require_project(&mut db, project_id)?;
         let tag = Self::require_tag(&mut db, tag_id)?;

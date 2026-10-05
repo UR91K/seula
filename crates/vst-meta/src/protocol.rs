@@ -50,8 +50,13 @@ pub enum Event {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum Outcome {
-    Success { plugins: Vec<PluginMeta> },
-    Error { error_type: ErrorType, error: String },
+    Success {
+        plugins: Vec<PluginMeta>,
+    },
+    Error {
+        error_type: ErrorType,
+        error: String,
+    },
 }
 
 /// Why a scan failed.

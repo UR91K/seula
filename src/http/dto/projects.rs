@@ -322,9 +322,11 @@ pub struct BatchOperationResponse {
 
 impl BatchOperationResponse {
     pub fn from_results(results: Vec<(String, Result<(), crate::error::DatabaseError>)>) -> Self {
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
 
         let results = results
             .into_iter()
@@ -470,11 +472,13 @@ impl From<ProjectStatistics> for ProjectStatisticsDto {
             time_signature_distribution: stats
                 .time_signature_distribution
                 .into_iter()
-                .map(|(numerator, denominator, count)| TimeSignatureStatisticDto {
-                    numerator,
-                    denominator,
-                    count,
-                })
+                .map(
+                    |(numerator, denominator, count)| TimeSignatureStatisticDto {
+                        numerator,
+                        denominator,
+                        count,
+                    },
+                )
                 .collect(),
             ableton_version_distribution: stats
                 .ableton_version_distribution
@@ -501,7 +505,14 @@ impl From<ProjectStatistics> for ProjectStatisticsDto {
                 .most_complex_projects
                 .into_iter()
                 .map(
-                    |(project_id, project_name, plugin_count, sample_count, tag_count, complexity_score)| {
+                    |(
+                        project_id,
+                        project_name,
+                        plugin_count,
+                        sample_count,
+                        tag_count,
+                        complexity_score,
+                    )| {
                         ProjectComplexityStatisticDto {
                             project_id,
                             project_name,

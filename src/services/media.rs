@@ -30,13 +30,17 @@ impl MediaService {
         filename: &str,
         collection_id: &str,
     ) -> Result<MediaFile, MediaError> {
-        let media_file = self.storage.store_file(data, filename, MediaType::CoverArt)?;
+        let media_file = self
+            .storage
+            .store_file(data, filename, MediaType::CoverArt)?;
 
         let mut db = self.db.lock().await;
         if let Err(e) = db.insert_media_file(&media_file) {
-            let _ = self
-                .storage
-                .delete_file(&media_file.id, &media_file.file_extension, &media_file.media_type);
+            let _ = self.storage.delete_file(
+                &media_file.id,
+                &media_file.file_extension,
+                &media_file.media_type,
+            );
             return Err(e.into());
         }
 
@@ -53,19 +57,27 @@ impl MediaService {
         filename: &str,
         project_id: &str,
     ) -> Result<MediaFile, MediaError> {
-        let media_file = self.storage.store_file(data, filename, MediaType::AudioFile)?;
+        let media_file = self
+            .storage
+            .store_file(data, filename, MediaType::AudioFile)?;
 
         let mut db = self.db.lock().await;
         if let Err(e) = db.insert_media_file(&media_file) {
-            let _ = self
-                .storage
-                .delete_file(&media_file.id, &media_file.file_extension, &media_file.media_type);
+            let _ = self.storage.delete_file(
+                &media_file.id,
+                &media_file.file_extension,
+                &media_file.media_type,
+            );
             return Err(e.into());
         }
 
         // Added to the list; primary only if the project had none. Uploading used to
         // replace the audio outright (ADR-0037).
-        let has_primary = db.get_project_audio_file(project_id).ok().flatten().is_some();
+        let has_primary = db
+            .get_project_audio_file(project_id)
+            .ok()
+            .flatten()
+            .is_some();
         let attached = if has_primary {
             db.add_project_audio_file(project_id, &media_file.id)
         } else {
@@ -78,14 +90,20 @@ impl MediaService {
         Ok(media_file)
     }
 
-    pub async fn get_media_file(&self, media_file_id: &str) -> Result<Option<MediaFile>, MediaError> {
+    pub async fn get_media_file(
+        &self,
+        media_file_id: &str,
+    ) -> Result<Option<MediaFile>, MediaError> {
         let db = self.db.lock().await;
         Ok(db.get_media_file(media_file_id)?)
     }
 
     pub fn file_path(&self, media_file: &MediaFile) -> Result<PathBuf, MediaError> {
-        self.storage
-            .get_file_path(&media_file.id, &media_file.file_extension, &media_file.media_type)
+        self.storage.get_file_path(
+            &media_file.id,
+            &media_file.file_extension,
+            &media_file.media_type,
+        )
     }
 
     /// Deletes a media file's metadata and its physical file. A failure to delete
@@ -109,7 +127,11 @@ impl MediaService {
         Ok(())
     }
 
-    pub async fn set_collection_cover_art(&self, collection_id: &str, media_file_id: &str) -> Result<(), MediaError> {
+    pub async fn set_collection_cover_art(
+        &self,
+        collection_id: &str,
+        media_file_id: &str,
+    ) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
         Ok(db.update_collection_cover_art(collection_id, Some(media_file_id))?)
     }
@@ -119,7 +141,11 @@ impl MediaService {
         Ok(db.update_collection_cover_art(collection_id, None)?)
     }
 
-    pub async fn set_project_audio_file(&self, project_id: &str, media_file_id: &str) -> Result<(), MediaError> {
+    pub async fn set_project_audio_file(
+        &self,
+        project_id: &str,
+        media_file_id: &str,
+    ) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
         Ok(db.update_project_audio_file(project_id, Some(media_file_id))?)
     }
@@ -130,25 +156,39 @@ impl MediaService {
     }
 
     /// A project's audition audios, each with whether it is the primary (ADR-0037).
-    pub async fn project_audio_files(&self, project_id: &str) -> Result<Vec<(MediaFile, bool)>, MediaError> {
+    pub async fn project_audio_files(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<(MediaFile, bool)>, MediaError> {
         let db = self.db.lock().await;
         Ok(db.get_project_audio_files(project_id)?)
     }
 
     /// Attach an already-stored audio to a project's list, without making it primary.
-    pub async fn add_project_audio_file(&self, project_id: &str, media_file_id: &str) -> Result<(), MediaError> {
+    pub async fn add_project_audio_file(
+        &self,
+        project_id: &str,
+        media_file_id: &str,
+    ) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
         let media = db
             .get_media_file(media_file_id)?
             .ok_or_else(|| MediaError::FileNotFound(media_file_id.to_string()))?;
         if media.media_type != MediaType::AudioFile {
-            return Err(MediaError::InvalidMediaType(format!("{} is not an audio file", media_file_id)));
+            return Err(MediaError::InvalidMediaType(format!(
+                "{} is not an audio file",
+                media_file_id
+            )));
         }
         Ok(db.add_project_audio_file(project_id, media_file_id)?)
     }
 
     /// Take an audio off a project's list; returns false if it was not listed.
-    pub async fn remove_project_audio_file_from_list(&self, project_id: &str, media_file_id: &str) -> Result<bool, MediaError> {
+    pub async fn remove_project_audio_file_from_list(
+        &self,
+        project_id: &str,
+        media_file_id: &str,
+    ) -> Result<bool, MediaError> {
         let mut db = self.db.lock().await;
         Ok(db.remove_project_audio_file_from_list(project_id, media_file_id)?)
     }
@@ -194,7 +234,10 @@ impl MediaService {
 
     /// Deletes every orphaned media file (or, if `dry_run`, just reports what would
     /// be deleted) and returns the ids removed plus bytes freed.
-    pub async fn cleanup_orphaned_media(&self, dry_run: bool) -> Result<(Vec<String>, i64), MediaError> {
+    pub async fn cleanup_orphaned_media(
+        &self,
+        dry_run: bool,
+    ) -> Result<(Vec<String>, i64), MediaError> {
         let mut db = self.db.lock().await;
         let orphaned_files = db.get_orphaned_media_files(None, None)?;
 
@@ -203,9 +246,9 @@ impl MediaService {
 
         for file in &orphaned_files {
             if !dry_run {
-                if let Err(e) = self
-                    .storage
-                    .delete_file(&file.id, &file.file_extension, &file.media_type)
+                if let Err(e) =
+                    self.storage
+                        .delete_file(&file.id, &file.file_extension, &file.media_type)
                 {
                     tracing::warn!("Failed to delete physical file from storage: {:?}", e);
                 }

@@ -9,10 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once};
 use uuid::Uuid;
 
+use seula::models::{AbletonVersion, KeySignature, Plugin, PluginFormat, Sample, TimeSignature};
 use seula::project::Project;
-use seula::models::{
-    AbletonVersion, KeySignature, Plugin, PluginFormat, Sample, TimeSignature,
-};
 use seula::scan::parser::ParseResult;
 
 pub mod builders;
@@ -262,7 +260,6 @@ pub fn generate_test_live_sets_arc(count: usize) -> Arc<Vec<Project>> {
     Arc::new(generate_test_live_sets_vec(count))
 }
 
-
 pub fn create_test_live_set_from_parse(name: &str, parse_result: ParseResult) -> Project {
     let now = Local::now();
     let ableton_version = parse_result.version;
@@ -357,7 +354,6 @@ mod tests {
         // Optional fields
         assert!(plugin.vendor.is_some(), "Plugin should have a vendor");
         assert!(plugin.version.is_some(), "Plugin should have a version");
-
     }
 
     #[test]

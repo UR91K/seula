@@ -133,19 +133,30 @@ pub async fn get_projects_by_tag(
 
     let offset = query.offset.unwrap_or(0) as usize;
     let projects = if let Some(limit) = query.limit {
-        projects.into_iter().skip(offset).take(limit as usize).collect()
+        projects
+            .into_iter()
+            .skip(offset)
+            .take(limit as usize)
+            .collect()
     } else {
         projects.into_iter().skip(offset).collect()
     };
 
-    Ok(Json(ProjectListResponse { projects, total_count }))
+    Ok(Json(ProjectListResponse {
+        projects,
+        total_count,
+    }))
 }
 
 pub async fn tag_project(
     State(state): State<AppState>,
     Path((project_id, tag_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let tag = state.services.tags.tag_project(&project_id, &tag_id).await?;
+    let tag = state
+        .services
+        .tags
+        .tag_project(&project_id, &tag_id)
+        .await?;
     Ok(Json(TagDto::from(tag)))
 }
 
@@ -153,7 +164,11 @@ pub async fn untag_project(
     State(state): State<AppState>,
     Path((project_id, tag_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    state.services.tags.untag_project(&project_id, &tag_id).await?;
+    state
+        .services
+        .tags
+        .untag_project(&project_id, &tag_id)
+        .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 

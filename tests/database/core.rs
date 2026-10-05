@@ -4,8 +4,7 @@ use std::collections::HashSet;
 
 use chrono::Local;
 use seula::{
-    AbletonVersion, KeySignature, Plugin, PluginFormat, Sample, Scale,
-    TimeSignature, Tonic,
+    AbletonVersion, KeySignature, Plugin, PluginFormat, Sample, Scale, TimeSignature, Tonic,
 };
 use uuid::Uuid;
 

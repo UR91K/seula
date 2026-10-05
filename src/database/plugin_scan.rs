@@ -5,8 +5,8 @@
 //! project never does, because a project file cannot know what is installed.
 
 use chrono::Local;
-use tracing::{debug, info, warn};
 use rusqlite::{params, OptionalExtension, Transaction};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use vst_meta::meta::{FormatExtra, PluginMeta};
@@ -150,28 +150,35 @@ fn upsert_scanned_plugin(
         (PluginKey::Vst3(_), false) => "VST3 Effect",
     };
 
-    let (fourcc, preset_chunks, f64_precision, silent_when_stopped, midi_in, midi_out, factory_flags) =
-        match &meta.extra {
-            FormatExtra::Vst2 {
-                fourcc,
-                preset_chunks,
-                f64_precision,
-                silent_when_stopped,
-                midi_in_channels,
-                midi_out_channels,
-            } => (
-                Some(fourcc.clone()),
-                Some(*preset_chunks),
-                Some(*f64_precision),
-                Some(*silent_when_stopped),
-                Some(*midi_in_channels),
-                Some(*midi_out_channels),
-                None,
-            ),
-            FormatExtra::Vst3 { factory_flags, .. } => {
-                (None, None, None, None, None, None, Some(*factory_flags))
-            }
-        };
+    let (
+        fourcc,
+        preset_chunks,
+        f64_precision,
+        silent_when_stopped,
+        midi_in,
+        midi_out,
+        factory_flags,
+    ) = match &meta.extra {
+        FormatExtra::Vst2 {
+            fourcc,
+            preset_chunks,
+            f64_precision,
+            silent_when_stopped,
+            midi_in_channels,
+            midi_out_channels,
+        } => (
+            Some(fourcc.clone()),
+            Some(*preset_chunks),
+            Some(*f64_precision),
+            Some(*silent_when_stopped),
+            Some(*midi_in_channels),
+            Some(*midi_out_channels),
+            None,
+        ),
+        FormatExtra::Vst3 { factory_flags, .. } => {
+            (None, None, None, None, None, None, Some(*factory_flags))
+        }
+    };
 
     tx.execute(
         "INSERT INTO plugins (

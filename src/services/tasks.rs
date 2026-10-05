@@ -18,16 +18,26 @@ impl TasksService {
         Self { db }
     }
 
-    pub async fn get_project_tasks(&self, project_id: &str) -> Result<Vec<ProjectTaskRow>, DatabaseError> {
+    pub async fn get_project_tasks(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectTaskRow>, DatabaseError> {
         let mut db = self.db.lock().await;
         db.get_project_tasks(project_id)
     }
 
-    pub async fn create_task(&self, project_id: &str, description: &str) -> Result<TaskRow, DatabaseError> {
+    pub async fn create_task(
+        &self,
+        project_id: &str,
+        description: &str,
+    ) -> Result<TaskRow, DatabaseError> {
         let mut db = self.db.lock().await;
         let task_id = db.add_task(project_id, description)?;
         db.get_task(&task_id)?.ok_or_else(|| {
-            DatabaseError::NotFound(format!("Task {} created but could not be retrieved", task_id))
+            DatabaseError::NotFound(format!(
+                "Task {} created but could not be retrieved",
+                task_id
+            ))
         })
     }
 
@@ -90,10 +100,20 @@ impl TasksService {
         pending_only: Option<bool>,
     ) -> Result<(Vec<ProjectTaskRow>, i32), DatabaseError> {
         let mut db = self.db.lock().await;
-        db.search_tasks(project_id, query, limit, offset, completed_only, pending_only)
+        db.search_tasks(
+            project_id,
+            query,
+            limit,
+            offset,
+            completed_only,
+            pending_only,
+        )
     }
 
-    pub async fn get_task_statistics(&self, project_id: Option<&str>) -> Result<TaskAnalytics, DatabaseError> {
+    pub async fn get_task_statistics(
+        &self,
+        project_id: Option<&str>,
+    ) -> Result<TaskAnalytics, DatabaseError> {
         let mut db = self.db.lock().await;
         db.get_task_analytics(project_id)
     }

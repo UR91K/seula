@@ -7,10 +7,10 @@ use std::path::Path;
 use std::str::from_utf8;
 use std::sync::Mutex;
 
-use tracing::{error, trace};
 use once_cell::sync::Lazy;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
+use tracing::{error, trace};
 
 use crate::error::{FileError, XmlParseError};
 

@@ -1,14 +1,16 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, InstallFilter, OutputFormat, PluginCommands};
-use crate::database::plugins::{InstallState, PluginStats, PluginRefreshResult, VendorInfo, FormatInfo};
+use crate::database::plugins::{
+    FormatInfo, InstallState, PluginRefreshResult, PluginStats, VendorInfo,
+};
 use crate::models::Plugin;
 use crate::services::PluginsService;
 use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 
 use crate::config::CONFIG;
-use crate::scan::plugins::{ScanReport, scan_system};
+use crate::scan::plugins::{scan_system, ScanReport};
 use vst_meta::protocol::Outcome;
 
 use serde::Serialize;
@@ -38,12 +40,46 @@ impl CliCommand for PluginCommands {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
 
         match self {
-            PluginCommands::List { vendor, format, installed, limit, offset, sort_by, sort_desc } => {
-                let plugins_list = self.get_plugins_list(&ctx.services.plugins, vendor, format, installed, *limit, *offset, sort_by, *sort_desc).await?;
+            PluginCommands::List {
+                vendor,
+                format,
+                installed,
+                limit,
+                offset,
+                sort_by,
+                sort_desc,
+            } => {
+                let plugins_list = self
+                    .get_plugins_list(
+                        &ctx.services.plugins,
+                        vendor,
+                        format,
+                        installed,
+                        *limit,
+                        *offset,
+                        sort_by,
+                        *sort_desc,
+                    )
+                    .await?;
                 formatter.print(&plugins_list)?;
             }
-            PluginCommands::Search { query, vendor, format, installed, limit } => {
-                let search_results = self.search_plugins(&ctx.services.plugins, query, vendor, format, installed, *limit).await?;
+            PluginCommands::Search {
+                query,
+                vendor,
+                format,
+                installed,
+                limit,
+            } => {
+                let search_results = self
+                    .search_plugins(
+                        &ctx.services.plugins,
+                        query,
+                        vendor,
+                        format,
+                        installed,
+                        *limit,
+                    )
+                    .await?;
                 formatter.print(&search_results)?;
             }
             PluginCommands::Show { id } => {
@@ -55,7 +91,9 @@ impl CliCommand for PluginCommands {
                 formatter.print(&stats)?;
             }
             PluginCommands::Refresh => {
-                let refresh_result = self.refresh_plugin_installation_status(&ctx.services.plugins).await?;
+                let refresh_result = self
+                    .refresh_plugin_installation_status(&ctx.services.plugins)
+                    .await?;
                 formatter.print(&refresh_result)?;
             }
             PluginCommands::Vendors => {
@@ -66,7 +104,12 @@ impl CliCommand for PluginCommands {
                 let formats = self.get_plugin_formats(&ctx.services.plugins).await?;
                 formatter.print(&formats)?;
             }
-            PluginCommands::ScanSystem { paths, timeout, failures_only, limit } => {
+            PluginCommands::ScanSystem {
+                paths,
+                timeout,
+                failures_only,
+                limit,
+            } => {
                 let scan = self.scan_system(paths, *timeout, *failures_only, *limit)?;
                 formatter.print(&scan)?;
                 // The summary would be truncated as a table row, and JSON/CSV already
@@ -74,13 +117,21 @@ impl CliCommand for PluginCommands {
                 if matches!(ctx.output_format, OutputFormat::Table) {
                     if scan.truncated {
                         formatter.print_message(
-                            &format!("Showing {} of {} rows -- raise --limit to see the rest.", scan.displayed.len(), scan.total_rows),
+                            &format!(
+                                "Showing {} of {} rows -- raise --limit to see the rest.",
+                                scan.displayed.len(),
+                                scan.total_rows
+                            ),
                             MessageType::Info,
                         );
                     }
                     formatter.print_message(
                         &scan.summary(),
-                        if scan.failed > 0 { MessageType::Warning } else { MessageType::Success },
+                        if scan.failed > 0 {
+                            MessageType::Warning
+                        } else {
+                            MessageType::Success
+                        },
                     );
                 }
             }
@@ -102,24 +153,29 @@ impl PluginCommands {
         sort_by: &Option<String>,
         sort_desc: bool,
     ) -> Result<PluginsList, CliError> {
-        let (plugins, total_count) = plugins.get_all_plugins(
-            Some(limit as i32),
-            Some(offset as i32),
-            sort_by.clone(),
-            Some(sort_desc),
-            vendor.as_ref().map(|s| s.clone()),
-            format.as_ref().map(|s| s.clone()),
-            &install_states(installed),
-            None, // min_usage_count
-            crate::database::ProjectScope::default(),
-        ).await?;
+        let (plugins, total_count) = plugins
+            .get_all_plugins(
+                Some(limit as i32),
+                Some(offset as i32),
+                sort_by.clone(),
+                Some(sort_desc),
+                vendor.as_ref().map(|s| s.clone()),
+                format.as_ref().map(|s| s.clone()),
+                &install_states(installed),
+                None, // min_usage_count
+                crate::database::ProjectScope::default(),
+            )
+            .await?;
 
         let displayed = plugins
             .into_iter()
             .map(|grpc_plugin| PluginRow {
                 id: grpc_plugin.plugin.id.to_string(),
                 name: grpc_plugin.plugin.name,
-                vendor: grpc_plugin.plugin.vendor.unwrap_or_else(|| "Unknown".to_string()),
+                vendor: grpc_plugin
+                    .plugin
+                    .vendor
+                    .unwrap_or_else(|| "Unknown".to_string()),
                 format: grpc_plugin.plugin.plugin_format.to_string(),
                 installed: grpc_plugin.plugin.installed,
                 usage_count: grpc_plugin.usage_count,
@@ -144,14 +200,16 @@ impl PluginCommands {
         installed: &[InstallFilter],
         limit: usize,
     ) -> Result<PluginsSearchResults, CliError> {
-        let (plugins, total_count) = plugins.search_plugins(
-            query,
-            Some(limit as i32),
-            Some(0),
-            &install_states(installed),
-            vendor.as_ref().map(|s| s.clone()),
-            format.as_ref().map(|s| s.clone()),
-        ).await?;
+        let (plugins, total_count) = plugins
+            .search_plugins(
+                query,
+                Some(limit as i32),
+                Some(0),
+                &install_states(installed),
+                vendor.as_ref().map(|s| s.clone()),
+                format.as_ref().map(|s| s.clone()),
+            )
+            .await?;
 
         let displayed = plugins
             .into_iter()
@@ -178,7 +236,9 @@ impl PluginCommands {
         plugins: &PluginsService,
         plugin_id: &str,
     ) -> Result<PluginDetails, CliError> {
-        let plugin = plugins.get_plugin(plugin_id, crate::database::ProjectScope::default()).await?;
+        let plugin = plugins
+            .get_plugin(plugin_id, crate::database::ProjectScope::default())
+            .await?;
 
         match plugin {
             Some(grpc_plugin) => Ok(PluginDetails {
@@ -190,26 +250,37 @@ impl PluginCommands {
         }
     }
 
-    async fn get_plugin_stats(&self, plugins: &PluginsService) -> Result<PluginStatsDisplay, CliError> {
+    async fn get_plugin_stats(
+        &self,
+        plugins: &PluginsService,
+    ) -> Result<PluginStatsDisplay, CliError> {
         let stats = plugins.get_plugin_stats().await?;
 
         Ok(PluginStatsDisplay { stats })
     }
 
-    async fn refresh_plugin_installation_status(&self, plugins: &PluginsService) -> Result<PluginRefreshDisplay, CliError> {
+    async fn refresh_plugin_installation_status(
+        &self,
+        plugins: &PluginsService,
+    ) -> Result<PluginRefreshDisplay, CliError> {
         let result = plugins.refresh_plugin_installation_status().await?;
 
         Ok(PluginRefreshDisplay { result })
     }
 
-    async fn get_plugin_vendors(&self, plugins: &PluginsService) -> Result<PluginVendorsDisplay, CliError> {
-        let (vendors, total_count) = plugins.get_plugin_vendors(
-            Some(50), // limit
-            Some(0),  // offset
-            Some("vendor".to_string()), // sort_by
-            Some(false), // sort_desc
-            crate::database::ProjectScope::default(),
-        ).await?;
+    async fn get_plugin_vendors(
+        &self,
+        plugins: &PluginsService,
+    ) -> Result<PluginVendorsDisplay, CliError> {
+        let (vendors, total_count) = plugins
+            .get_plugin_vendors(
+                Some(50),                   // limit
+                Some(0),                    // offset
+                Some("vendor".to_string()), // sort_by
+                Some(false),                // sort_desc
+                crate::database::ProjectScope::default(),
+            )
+            .await?;
 
         Ok(PluginVendorsDisplay {
             vendors,
@@ -217,14 +288,19 @@ impl PluginCommands {
         })
     }
 
-    async fn get_plugin_formats(&self, plugins: &PluginsService) -> Result<PluginFormatsDisplay, CliError> {
-        let (formats, total_count) = plugins.get_plugin_formats(
-            Some(50), // limit
-            Some(0),  // offset
-            Some("format".to_string()), // sort_by
-            Some(false), // sort_desc
-            crate::database::ProjectScope::default(),
-        ).await?;
+    async fn get_plugin_formats(
+        &self,
+        plugins: &PluginsService,
+    ) -> Result<PluginFormatsDisplay, CliError> {
+        let (formats, total_count) = plugins
+            .get_plugin_formats(
+                Some(50),                   // limit
+                Some(0),                    // offset
+                Some("format".to_string()), // sort_by
+                Some(false),                // sort_desc
+                crate::database::ProjectScope::default(),
+            )
+            .await?;
 
         Ok(PluginFormatsDisplay {
             formats,
@@ -254,8 +330,7 @@ impl PluginCommands {
 
         let timeout = Duration::from_secs(timeout.unwrap_or(config.vst_scan_timeout_secs));
 
-        let report =
-            scan_system(&roots, timeout).map_err(|e| -> CliError { Box::new(e) })?;
+        let report = scan_system(&roots, timeout).map_err(|e| -> CliError { Box::new(e) })?;
 
         Ok(SystemScanDisplay::new(report, failures_only, limit))
     }
@@ -488,7 +563,8 @@ impl TableDisplay for PluginsList {
         for row in &self.displayed {
             let status_cell = installed_cell(row.installed);
 
-            simple_table_row!(table,
+            simple_table_row!(
+                table,
                 &row.id[..8], // Show only first 8 chars of UUID
                 &row.name,
                 &row.vendor,
@@ -500,10 +576,16 @@ impl TableDisplay for PluginsList {
         }
 
         // Add summary row
-        simple_table_row!(table,
+        simple_table_row!(
+            table,
             "",
             &format!("Total: {} plugins", self.total_count),
-            &format!("Showing {}-{} of {}", self.offset + 1, self.offset + self.displayed.len(), self.total_count),
+            &format!(
+                "Showing {}-{} of {}",
+                self.offset + 1,
+                self.offset + self.displayed.len(),
+                self.total_count
+            ),
             "",
             "",
             "",
@@ -514,7 +596,17 @@ impl TableDisplay for PluginsList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "name", "vendor", "format", "installed", "usage_count", "project_count"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "id",
+                "name",
+                "vendor",
+                "format",
+                "installed",
+                "usage_count",
+                "project_count",
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -552,7 +644,8 @@ impl TableDisplay for PluginsSearchResults {
         for row in &self.displayed {
             let status_cell = installed_cell(row.installed);
 
-            simple_table_row!(table,
+            simple_table_row!(
+                table,
                 &row.id[..8],
                 &row.name,
                 &row.vendor,
@@ -562,7 +655,8 @@ impl TableDisplay for PluginsSearchResults {
         }
 
         // Add search summary
-        simple_table_row!(table,
+        simple_table_row!(
+            table,
             "",
             &format!("Search: '{}' - {} results", self.query, self.total_count),
             "",
@@ -574,7 +668,9 @@ impl TableDisplay for PluginsSearchResults {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["query", "id", "name", "vendor", "format", "installed"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["query", "id", "name", "vendor", "format", "installed"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -604,14 +700,22 @@ impl TableDisplay for PluginDetails {
 
         simple_table_row!(table, "ID", self.plugin.id);
         simple_table_row!(table, "Name", self.plugin.name);
-        simple_table_row!(table, "Vendor", self.plugin.vendor.as_deref().unwrap_or("Unknown"));
+        simple_table_row!(
+            table,
+            "Vendor",
+            self.plugin.vendor.as_deref().unwrap_or("Unknown")
+        );
         simple_table_row!(table, "Format", self.plugin.plugin_format.to_string());
         simple_table_row!(table, "Dev Identifier", self.plugin.dev_identifier);
-        
+
         let status = installed_cell(self.plugin.installed);
         simple_table_row!(table, "Status", status);
-        
-        simple_table_row!(table, "Version", self.plugin.version.as_deref().unwrap_or("Unknown"));
+
+        simple_table_row!(
+            table,
+            "Version",
+            self.plugin.version.as_deref().unwrap_or("Unknown")
+        );
         simple_table_row!(table, "Usage Count", self.usage_count);
         simple_table_row!(table, "Used in Projects", self.project_count);
 
@@ -619,16 +723,36 @@ impl TableDisplay for PluginDetails {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["id", &self.plugin.id.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["name", &self.plugin.name]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["vendor", &self.plugin.vendor.as_deref().unwrap_or("")]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["format", &self.plugin.plugin_format.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["dev_identifier", &self.plugin.dev_identifier]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["installed", installed_label(self.plugin.installed)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["version", &self.plugin.version.as_deref().unwrap_or("")]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["usage_count", &self.usage_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["project_count", &self.project_count.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", &self.plugin.id.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["name", &self.plugin.name])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["vendor", &self.plugin.vendor.as_deref().unwrap_or("")])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["format", &self.plugin.plugin_format.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["dev_identifier", &self.plugin.dev_identifier])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["installed", installed_label(self.plugin.installed)])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["version", &self.plugin.version.as_deref().unwrap_or("")])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["usage_count", &self.usage_count.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["project_count", &self.project_count.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -640,14 +764,38 @@ pub struct PluginStatsDisplay {
 
 impl TableDisplay for PluginStatsDisplay {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["Category".to_string(), "Metric".to_string(), "Value".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "Category".to_string(),
+            "Metric".to_string(),
+            "Value".to_string(),
+        ]);
 
         // Basic stats
         simple_table_row!(table, "Overview", "Total Plugins", self.stats.total_plugins);
-        simple_table_row!(table, "Overview", "Installed Plugins", self.stats.installed_plugins);
-        simple_table_row!(table, "Overview", "Missing Plugins", self.stats.missing_plugins);
-        simple_table_row!(table, "Overview", "Not Yet Scanned", self.stats.unknown_plugins);
-        simple_table_row!(table, "Overview", "Unique Vendors", self.stats.unique_vendors);
+        simple_table_row!(
+            table,
+            "Overview",
+            "Installed Plugins",
+            self.stats.installed_plugins
+        );
+        simple_table_row!(
+            table,
+            "Overview",
+            "Missing Plugins",
+            self.stats.missing_plugins
+        );
+        simple_table_row!(
+            table,
+            "Overview",
+            "Not Yet Scanned",
+            self.stats.unknown_plugins
+        );
+        simple_table_row!(
+            table,
+            "Overview",
+            "Unique Vendors",
+            self.stats.unique_vendors
+        );
 
         // Format breakdown
         for (format, count) in &self.stats.plugins_by_format {
@@ -663,12 +811,44 @@ impl TableDisplay for PluginStatsDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["category", "metric", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Total Plugins", &self.stats.total_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Installed Plugins", &self.stats.installed_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Missing Plugins", &self.stats.missing_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Not Yet Scanned", &self.stats.unknown_plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["Overview", "Unique Vendors", &self.stats.unique_vendors.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["category", "metric", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Total Plugins",
+                &self.stats.total_plugins.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Installed Plugins",
+                &self.stats.installed_plugins.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Missing Plugins",
+                &self.stats.missing_plugins.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Not Yet Scanned",
+                &self.stats.unknown_plugins.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "Overview",
+                "Unique Vendors",
+                &self.stats.unique_vendors.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -683,21 +863,54 @@ impl TableDisplay for PluginRefreshDisplay {
         let mut table = SimpleTable::new(vec!["Refresh Result".to_string(), "Count".to_string()]);
 
         simple_table_row!(table, "Candidates Scanned", self.result.candidates_scanned);
-        simple_table_row!(table, colored_cell!("Installed", green), self.result.plugins_installed);
-        simple_table_row!(table, colored_cell!("Missing", red), self.result.plugins_missing);
+        simple_table_row!(
+            table,
+            colored_cell!("Installed", green),
+            self.result.plugins_installed
+        );
+        simple_table_row!(
+            table,
+            colored_cell!("Missing", red),
+            self.result.plugins_missing
+        );
         simple_table_row!(table, "Reconciled", self.result.plugins_reconciled);
-        simple_table_row!(table, colored_cell!("Scan Failures", yellow), self.result.scan_failures);
+        simple_table_row!(
+            table,
+            colored_cell!("Scan Failures", yellow),
+            self.result.scan_failures
+        );
 
         table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["result", "count"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["candidates_scanned", &self.result.candidates_scanned.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["plugins_installed", &self.result.plugins_installed.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["plugins_missing", &self.result.plugins_missing.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["plugins_reconciled", &self.result.plugins_reconciled.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["scan_failures", &self.result.scan_failures.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["result", "count"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "candidates_scanned",
+                &self.result.candidates_scanned.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "plugins_installed",
+                &self.result.plugins_installed.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["plugins_missing", &self.result.plugins_missing.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "plugins_reconciled",
+                &self.result.plugins_reconciled.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["scan_failures", &self.result.scan_failures.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -721,7 +934,8 @@ impl TableDisplay for PluginVendorsDisplay {
         ]);
 
         for vendor in &self.vendors {
-            simple_table_row!(table,
+            simple_table_row!(
+                table,
                 vendor.vendor.as_str(),
                 &vendor.plugin_count.to_string(),
                 &vendor.installed_plugins.to_string(),
@@ -736,17 +950,29 @@ impl TableDisplay for PluginVendorsDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["vendor", "total_plugins", "installed", "missing", "unknown", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "vendor",
+                "total_plugins",
+                "installed",
+                "missing",
+                "unknown",
+                "usage_count",
+                "projects_using",
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
         for vendor in &self.vendors {
-            writer.write_record([
-                vendor.vendor.as_str(),
-                &vendor.plugin_count.to_string(),
-                &vendor.installed_plugins.to_string(),
-                &vendor.missing_plugins.to_string(),
-                &vendor.unknown_plugins.to_string(),
-                &vendor.total_usage_count.to_string(),
-                &vendor.unique_projects_using.to_string(),
-            ]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([
+                    vendor.vendor.as_str(),
+                    &vendor.plugin_count.to_string(),
+                    &vendor.installed_plugins.to_string(),
+                    &vendor.missing_plugins.to_string(),
+                    &vendor.unknown_plugins.to_string(),
+                    &vendor.total_usage_count.to_string(),
+                    &vendor.unique_projects_using.to_string(),
+                ])
+                .map_err(|e| -> CliError { e.into() })?;
         }
         Ok(())
     }
@@ -771,7 +997,8 @@ impl TableDisplay for PluginFormatsDisplay {
         ]);
 
         for format in &self.formats {
-            simple_table_row!(table,
+            simple_table_row!(
+                table,
                 format.format.as_str(),
                 &format.plugin_count.to_string(),
                 &format.installed_plugins.to_string(),
@@ -786,17 +1013,29 @@ impl TableDisplay for PluginFormatsDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["format", "total_plugins", "installed", "missing", "unknown", "usage_count", "projects_using"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "format",
+                "total_plugins",
+                "installed",
+                "missing",
+                "unknown",
+                "usage_count",
+                "projects_using",
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
         for format in &self.formats {
-            writer.write_record([
-                format.format.as_str(),
-                &format.plugin_count.to_string(),
-                &format.installed_plugins.to_string(),
-                &format.missing_plugins.to_string(),
-                &format.unknown_plugins.to_string(),
-                &format.total_usage_count.to_string(),
-                &format.unique_projects_using.to_string(),
-            ]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([
+                    format.format.as_str(),
+                    &format.plugin_count.to_string(),
+                    &format.installed_plugins.to_string(),
+                    &format.missing_plugins.to_string(),
+                    &format.unknown_plugins.to_string(),
+                    &format.total_usage_count.to_string(),
+                    &format.unique_projects_using.to_string(),
+                ])
+                .map_err(|e| -> CliError { e.into() })?;
         }
         Ok(())
     }

@@ -1,8 +1,8 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
 use chrono::Local;
-use tracing::debug;
 use rusqlite::params;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::ProjectDatabase;
@@ -160,7 +160,14 @@ impl ProjectDatabase {
                     "Found task: {} ({}) from project {} created at {}",
                     description, id, project_name, created_at
                 );
-                Ok((id, project_id, project_name, description, completed, created_at))
+                Ok((
+                    id,
+                    project_id,
+                    project_name,
+                    description,
+                    completed,
+                    created_at,
+                ))
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -203,7 +210,12 @@ impl ProjectDatabase {
         ))?;
 
         let rows = stmt.query_map([start], |row| {
-            Ok((row.get::<_, i32>(0)?, row.get::<_, u32>(1)?, row.get::<_, i32>(2)?, row.get::<_, i32>(3)?))
+            Ok((
+                row.get::<_, i32>(0)?,
+                row.get::<_, u32>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, i32>(3)?,
+            ))
         })?;
         let mut found = std::collections::HashMap::new();
         for row in rows {
@@ -215,7 +227,11 @@ impl ProjectDatabase {
             .into_iter()
             .map(|(year, month)| {
                 let (completed, total) = found.get(&(year, month)).copied().unwrap_or((0, 0));
-                let rate = if total > 0 { completed as f64 / total as f64 } else { 0.0 };
+                let rate = if total > 0 {
+                    completed as f64 / total as f64
+                } else {
+                    0.0
+                };
                 (year, month as i32, completed, total, rate)
             })
             .collect();
@@ -330,7 +346,10 @@ impl ProjectDatabase {
         completed_only: Option<bool>,
         pending_only: Option<bool>,
     ) -> Result<(Vec<(String, String, bool, i64)>, i32), DatabaseError> {
-        debug!("Searching tasks in project {} with query: {}", project_id, query);
+        debug!(
+            "Searching tasks in project {} with query: {}",
+            project_id, query
+        );
 
         // Build WHERE conditions
         let mut conditions = vec!["project_id = ?"];
@@ -390,23 +409,32 @@ impl ProjectDatabase {
     }
 
     /// Get detailed task analytics for status bars/overviews
-    pub fn get_task_analytics(&mut self, project_id: Option<&str>) -> Result<TaskAnalytics, DatabaseError> {
+    pub fn get_task_analytics(
+        &mut self,
+        project_id: Option<&str>,
+    ) -> Result<TaskAnalytics, DatabaseError> {
         debug!("Getting task statistics for project: {:?}", project_id);
 
-        let (where_clause, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = if let Some(pid) = project_id {
-            ("WHERE project_id = ?".to_string(), vec![Box::new(pid.to_string())])
-        } else {
-            ("".to_string(), vec![])
-        };
+        let (where_clause, params): (String, Vec<Box<dyn rusqlite::ToSql>>) =
+            if let Some(pid) = project_id {
+                (
+                    "WHERE project_id = ?".to_string(),
+                    vec![Box::new(pid.to_string())],
+                )
+            } else {
+                ("".to_string(), vec![])
+            };
 
         // Get basic counts
-        let query = format!("SELECT COUNT(*), COUNT(CASE WHEN completed = 1 THEN 1 END) FROM project_tasks {}", where_clause);
+        let query = format!(
+            "SELECT COUNT(*), COUNT(CASE WHEN completed = 1 THEN 1 END) FROM project_tasks {}",
+            where_clause
+        );
         let mut stmt = self.conn.prepare(&query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        
-        let (total_tasks, completed_tasks): (i32, i32) = stmt.query_row(param_refs.as_slice(), |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+
+        let (total_tasks, completed_tasks): (i32, i32) =
+            stmt.query_row(param_refs.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         let pending_tasks = total_tasks - completed_tasks;
         let completion_rate = if total_tasks > 0 {
@@ -422,31 +450,33 @@ impl ProjectDatabase {
             format!("SELECT COUNT(*), COUNT(CASE WHEN completed = 1 THEN 1 END) FROM project_tasks {} AND created_at >= strftime('%s', 'now', '-7 days')", where_clause)
         };
         let mut weekly_stmt = self.conn.prepare(&weekly_query)?;
-        let (tasks_created_this_week, tasks_completed_this_week): (i32, i32) = weekly_stmt.query_row(param_refs.as_slice(), |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+        let (tasks_created_this_week, tasks_completed_this_week): (i32, i32) =
+            weekly_stmt.query_row(param_refs.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?;
 
-        // Get monthly stats  
+        // Get monthly stats
         let monthly_query = if where_clause.is_empty() {
             "SELECT COUNT(*), COUNT(CASE WHEN completed = 1 THEN 1 END) FROM project_tasks WHERE created_at >= strftime('%s', 'now', '-30 days')".to_string()
         } else {
             format!("SELECT COUNT(*), COUNT(CASE WHEN completed = 1 THEN 1 END) FROM project_tasks {} AND created_at >= strftime('%s', 'now', '-30 days')", where_clause)
         };
         let mut monthly_stmt = self.conn.prepare(&monthly_query)?;
-        let (tasks_created_this_month, tasks_completed_this_month): (i32, i32) = monthly_stmt.query_row(param_refs.as_slice(), |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+        let (tasks_created_this_month, tasks_completed_this_month): (i32, i32) =
+            monthly_stmt.query_row(param_refs.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         // Get monthly trends (reuse existing method) - we'll do this separately to avoid borrowing issues
         drop(stmt); // Drop the statement to release the borrow
         drop(weekly_stmt);
         drop(monthly_stmt);
-        
+
         let monthly_trends = if let Some(pid) = project_id {
             // For specific project, we need a different query
             self.get_project_task_trends(pid, 12)?
         } else {
-            self.get_task_completion_trends(12, Local::now().date_naive(), super::ProjectScope::All)?
+            self.get_task_completion_trends(
+                12,
+                Local::now().date_naive(),
+                super::ProjectScope::All,
+            )?
         };
 
         Ok(TaskAnalytics {
@@ -468,7 +498,10 @@ impl ProjectDatabase {
         project_id: &str,
         months: i32,
     ) -> Result<Vec<(i32, i32, i32, i32, f64)>, DatabaseError> {
-        debug!("Getting task completion trends for project {} over last {} months", project_id, months);
+        debug!(
+            "Getting task completion trends for project {} over last {} months",
+            project_id, months
+        );
         let mut stmt = self.conn.prepare(
             r#"
             SELECT 

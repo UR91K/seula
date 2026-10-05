@@ -27,7 +27,9 @@ pub async fn get_config(State(state): State<AppState>) -> Result<impl IntoRespon
     }))
 }
 
-pub async fn get_config_status(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+pub async fn get_config_status(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
     let config = state.services.config.get().map_err(load_error)?;
     Ok(Json(ConfigStatusResponse {
         needs_setup: config.needs_setup(),
@@ -86,7 +88,12 @@ pub async fn remove_path(
         Err(e) => {
             // Match prior (gRPC) behavior: report the (unchanged) current path
             // count even on failure, rather than leaving the field unset.
-            let remaining = state.services.config.get().map(|c| c.paths.len() as i32).unwrap_or(0);
+            let remaining = state
+                .services
+                .config
+                .get()
+                .map(|c| c.paths.len() as i32)
+                .unwrap_or(0);
             Json(RemovePathResponse {
                 success: false,
                 error_message: Some(e.to_string()),
@@ -139,7 +146,12 @@ pub async fn reload_config(State(state): State<AppState>) -> Json<ReloadConfigRe
 }
 
 pub async fn validate_config(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
-    let needs_setup = state.services.config.get().map_err(load_error)?.needs_setup();
+    let needs_setup = state
+        .services
+        .config
+        .get()
+        .map_err(load_error)?
+        .needs_setup();
 
     Ok(Json(match state.services.config.validate() {
         Ok(warnings) => ValidateConfigResponse {

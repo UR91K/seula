@@ -1,7 +1,7 @@
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Plugin, PluginKey, Sample, TimeSignature};
+use crate::project::Project;
 use chrono::{Local, TimeZone};
 use rusqlite::{params, OptionalExtension, Row, Transaction};
 use std::collections::HashSet;
@@ -48,8 +48,7 @@ pub fn insert_plugin(tx: &Transaction, plugin: &Plugin) -> Result<Option<String>
             .map(|id| (id, "class_id"))
         });
 
-    let (plugin_id, resolved_via) =
-        resolved.unwrap_or_else(|| (plugin.id.to_string(), "created"));
+    let (plugin_id, resolved_via) = resolved.unwrap_or_else(|| (plugin.id.to_string(), "created"));
 
     tx.execute(
         "INSERT INTO plugins (

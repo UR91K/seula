@@ -77,7 +77,13 @@ pub struct SampleCheckEventDto {
 /// Maps the HTTP sort key onto the database layer's, which still calls it
 /// `usage_count` (ADR-0034).
 pub fn sample_sort_key(sort_by: Option<String>) -> Option<String> {
-    sort_by.map(|s| if s == "project_count" { "usage_count".to_string() } else { s })
+    sort_by.map(|s| {
+        if s == "project_count" {
+            "usage_count".to_string()
+        } else {
+            s
+        }
+    })
 }
 
 #[derive(Serialize)]

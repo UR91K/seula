@@ -130,7 +130,10 @@ impl CollectionsService {
         let mut db = self.db.lock().await;
         let new_id = db.duplicate_collection(id, new_name, new_description, new_notes)?;
         Self::load_detail(&mut db, &new_id, ProjectScope::default())?.ok_or_else(|| {
-            DatabaseError::QueryError(format!("Collection {} was duplicated but not found", new_id))
+            DatabaseError::QueryError(format!(
+                "Collection {} was duplicated but not found",
+                new_id
+            ))
         })
     }
 
@@ -190,7 +193,13 @@ impl CollectionsService {
         let mut reordered = project_ids.iter();
         let full_order: Vec<&String> = all_ids
             .iter()
-            .map(|id| if current_set.contains(id) { reordered.next().unwrap_or(id) } else { id })
+            .map(|id| {
+                if current_set.contains(id) {
+                    reordered.next().unwrap_or(id)
+                } else {
+                    id
+                }
+            })
             .collect();
 
         for (new_position, project_id) in full_order.into_iter().enumerate() {
@@ -254,7 +263,8 @@ impl CollectionsService {
         let mut db = self.db.lock().await;
         let (collection_id, results) =
             db.batch_create_collection_from_projects(name, project_ids, description, notes)?;
-        let detail = Self::load_detail(&mut db, &collection_id, ProjectScope::default()).unwrap_or(None);
+        let detail =
+            Self::load_detail(&mut db, &collection_id, ProjectScope::default()).unwrap_or(None);
         Ok((detail, results))
     }
 
@@ -263,13 +273,22 @@ impl CollectionsService {
         id: &str,
         scope: ProjectScope,
     ) -> Result<Option<CollectionDetail>, DatabaseError> {
-        let Some((id, name, description, notes, created_at, modified_at, project_ids, cover_art_id)) =
-            db.get_collection_by_id(id, scope)?
+        let Some((
+            id,
+            name,
+            description,
+            notes,
+            created_at,
+            modified_at,
+            project_ids,
+            cover_art_id,
+        )) = db.get_collection_by_id(id, scope)?
         else {
             return Ok(None);
         };
-        let (total_duration_seconds, project_count) =
-            db.get_collection_statistics(&id, scope).unwrap_or((None, 0));
+        let (total_duration_seconds, project_count) = db
+            .get_collection_statistics(&id, scope)
+            .unwrap_or((None, 0));
         Ok(Some(CollectionDetail {
             id,
             name,
@@ -284,9 +303,14 @@ impl CollectionsService {
         }))
     }
 
-    fn require_collection(db: &mut ProjectDatabase, collection_id: &str) -> Result<(), DatabaseError> {
+    fn require_collection(
+        db: &mut ProjectDatabase,
+        collection_id: &str,
+    ) -> Result<(), DatabaseError> {
         db.get_collection_by_id(collection_id, ProjectScope::All)?
-            .ok_or_else(|| DatabaseError::NotFound(format!("Collection {} not found", collection_id)))
+            .ok_or_else(|| {
+                DatabaseError::NotFound(format!("Collection {} not found", collection_id))
+            })
             .map(|_| ())
     }
 

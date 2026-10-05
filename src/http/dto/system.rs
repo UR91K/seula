@@ -17,8 +17,7 @@ use crate::grpc::common::Project as ProtoProject;
 use crate::grpc::system as proto;
 use crate::http::dto::collections::CollectionDto;
 use crate::http::dto::projects::{
-    AbletonVersionDto, KeySignatureDto, PluginDto, ProjectDto, SampleDto, TaskDto,
-    TimeSignatureDto,
+    AbletonVersionDto, KeySignatureDto, PluginDto, ProjectDto, SampleDto, TaskDto, TimeSignatureDto,
 };
 use crate::http::dto::tags::TagDto;
 

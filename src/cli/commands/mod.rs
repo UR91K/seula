@@ -1,19 +1,19 @@
 #![allow(unused_imports)]
+pub mod collection;
+pub mod config;
+pub mod plugin;
 pub mod project;
 pub mod sample;
-pub mod collection;
+pub mod scan;
+pub mod search;
+pub mod system;
 pub mod tag;
 pub mod task;
-pub mod system;
-pub mod config;
-pub mod search;
-pub mod scan;
-pub mod plugin;
 
-use crate::grpc::handlers::*;
+use crate::cli::CliError;
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
-use crate::cli::CliError;
+use crate::grpc::handlers::*;
 use crate::media::{MediaConfig, MediaStorageManager};
 use crate::services::Services;
 use std::sync::Arc;
@@ -29,10 +29,16 @@ pub struct CliContext {
 }
 
 impl CliContext {
-    pub async fn new(output_format: crate::cli::OutputFormat, no_color: bool) -> Result<Self, CliError> {
+    pub async fn new(
+        output_format: crate::cli::OutputFormat,
+        no_color: bool,
+    ) -> Result<Self, CliError> {
         let config = CONFIG.as_ref()?;
         let db_path = std::path::PathBuf::from(
-            config.database_path.clone().expect("Database path must be set by config initialization"),
+            config
+                .database_path
+                .clone()
+                .expect("Database path must be set by config initialization"),
         );
         let db = Arc::new(Mutex::new(ProjectDatabase::new(db_path)?));
 
@@ -61,7 +67,11 @@ pub trait CliCommand {
 }
 
 /// Execute a CLI command with proper error handling
-pub async fn execute_command(command: &impl CliCommand, output_format: crate::cli::OutputFormat, no_color: bool) -> Result<(), CliError> {
+pub async fn execute_command(
+    command: &impl CliCommand,
+    output_format: crate::cli::OutputFormat,
+    no_color: bool,
+) -> Result<(), CliError> {
     let ctx = CliContext::new(output_format, no_color).await?;
     command.execute(&ctx).await
 }
@@ -70,20 +80,23 @@ pub async fn execute_command(command: &impl CliCommand, output_format: crate::cl
 pub async fn create_db_connection() -> Result<Arc<Mutex<ProjectDatabase>>, CliError> {
     let config = CONFIG.as_ref()?;
     let db_path = std::path::PathBuf::from(
-        config.database_path.clone().expect("Database path must be set by config initialization"),
+        config
+            .database_path
+            .clone()
+            .expect("Database path must be set by config initialization"),
     );
     let db = ProjectDatabase::new(db_path)?;
     let db = Arc::new(Mutex::new(db));
     Ok(db)
 }
 
+pub use collection::*;
+pub use config::*;
+pub use plugin::*;
 pub use project::*;
 pub use sample::*;
-pub use collection::*;
+pub use scan::*;
+pub use search::*;
+pub use system::*;
 pub use tag::*;
 pub use task::*;
-pub use plugin::*;
-pub use system::*;
-pub use config::*;
-pub use search::*;
-pub use scan::*;

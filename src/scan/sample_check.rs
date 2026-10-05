@@ -32,7 +32,9 @@ const LIST_THRESHOLD: usize = 3;
 
 /// A thread count for an I/O-bound check: twice the cores, at most 16.
 pub fn default_threads() -> usize {
-    std::thread::available_parallelism().map_or(4, |n| n.get() * 2).min(16)
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get() * 2)
+        .min(16)
 }
 
 /// Check every path, returning what was found for each, or `None` when it is not
@@ -45,7 +47,10 @@ pub fn check_sample_files(
 ) -> HashMap<String, Option<SampleFileState>> {
     let mut by_folder: HashMap<PathBuf, Vec<&str>> = HashMap::new();
     for path in paths {
-        let folder = Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default();
+        let folder = Path::new(path)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
         by_folder.entry(folder).or_default().push(path);
     }
     let folders: Vec<(PathBuf, Vec<&str>)> = by_folder.into_iter().collect();
@@ -61,7 +66,9 @@ pub fn check_sample_files(
             let (next, folders) = (&next, &folders);
             scope.spawn(move || loop {
                 let i = next.fetch_add(1, Ordering::Relaxed);
-                let Some((folder, files)) = folders.get(i) else { break };
+                let Some((folder, files)) = folders.get(i) else {
+                    break;
+                };
                 if tx.send((i, check_folder(folder, files))).is_err() {
                     break;
                 }
@@ -78,7 +85,12 @@ pub fn check_sample_files(
 }
 
 fn check_folder(folder: &Path, files: &[&str]) -> Vec<(String, Option<SampleFileState>)> {
-    let one_by_one = || files.iter().map(|p| (p.to_string(), stat(Path::new(p)))).collect();
+    let one_by_one = || {
+        files
+            .iter()
+            .map(|p| (p.to_string(), stat(Path::new(p))))
+            .collect()
+    };
     if files.len() < LIST_THRESHOLD {
         return one_by_one();
     }
@@ -91,21 +103,35 @@ fn check_folder(folder: &Path, files: &[&str]) -> Vec<(String, Option<SampleFile
         .filter_map(|entry| {
             let kind = entry.file_type().ok()?;
             // A listing describes a link, not what it points at.
-            let meta = if kind.is_symlink() { fs::metadata(entry.path()).ok()? } else { entry.metadata().ok()? };
-            meta.is_file().then(|| (name_key(&entry.file_name().to_string_lossy()), state_of(&meta)))
+            let meta = if kind.is_symlink() {
+                fs::metadata(entry.path()).ok()?
+            } else {
+                entry.metadata().ok()?
+            };
+            meta.is_file().then(|| {
+                (
+                    name_key(&entry.file_name().to_string_lossy()),
+                    state_of(&meta),
+                )
+            })
         })
         .collect();
     files
         .iter()
         .map(|p| {
-            let name = Path::new(p).file_name().map(|n| name_key(&n.to_string_lossy()));
+            let name = Path::new(p)
+                .file_name()
+                .map(|n| name_key(&n.to_string_lossy()));
             (p.to_string(), name.and_then(|n| listing.get(&n).copied()))
         })
         .collect()
 }
 
 fn stat(path: &Path) -> Option<SampleFileState> {
-    fs::metadata(path).ok().filter(Metadata::is_file).map(|m| state_of(&m))
+    fs::metadata(path)
+        .ok()
+        .filter(Metadata::is_file)
+        .map(|m| state_of(&m))
 }
 
 fn state_of(meta: &Metadata) -> SampleFileState {

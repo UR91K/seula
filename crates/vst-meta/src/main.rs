@@ -14,7 +14,10 @@ use vst_meta::protocol::Event;
 use vst_meta::scan;
 
 #[derive(Parser)]
-#[command(name = "vst-meta", about = "Extract metadata from VST2 and VST3 plugins")]
+#[command(
+    name = "vst-meta",
+    about = "Extract metadata from VST2 and VST3 plugins"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -58,7 +61,11 @@ fn main() {
             stdin,
             human,
         } => {
-            let paths = if stdin { read_paths_from_stdin() } else { paths };
+            let paths = if stdin {
+                read_paths_from_stdin()
+            } else {
+                paths
+            };
 
             if paths.is_empty() {
                 eprintln!("No paths given. Pass paths as arguments or use --stdin.");

@@ -1,5 +1,5 @@
-use tracing::debug;
 use tonic::{Request, Response, Status};
+use tracing::debug;
 
 use super::super::common::*;
 use super::super::tasks::*;
@@ -60,7 +60,10 @@ impl TasksHandler {
         debug!("CreateTask request: {:?}", request);
         let req = request.into_inner();
 
-        let task = self.service.create_task(&req.project_id, &req.description).await?;
+        let task = self
+            .service
+            .create_task(&req.project_id, &req.description)
+            .await?;
 
         Ok(Response::new(CreateTaskResponse {
             task: Some(Self::task_to_proto(task)),
@@ -110,9 +113,11 @@ impl TasksHandler {
             .batch_update_task_status(&req.task_ids, req.completed)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -138,9 +143,11 @@ impl TasksHandler {
 
         let results = self.service.batch_delete_tasks(&req.task_ids).await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -191,20 +198,25 @@ impl TasksHandler {
         debug!("GetTaskStatistics request: {:?}", request);
         let req = request.into_inner();
 
-        let stats = self.service.get_task_statistics(req.project_id.as_deref()).await?;
+        let stats = self
+            .service
+            .get_task_statistics(req.project_id.as_deref())
+            .await?;
 
         let monthly_trends = stats
             .monthly_trends
             .into_iter()
-            .map(|(year, month, completed_tasks, total_tasks, completion_rate)| {
-                super::super::tasks::TaskTrend {
-                    year,
-                    month,
-                    completed_tasks,
-                    total_tasks,
-                    completion_rate: completion_rate * 100.0, // Convert to percentage
-                }
-            })
+            .map(
+                |(year, month, completed_tasks, total_tasks, completion_rate)| {
+                    super::super::tasks::TaskTrend {
+                        year,
+                        month,
+                        completed_tasks,
+                        total_tasks,
+                        completion_rate: completion_rate * 100.0, // Convert to percentage
+                    }
+                },
+            )
             .collect();
 
         let proto_stats = super::super::tasks::TaskStatistics {

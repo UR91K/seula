@@ -73,10 +73,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/projects/:project_id/tags/:tag_id",
             post(tag_handlers::tag_project).delete(tag_handlers::untag_project),
         )
-        .route(
-            "/api/v1/projects",
-            get(project_handlers::list_projects),
-        )
+        .route("/api/v1/projects", get(project_handlers::list_projects))
         .route(
             "/api/v1/projects/statistics",
             get(project_handlers::get_statistics),
@@ -252,7 +249,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/samples/refresh-presence-status",
             post(sample_handlers::refresh_sample_presence_status),
         )
-        .route("/api/v1/samples/check", post(sample_handlers::check_samples))
+        .route(
+            "/api/v1/samples/check",
+            post(sample_handlers::check_samples),
+        )
         .route(
             "/api/v1/samples/:sample_id",
             get(sample_handlers::get_sample),
@@ -261,10 +261,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/samples/:sample_id/projects",
             get(sample_handlers::get_projects_by_sample),
         )
-        .route(
-            "/api/v1/config",
-            get(config_handlers::get_config),
-        )
+        .route("/api/v1/config", get(config_handlers::get_config))
         .route(
             "/api/v1/config/status",
             get(config_handlers::get_config_status),
@@ -330,16 +327,14 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/v1/projects/:project_id/audio-files",
-            get(media_handlers::list_project_audio_files).post(media_handlers::add_project_audio_file),
+            get(media_handlers::list_project_audio_files)
+                .post(media_handlers::add_project_audio_file),
         )
         .route(
             "/api/v1/projects/:project_id/audio-files/:media_file_id",
             delete(media_handlers::remove_project_audio_file_from_list),
         )
-        .route(
-            "/api/v1/system/info",
-            get(system_handlers::get_system_info),
-        )
+        .route("/api/v1/system/info", get(system_handlers::get_system_info))
         .route(
             "/api/v1/system/statistics",
             get(system_handlers::get_statistics),
@@ -396,9 +391,7 @@ fn is_local_origin(origin: &str) -> bool {
         return false;
     };
     let host = match authority.rsplit_once(':') {
-        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => {
-            host
-        }
+        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => host,
         _ => authority,
     };
     match scheme {

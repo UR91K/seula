@@ -9,9 +9,9 @@
 use crate::common::setup;
 
 use super::*;
-use std::collections::VecDeque;
 use seula::grpc::media::media_service_server::MediaService;
 use seula::media::{MediaFile, MediaType};
+use std::collections::VecDeque;
 use tokio_stream::StreamExt;
 
 #[tokio::test]
@@ -287,7 +287,7 @@ async fn test_delete_media_not_found() {
 
 #[tokio::test]
 async fn test_download_media_streaming() {
-    setup("error"); 
+    setup("error");
     let server = create_test_server().await;
 
     // Create a test file using the MediaStorageManager

@@ -1,12 +1,12 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
+use crate::project::Project;
 use chrono::{Local, TimeZone};
-use tracing::debug;
 use rusqlite::{params, OptionalExtension};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::ProjectDatabase;
@@ -429,17 +429,24 @@ impl ProjectDatabase {
         // Get results with pagination
         let main_query = "SELECT id, name, created_at FROM tags WHERE name LIKE ? ORDER BY name LIMIT ? OFFSET ?";
         let mut stmt = self.conn.prepare(main_query)?;
-        
+
         let limit_val = limit.unwrap_or(50);
         let offset_val = offset.unwrap_or(0);
-        
+
         let tags: Vec<(String, String, i64)> = stmt
-            .query_map([&search_param, &limit_val.to_string(), &offset_val.to_string()], |row| {
-                let id: String = row.get(0)?;
-                let name: String = row.get(1)?;
-                let created_at: i64 = row.get(2)?;
-                Ok((id, name, created_at))
-            })?
+            .query_map(
+                [
+                    &search_param,
+                    &limit_val.to_string(),
+                    &offset_val.to_string(),
+                ],
+                |row| {
+                    let id: String = row.get(0)?;
+                    let name: String = row.get(1)?;
+                    let created_at: i64 = row.get(2)?;
+                    Ok((id, name, created_at))
+                },
+            )?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -452,38 +459,38 @@ impl ProjectDatabase {
         debug!("Getting tag statistics");
 
         // Get basic counts
-        let total_tags: i32 = self.conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))?;
-        
+        let total_tags: i32 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))?;
+
         let tags_in_use: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT tag_id) FROM project_tags", 
-            [], 
-            |row| row.get(0)
+            "SELECT COUNT(DISTINCT tag_id) FROM project_tags",
+            [],
+            |row| row.get(0),
         )?;
-        
+
         let unused_tags = total_tags - tags_in_use;
 
         // Get projects with/without tags
         let projects_with_tags: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT project_id) FROM project_tags", 
-            [], 
-            |row| row.get(0)
+            "SELECT COUNT(DISTINCT project_id) FROM project_tags",
+            [],
+            |row| row.get(0),
         )?;
-        
+
         let total_projects: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM projects WHERE is_active = true", 
-            [], 
-            |row| row.get(0)
+            "SELECT COUNT(*) FROM projects WHERE is_active = true",
+            [],
+            |row| row.get(0),
         )?;
-        
+
         let projects_with_no_tags = total_projects - projects_with_tags;
 
         // Calculate average tags per project
-        let total_tag_associations: i32 = self.conn.query_row(
-            "SELECT COUNT(*) FROM project_tags", 
-            [], 
-            |row| row.get(0)
-        )?;
-        
+        let total_tag_associations: i32 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM project_tags", [], |row| row.get(0))?;
+
         let average_tags_per_project = if total_projects > 0 {
             total_tag_associations as f64 / total_projects as f64
         } else {
@@ -492,7 +499,7 @@ impl ProjectDatabase {
 
         // Get most used tags (top 10)
         let most_used_tags = self.get_tag_usage_ranking(10, false)?;
-        
+
         // Get least used tags (bottom 10, but only those that are actually used)
         let least_used_tags = self.get_tag_usage_ranking(10, true)?;
 
@@ -509,7 +516,11 @@ impl ProjectDatabase {
     }
 
     /// Get tag usage ranking for statistics
-    fn get_tag_usage_ranking(&mut self, limit: i32, least_used: bool) -> Result<Vec<TagUsageInfo>, DatabaseError> {
+    fn get_tag_usage_ranking(
+        &mut self,
+        limit: i32,
+        least_used: bool,
+    ) -> Result<Vec<TagUsageInfo>, DatabaseError> {
         let order = if least_used { "ASC" } else { "DESC" };
         let query = format!(
             r#"
@@ -579,7 +590,11 @@ impl ProjectDatabase {
             _ => "t.name", // default sort
         };
 
-        let sort_order = if sort_desc.unwrap_or(false) { "DESC" } else { "ASC" };
+        let sort_order = if sort_desc.unwrap_or(false) {
+            "DESC"
+        } else {
+            "ASC"
+        };
 
         // Get total count
         let count_query = format!(
@@ -620,7 +635,7 @@ impl ProjectDatabase {
 
         let mut stmt = self.conn.prepare(&main_query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        
+
         let tags: Vec<TagUsageInfo> = stmt
             .query_map(param_refs.as_slice(), |row| {
                 let tag_id: String = row.get(0)?;

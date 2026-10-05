@@ -3,8 +3,8 @@ use super::models::SqlDateTime;
 use crate::error::DatabaseError;
 use crate::media::{MediaFile, MediaType};
 use chrono::DateTime;
-use tracing::{debug, info, warn};
 use rusqlite::{params, OptionalExtension, Row};
+use tracing::{debug, info, warn};
 
 impl ProjectDatabase {
     /// Insert a new media file record into the database
@@ -397,7 +397,10 @@ impl ProjectDatabase {
              ORDER BY pa.position, pa.added_at",
         )?;
         let rows = stmt.query_map(params![project_id], |row| {
-            Ok((self.row_to_media_file(row)?, row.get::<_, bool>("is_primary")?))
+            Ok((
+                self.row_to_media_file(row)?,
+                row.get::<_, bool>("is_primary")?,
+            ))
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }

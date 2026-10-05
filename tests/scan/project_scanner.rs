@@ -1,8 +1,8 @@
 //! Project scanner tests
 
+use seula::scan::project_scanner::ProjectPathScanner;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use seula::scan::project_scanner::ProjectPathScanner;
 use tempfile::TempDir;
 
 use crate::common::setup;

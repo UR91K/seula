@@ -1,8 +1,8 @@
 use crate::error::DatabaseError;
 use chrono::{DateTime, Local, TimeZone};
-use tracing::{debug, info};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
+use tracing::{debug, info};
 
 /// The schema this build writes and understands.
 ///

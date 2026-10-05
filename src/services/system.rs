@@ -8,15 +8,15 @@ use crate::database::batch::BatchInsertManager;
 use crate::database::plugins::PluginRefreshResult;
 use crate::database::samples::SampleRefreshResult;
 use crate::database::{ProjectDatabase, ProjectScope};
-use crate::scan::sample_check::{check_sample_files, default_threads};
 use crate::error::{DatabaseError, LiveSetError};
 use crate::grpc::common::{ScanStatus, WatcherEventType};
+use crate::grpc::handlers::utils::convert_live_set_to_proto;
 use crate::grpc::scanning::ScanProgressResponse;
 use crate::grpc::system::GetStatisticsResponse;
 use crate::grpc::watcher::WatcherEventResponse;
-use crate::grpc::handlers::utils::convert_live_set_to_proto;
 use crate::process_projects_into;
 use crate::project::Project;
+use crate::scan::sample_check::{check_sample_files, default_threads};
 use crate::watcher::file_watcher::{FileEvent, FileWatcher};
 
 /// What a project scan reports through: completed, total, progress, message, phase.
@@ -141,7 +141,9 @@ impl SystemService {
     {
         let db = Arc::clone(&self.db);
         self.start_scan_with(on_progress, move |callback| {
-            let config = CONFIG.as_ref().map_err(|e| LiveSetError::ConfigError(e.clone()))?;
+            let config = CONFIG
+                .as_ref()
+                .map_err(|e| LiveSetError::ConfigError(e.clone()))?;
             process_projects_into(&db, config, Some(callback))
         })
         .await
@@ -249,7 +251,11 @@ impl SystemService {
                 let response = ScanProgressResponse {
                     completed,
                     total,
-                    progress: if total == 0 { 0.0 } else { completed as f32 / total as f32 },
+                    progress: if total == 0 {
+                        0.0
+                    } else {
+                        completed as f32 / total as f32
+                    },
                     message,
                     status: status as i32,
                 };
@@ -259,12 +265,20 @@ impl SystemService {
             };
 
             on_progress(
-                report(0, 0, "Finding plugins...".to_string(), ScanStatus::ScanScanningPlugins),
+                report(
+                    0,
+                    0,
+                    "Finding plugins...".to_string(),
+                    ScanStatus::ScanScanningPlugins,
+                ),
                 None,
             );
 
             let mut on_plugin = |index: usize, total: usize, path: &Path| {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("plugin");
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("plugin");
                 on_progress(
                     report(
                         index as u32,
@@ -287,7 +301,10 @@ impl SystemService {
                         result.plugins_installed, result.plugins_missing, result.scan_failures
                     );
                     let total = result.candidates_scanned.max(0) as u32;
-                    on_progress(report(total, total, message, ScanStatus::ScanCompleted), Some(result));
+                    on_progress(
+                        report(total, total, message, ScanStatus::ScanCompleted),
+                        Some(result),
+                    );
                 }
                 Err(e) => {
                     let message = format!("Plugin scan failed: {}", e);
@@ -322,7 +339,11 @@ impl SystemService {
                 let response = ScanProgressResponse {
                     completed,
                     total,
-                    progress: if total == 0 { 0.0 } else { completed as f32 / total as f32 },
+                    progress: if total == 0 {
+                        0.0
+                    } else {
+                        completed as f32 / total as f32
+                    },
                     message,
                     status: status as i32,
                 };
@@ -337,7 +358,12 @@ impl SystemService {
             let paths = db.blocking_lock().sample_paths();
             let outcome = paths.and_then(|paths| {
                 on_progress(
-                    report(0, 0, format!("Checking {} samples...", paths.len()), ScanStatus::ScanCheckingSamples),
+                    report(
+                        0,
+                        0,
+                        format!("Checking {} samples...", paths.len()),
+                        ScanStatus::ScanCheckingSamples,
+                    ),
                     None,
                 );
                 // One event per folder would be thousands on a big library; about 200
@@ -346,7 +372,10 @@ impl SystemService {
                     if done != total && done % (total / 200).max(1) != 0 {
                         return;
                     }
-                    let name = folder.file_name().and_then(|n| n.to_str()).unwrap_or("folder");
+                    let name = folder
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("folder");
                     on_progress(
                         report(
                             done as u32,
@@ -365,10 +394,15 @@ impl SystemService {
                 Ok(result) => {
                     let message = format!(
                         "Sample check completed: {} checked, {} now missing, {} found again",
-                        result.total_samples_checked, result.samples_now_missing, result.samples_now_present
+                        result.total_samples_checked,
+                        result.samples_now_missing,
+                        result.samples_now_present
                     );
                     let total = result.total_samples_checked.max(0) as u32;
-                    on_progress(report(total, total, message, ScanStatus::ScanCompleted), Some(result));
+                    on_progress(
+                        report(total, total, message, ScanStatus::ScanCompleted),
+                        Some(result),
+                    );
                 }
                 Err(e) => {
                     let message = format!("Sample check failed: {}", e);
@@ -438,7 +472,9 @@ impl SystemService {
 
                 match Project::new(file_path.clone()) {
                     Ok(live_set) => parsed.push((file_path_str, live_set)),
-                    Err(e) => failures.push((file_path_str, format!("Failed to parse project: {}", e))),
+                    Err(e) => {
+                        failures.push((file_path_str, format!("Failed to parse project: {}", e)))
+                    }
                 }
             }
 
@@ -456,13 +492,16 @@ impl SystemService {
             let projects_to_insert: Vec<Project> = parsed.into_iter().map(|(_, p)| p).collect();
 
             let mut db = self.db.lock().await;
-            let mut batch_manager = BatchInsertManager::new(&mut db.conn, Arc::new(projects_to_insert));
+            let mut batch_manager =
+                BatchInsertManager::new(&mut db.conn, Arc::new(projects_to_insert));
             match batch_manager.execute() {
                 Ok(_) => {
                     for (path, project_id) in path_ids {
                         match db.get_project_by_id(&project_id) {
                             Ok(Some(inserted)) => successes.push((path, inserted)),
-                            Ok(None) => failures.push((path, "Project inserted but not found".to_string())),
+                            Ok(None) => {
+                                failures.push((path, "Project inserted but not found".to_string()))
+                            }
                             Err(e) => failures.push((path, format!("Database error: {}", e))),
                         }
                     }
@@ -491,7 +530,9 @@ impl SystemService {
         let (mut watcher, event_receiver) =
             FileWatcher::new(Arc::clone(&self.db)).map_err(|e| e.to_string())?;
 
-        let config = CONFIG.as_ref().map_err(|e| format!("Config error: {}", e))?;
+        let config = CONFIG
+            .as_ref()
+            .map_err(|e| format!("Config error: {}", e))?;
         for path in &config.paths {
             if let Err(e) = watcher.add_watch_path(PathBuf::from(path)) {
                 tracing::warn!("Failed to add watch path {}: {}", path, e);
@@ -539,7 +580,9 @@ impl SystemService {
                             }
                         }
                         Ok(None) => {}
-                        Err(e) => tracing::warn!("Error looking up project for deleted file: {}", e),
+                        Err(e) => {
+                            tracing::warn!("Error looking up project for deleted file: {}", e)
+                        }
                     }
                 }
 
@@ -582,7 +625,10 @@ impl SystemService {
     /// `GetStatistics`), and the HTTP adapter mirrors it field by field.
     ///
     /// Every figure counts the projects in `scope` and what they use (ADR-0045).
-    pub async fn get_statistics(&self, scope: ProjectScope) -> Result<GetStatisticsResponse, DatabaseError> {
+    pub async fn get_statistics(
+        &self,
+        scope: ProjectScope,
+    ) -> Result<GetStatisticsResponse, DatabaseError> {
         use crate::grpc::system::*;
 
         let today = chrono::Utc::now().date_naive();
@@ -670,7 +716,11 @@ impl SystemService {
 
         let total_months = projects_per_month.len() as f64;
         let average_monthly_projects = if total_months > 0.0 {
-            projects_per_month.iter().map(|m| m.count as f64).sum::<f64>() / total_months
+            projects_per_month
+                .iter()
+                .map(|m| m.count as f64)
+                .sum::<f64>()
+                / total_months
         } else {
             0.0
         };
@@ -687,11 +737,13 @@ impl SystemService {
             None
         };
 
-        let (average_plugins_per_project, average_samples_per_project) = db.get_complexity_metrics(scope)?;
+        let (average_plugins_per_project, average_samples_per_project) =
+            db.get_complexity_metrics(scope)?;
 
         let most_complex_projects_raw = db.get_most_complex_projects(5, scope)?;
         let mut most_complex_projects = Vec::new();
-        for (project_id, plugin_count, sample_count, complexity_score) in most_complex_projects_raw {
+        for (project_id, plugin_count, sample_count, complexity_score) in most_complex_projects_raw
+        {
             if let Ok(Some(project)) = db.get_project_by_id_any_status(&project_id) {
                 if let Ok(proto_project) = convert_live_set_to_proto(project, &mut db) {
                     most_complex_projects.push(ProjectComplexityStatistic {
@@ -720,18 +772,21 @@ impl SystemService {
             .map(|(name, usage_count)| TagStatistic { name, usage_count })
             .collect();
 
-        let (completed_tasks, pending_tasks, task_completion_rate) = db.get_task_statistics(scope)?;
+        let (completed_tasks, pending_tasks, task_completion_rate) =
+            db.get_task_statistics(scope)?;
 
         let recent_activity = db
             .get_recent_activity(30, today, scope)?
             .into_iter()
-            .map(|(year, month, day, projects_created, projects_modified)| ActivityTrendStatistic {
-                year,
-                month,
-                day,
-                projects_created,
-                projects_modified,
-            })
+            .map(
+                |(year, month, day, projects_created, projects_modified)| ActivityTrendStatistic {
+                    year,
+                    month,
+                    day,
+                    projects_created,
+                    projects_modified,
+                },
+            )
             .collect();
 
         let ableton_versions = db
@@ -740,13 +795,24 @@ impl SystemService {
             .map(|(version, count)| VersionStatistic { version, count })
             .collect();
 
-        let (average_projects_per_collection, largest_collection_id) = db.get_collection_analytics(scope)?;
+        let (average_projects_per_collection, largest_collection_id) =
+            db.get_collection_analytics(scope)?;
 
         let largest_collection = if let Some(collection_id) = largest_collection_id {
             match db.get_collection_by_id(&collection_id, scope) {
-                Ok(Some((id, name, description, notes, created_at, modified_at, project_ids, cover_art_id))) => {
-                    let (total_duration_seconds, project_count) =
-                        db.get_collection_statistics(&id, scope).unwrap_or((None, 0));
+                Ok(Some((
+                    id,
+                    name,
+                    description,
+                    notes,
+                    created_at,
+                    modified_at,
+                    project_ids,
+                    cover_art_id,
+                ))) => {
+                    let (total_duration_seconds, project_count) = db
+                        .get_collection_statistics(&id, scope)
+                        .unwrap_or((None, 0));
                     Some(crate::grpc::common::Collection {
                         id,
                         name,
@@ -770,12 +836,14 @@ impl SystemService {
             .get_task_completion_trends(12, today, scope)?
             .into_iter()
             .map(
-                |(year, month, completed_tasks, total_tasks, completion_rate)| TaskCompletionTrendStatistic {
-                    year,
-                    month,
-                    completed_tasks,
-                    total_tasks,
-                    completion_rate,
+                |(year, month, completed_tasks, total_tasks, completion_rate)| {
+                    TaskCompletionTrendStatistic {
+                        year,
+                        month,
+                        completed_tasks,
+                        total_tasks,
+                        completion_rate,
+                    }
                 },
             )
             .collect();
@@ -863,7 +931,10 @@ mod tests {
         }
 
         assert_eq!(*system.scan_status.lock().await, ScanStatus::ScanCompleted);
-        assert!(system.start_scan_with(|_| {}, |_| Ok(())).await, "a new scan can start");
+        assert!(
+            system.start_scan_with(|_| {}, |_| Ok(())).await,
+            "a new scan can start"
+        );
     }
 
     /// The watcher stream once looped on a blocking `recv()` inside an async task, so
@@ -884,7 +955,10 @@ mod tests {
 
         let (done_tx, done_rx) = std::sync::mpsc::channel();
         let runtime = std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
             rt.block_on(async {
                 assert!(system.start_watcher_event_stream(|_| {}).await);
                 // Give the stream its turn, then see whether anything else gets one.
@@ -894,7 +968,9 @@ mod tests {
             });
         });
 
-        let other_task_ran = done_rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
+        let other_task_ran = done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .is_ok();
         // Ends the stream either way, so the runtime thread can finish.
         drop(event_tx);
         runtime.join().unwrap();
@@ -914,10 +990,15 @@ mod tests {
         for multiple in [false, true] {
             let returned = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let returned_seen = Arc::clone(&returned);
-            let other = tokio::spawn(async move { !returned_seen.load(std::sync::atomic::Ordering::SeqCst) });
+            let other =
+                tokio::spawn(
+                    async move { !returned_seen.load(std::sync::atomic::Ordering::SeqCst) },
+                );
 
             if multiple {
-                let (added, failed) = system.add_multiple_projects(vec![path.to_string_lossy().into_owned()]).await;
+                let (added, failed) = system
+                    .add_multiple_projects(vec![path.to_string_lossy().into_owned()])
+                    .await;
                 assert!(added.is_empty() && failed.len() == 1);
             } else {
                 assert!(system.add_single_project(&path).await.is_err());
@@ -925,7 +1006,10 @@ mod tests {
             returned.store(true, std::sync::atomic::Ordering::SeqCst);
 
             let ran_during_the_call = other.await.unwrap();
-            assert!(ran_during_the_call, "parsing held the runtime (multiple: {multiple})");
+            assert!(
+                ran_during_the_call,
+                "parsing held the runtime (multiple: {multiple})"
+            );
         }
     }
 }

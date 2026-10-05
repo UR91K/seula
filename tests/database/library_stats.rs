@@ -33,7 +33,9 @@ fn add_project(db: &ProjectDatabase, id: &str, tempo: f64, created_at: i64) {
 }
 
 fn archive(db: &ProjectDatabase, id: &str) {
-    db.conn.execute("UPDATE projects SET is_active = 0 WHERE id = ?1", [id]).unwrap();
+    db.conn
+        .execute("UPDATE projects SET is_active = 0 WHERE id = ?1", [id])
+        .unwrap();
 }
 
 /// Regression: every tempo under 90 went into one bin labelled 80, and empty bins were
@@ -49,7 +51,15 @@ fn tempo_bins_are_equal_width_with_empty_bins_as_zero() {
 
     assert_eq!(
         bins,
-        vec![(60.0, 1), (70.0, 1), (80.0, 1), (90.0, 0), (100.0, 0), (110.0, 0), (120.0, 1)]
+        vec![
+            (60.0, 1),
+            (70.0, 1),
+            (80.0, 1),
+            (90.0, 0),
+            (100.0, 0),
+            (110.0, 0),
+            (120.0, 1)
+        ]
     );
 }
 
@@ -64,13 +74,21 @@ fn projects_per_month_is_twelve_calendar_months_with_quiet_months_as_zero() {
     add_project(&db, "jun1", 120.0, epoch(2026, 6, 3));
     add_project(&db, "jun2", 120.0, epoch(2026, 6, 20));
 
-    let months = db.get_projects_per_month(12, today, ProjectScope::Active).unwrap();
+    let months = db
+        .get_projects_per_month(12, today, ProjectScope::Active)
+        .unwrap();
 
     assert_eq!(months.len(), 12);
     assert_eq!(months.first(), Some(&(2025, 10, 1)));
     assert_eq!(months.last(), Some(&(2026, 9, 0)));
-    assert_eq!(months.iter().find(|m| (m.0, m.1) == (2026, 5)), Some(&(2026, 5, 0)));
-    assert_eq!(months.iter().find(|m| (m.0, m.1) == (2026, 6)), Some(&(2026, 6, 2)));
+    assert_eq!(
+        months.iter().find(|m| (m.0, m.1) == (2026, 5)),
+        Some(&(2026, 5, 0))
+    );
+    assert_eq!(
+        months.iter().find(|m| (m.0, m.1) == (2026, 6)),
+        Some(&(2026, 6, 2))
+    );
 }
 
 #[test]
@@ -90,7 +108,9 @@ fn recent_activity_has_every_day_oldest_first() {
     let today = NaiveDate::from_ymd_opt(2026, 9, 24).unwrap();
     add_project(&db, "a", 120.0, epoch(2026, 9, 22));
 
-    let days = db.get_recent_activity(7, today, ProjectScope::Active).unwrap();
+    let days = db
+        .get_recent_activity(7, today, ProjectScope::Active)
+        .unwrap();
 
     assert_eq!(days.len(), 7);
     assert_eq!(days[0], (2026, 9, 18, 0, 0));
@@ -123,7 +143,12 @@ fn scoped_library(db: &ProjectDatabase) {
         add_project(db, p, 120.0, 0);
     }
     archive(db, "gone");
-    for (id, installed) in [("shared", "1"), ("absent", "0"), ("unscanned", "NULL"), ("archived_only", "1")] {
+    for (id, installed) in [
+        ("shared", "1"),
+        ("absent", "0"),
+        ("unscanned", "NULL"),
+        ("archived_only", "1"),
+    ] {
         db.conn
             .execute(
                 &format!(
@@ -142,23 +167,46 @@ fn scoped_library(db: &ProjectDatabase) {
         ("gone", "archived_only"),
     ] {
         db.conn
-            .execute("INSERT INTO project_plugins (project_id, plugin_id) VALUES (?1, ?2)", [p, plugin])
+            .execute(
+                "INSERT INTO project_plugins (project_id, plugin_id) VALUES (?1, ?2)",
+                [p, plugin],
+            )
             .unwrap();
     }
     for (id, present) in [("kick", 1), ("lost", 0)] {
         db.conn
-            .execute("INSERT INTO samples (id, name, path, is_present) VALUES (?1, ?1, ?1, ?2)", rusqlite::params![id, present])
+            .execute(
+                "INSERT INTO samples (id, name, path, is_present) VALUES (?1, ?1, ?1, ?2)",
+                rusqlite::params![id, present],
+            )
             .unwrap();
     }
-    db.conn.execute("INSERT INTO project_samples VALUES ('live', 'kick')", []).unwrap();
-    db.conn.execute("INSERT INTO project_samples VALUES ('gone', 'lost')", []).unwrap();
+    db.conn
+        .execute("INSERT INTO project_samples VALUES ('live', 'kick')", [])
+        .unwrap();
+    db.conn
+        .execute("INSERT INTO project_samples VALUES ('gone', 'lost')", [])
+        .unwrap();
     for (id, name) in [("t1", "techno"), ("t2", "old"), ("t3", "never")] {
         db.conn
-            .execute("INSERT INTO tags (id, name, created_at) VALUES (?1, ?2, 0)", [id, name])
+            .execute(
+                "INSERT INTO tags (id, name, created_at) VALUES (?1, ?2, 0)",
+                [id, name],
+            )
             .unwrap();
     }
-    db.conn.execute("INSERT INTO project_tags (project_id, tag_id, created_at) VALUES ('live', 't1', 0)", []).unwrap();
-    db.conn.execute("INSERT INTO project_tags (project_id, tag_id, created_at) VALUES ('gone', 't2', 0)", []).unwrap();
+    db.conn
+        .execute(
+            "INSERT INTO project_tags (project_id, tag_id, created_at) VALUES ('live', 't1', 0)",
+            [],
+        )
+        .unwrap();
+    db.conn
+        .execute(
+            "INSERT INTO project_tags (project_id, tag_id, created_at) VALUES ('gone', 't2', 0)",
+            [],
+        )
+        .unwrap();
     for (id, name) in [("c1", "live one"), ("c2", "archive one"), ("c3", "empty")] {
         db.conn
             .execute(
@@ -189,21 +237,42 @@ fn every_count_takes_the_scope_and_splits_into_its_states() {
     let active = db.get_library_counts(ProjectScope::Active).unwrap();
     assert_eq!((active.projects_active, active.projects_archived), (2, 1));
     assert_eq!(
-        (active.plugins_installed, active.plugins_missing, active.plugins_not_scanned),
+        (
+            active.plugins_installed,
+            active.plugins_missing,
+            active.plugins_not_scanned
+        ),
         (1, 1, 1),
         "archived_only is used by no active project"
     );
     assert_eq!((active.samples_present, active.samples_missing), (1, 0));
     assert_eq!((active.tags_in_use, active.tags_unused), (1, 2));
-    assert_eq!((active.collections_with_projects, active.collections_empty), (1, 2));
+    assert_eq!(
+        (active.collections_with_projects, active.collections_empty),
+        (1, 2)
+    );
     assert_eq!((active.tasks_completed, active.tasks_pending), (1, 1));
 
     let all = db.get_library_counts(ProjectScope::All).unwrap();
-    assert_eq!((all.projects_active, all.projects_archived), (2, 1), "the project split ignores scope");
-    assert_eq!((all.plugins_installed, all.plugins_missing, all.plugins_not_scanned), (2, 1, 1));
+    assert_eq!(
+        (all.projects_active, all.projects_archived),
+        (2, 1),
+        "the project split ignores scope"
+    );
+    assert_eq!(
+        (
+            all.plugins_installed,
+            all.plugins_missing,
+            all.plugins_not_scanned
+        ),
+        (2, 1, 1)
+    );
     assert_eq!((all.samples_present, all.samples_missing), (1, 1));
     assert_eq!((all.tags_in_use, all.tags_unused), (2, 1));
-    assert_eq!((all.collections_with_projects, all.collections_empty), (2, 1));
+    assert_eq!(
+        (all.collections_with_projects, all.collections_empty),
+        (2, 1)
+    );
     assert_eq!((all.tasks_completed, all.tasks_pending), (2, 1));
 }
 
@@ -245,9 +314,14 @@ fn completion_rates_are_fractions() {
     // Moved into the window: the active tasks are one done and one pending.
     let today = NaiveDate::from_ymd_opt(2026, 9, 24).unwrap();
     db.conn
-        .execute("UPDATE project_tasks SET created_at = ?1", [epoch(2026, 9, 1)])
+        .execute(
+            "UPDATE project_tasks SET created_at = ?1",
+            [epoch(2026, 9, 1)],
+        )
         .unwrap();
-    let trends = db.get_task_completion_trends(12, today, ProjectScope::Active).unwrap();
+    let trends = db
+        .get_task_completion_trends(12, today, ProjectScope::Active)
+        .unwrap();
     assert_eq!(trends.len(), 12);
     assert_eq!(trends[0], (2025, 10, 0, 0, 0.0));
     assert_eq!(trends[11], (2026, 9, 1, 2, 0.5));

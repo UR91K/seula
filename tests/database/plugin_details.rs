@@ -11,8 +11,19 @@ fn temp_db() -> (TempDir, ProjectDatabase) {
 }
 
 /// `installed`: Some(true) found, Some(false) looked and absent, None never scanned.
-fn add_plugin(db: &ProjectDatabase, id: &str, name: &str, vendor: &str, format: &str, installed: Option<bool>) {
-    let kind = if format.starts_with("VST3") { "VST3" } else { "VST2" };
+fn add_plugin(
+    db: &ProjectDatabase,
+    id: &str,
+    name: &str,
+    vendor: &str,
+    format: &str,
+    installed: Option<bool>,
+) {
+    let kind = if format.starts_with("VST3") {
+        "VST3"
+    } else {
+        "VST2"
+    };
     let found = installed == Some(true);
     db.conn
         .execute(
@@ -55,7 +66,10 @@ fn details_carry_the_scan_record_classes_buses_and_references() {
     assert_eq!(details.classes.len(), 1);
     let directions: Vec<&str> = details.buses.iter().map(|b| b.direction.as_str()).collect();
     assert_eq!(directions, ["input", "output"], "inputs first");
-    assert_eq!(details.references[0].ableton_name.as_deref(), Some("Pro-Q 3"));
+    assert_eq!(
+        details.references[0].ableton_name.as_deref(),
+        Some("Pro-Q 3")
+    );
 }
 
 #[test]
@@ -76,17 +90,42 @@ fn stats_count_only_what_the_filter_selects() {
     let (_dir, db) = temp_db();
     add_plugin(&db, "1", "Pro-Q 3", "FabFilter", "VST3 Effect", Some(true));
     add_plugin(&db, "2", "Pro-L 2", "FabFilter", "VST3 Effect", Some(false));
-    add_plugin(&db, "3", "Serum", "Xfer Records", "VST2 Instrument", Some(true));
+    add_plugin(
+        &db,
+        "3",
+        "Serum",
+        "Xfer Records",
+        "VST2 Instrument",
+        Some(true),
+    );
     add_plugin(&db, "4", "Arcade", "Output", "VST3 Instrument", None);
 
     let all = db.get_plugin_stats().unwrap();
-    assert_eq!((all.total_plugins, all.installed_plugins, all.missing_plugins, all.unknown_plugins), (4, 2, 1, 1));
+    assert_eq!(
+        (
+            all.total_plugins,
+            all.installed_plugins,
+            all.missing_plugins,
+            all.unknown_plugins
+        ),
+        (4, 2, 1, 1)
+    );
     assert_eq!(all.unique_vendors, 3);
 
     let fabfilter = db
-        .get_plugin_stats_filtered(&PluginFilter { vendor: Some("FabFilter".into()), ..Default::default() })
+        .get_plugin_stats_filtered(&PluginFilter {
+            vendor: Some("FabFilter".into()),
+            ..Default::default()
+        })
         .unwrap();
-    assert_eq!((fabfilter.total_plugins, fabfilter.installed_plugins, fabfilter.missing_plugins), (2, 1, 1));
+    assert_eq!(
+        (
+            fabfilter.total_plugins,
+            fabfilter.installed_plugins,
+            fabfilter.missing_plugins
+        ),
+        (2, 1, 1)
+    );
     assert_eq!(fabfilter.unique_vendors, 1);
 
     let not_loadable = db
@@ -95,7 +134,10 @@ fn stats_count_only_what_the_filter_selects() {
             ..Default::default()
         })
         .unwrap();
-    assert_eq!((not_loadable.total_plugins, not_loadable.installed_plugins), (2, 0));
+    assert_eq!(
+        (not_loadable.total_plugins, not_loadable.installed_plugins),
+        (2, 0)
+    );
 
     let searched = db
         .get_plugin_stats_filtered(&PluginFilter {

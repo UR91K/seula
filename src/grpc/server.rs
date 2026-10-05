@@ -10,20 +10,20 @@ use crate::database::ProjectDatabase;
 use crate::media::{MediaConfig, MediaStorageManager};
 use crate::services::{Services, SystemService};
 
-use super::handlers::*;
-use super::common::*;
-use super::projects::*;
 use super::collections::*;
-use super::tasks::*;
-use super::search::*;
-use super::tags::*;
+use super::common::*;
+use super::config::*;
+use super::handlers::*;
 use super::media::*;
-use super::system::*;
 use super::plugins::*;
+use super::projects::*;
 use super::samples::*;
 use super::scanning::*;
+use super::search::*;
+use super::system::*;
+use super::tags::*;
+use super::tasks::*;
 use super::watcher::*;
-use super::config::*;
 
 #[derive(Clone)]
 pub struct SeulaServer {
@@ -77,7 +77,12 @@ impl SeulaServer {
             start_time,
         );
 
-        Ok(Self::from_shared(db, media_storage, services, system_service))
+        Ok(Self::from_shared(
+            db,
+            media_storage,
+            services,
+            system_service,
+        ))
     }
 
     /// Builds the server from already-constructed shared state, so a caller that also
@@ -342,7 +347,9 @@ impl collection_service_server::CollectionService for SeulaServer {
         &self,
         request: Request<GetCollectionStatisticsRequest>,
     ) -> Result<Response<GetCollectionStatisticsResponse>, Status> {
-        self.collections_handler.get_collection_statistics(request).await
+        self.collections_handler
+            .get_collection_statistics(request)
+            .await
     }
 
     async fn batch_add_to_collection(
@@ -778,7 +785,9 @@ impl plugin_service_server::PluginService for SeulaServer {
         &self,
         request: Request<RefreshPluginInstallationStatusRequest>,
     ) -> Result<Response<RefreshPluginInstallationStatusResponse>, Status> {
-        self.plugins_handler.refresh_plugin_installation_status(request).await
+        self.plugins_handler
+            .refresh_plugin_installation_status(request)
+            .await
     }
 }
 
@@ -840,7 +849,9 @@ impl sample_service_server::SampleService for SeulaServer {
         &self,
         request: Request<RefreshSamplePresenceStatusRequest>,
     ) -> Result<Response<RefreshSamplePresenceStatusResponse>, Status> {
-        self.samples_handler.refresh_sample_presence_status(request).await
+        self.samples_handler
+            .refresh_sample_presence_status(request)
+            .await
     }
 
     async fn get_sample_analytics(

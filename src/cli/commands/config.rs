@@ -1,5 +1,5 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::output::{MessageType, OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::{CliError, ConfigCommands};
 use crate::config::{Config, CONFIG};
 use crate::{colored_cell, simple_table_row};
@@ -47,13 +47,15 @@ impl ConfigCommands {
         let config = CONFIG.as_ref().map_err(|e| {
             Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Failed to load configuration: {}", e)
+                format!("Failed to load configuration: {}", e),
             )) as CliError
         })?;
 
         Ok(ConfigDisplay {
             paths: config.paths.clone(),
-            database_path: config.database_path().unwrap_or_else(|| "Default".to_string()),
+            database_path: config
+                .database_path()
+                .unwrap_or_else(|| "Default".to_string()),
             grpc_port: config.grpc_port(),
             log_level: config.log_level(),
             media_storage_dir: config.media_storage_dir.clone(),
@@ -68,7 +70,7 @@ impl ConfigCommands {
         let config = CONFIG.as_ref().map_err(|e| {
             Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Failed to load configuration: {}", e)
+                format!("Failed to load configuration: {}", e),
             )) as CliError
         })?;
 
@@ -91,7 +93,7 @@ impl ConfigCommands {
         let config_path = crate::config::loader::find_config_file().map_err(|e| {
             Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Failed to find config file: {}", e)
+                format!("Failed to find config file: {}", e),
             )) as CliError
         })?;
 
@@ -110,12 +112,12 @@ impl ConfigCommands {
             });
 
         let mut cmd = Command::new(&editor);
-        
+
         // Special handling for macOS 'open' command
         if cfg!(target_os = "macos") && editor == "open" {
             cmd.arg("-t"); // Open in text editor
         }
-        
+
         cmd.arg(&config_path);
 
         match cmd.status() {
@@ -179,22 +181,44 @@ impl TableDisplay for ConfigDisplay {
 
         // Project paths
         if self.paths.is_empty() {
-            simple_table_row!(table, "Project Paths", colored_cell!("None configured", red));
+            simple_table_row!(
+                table,
+                "Project Paths",
+                colored_cell!("None configured", red)
+            );
         } else {
-            simple_table_row!(table, "Project Paths", format!("{} configured", self.paths.len()));
+            simple_table_row!(
+                table,
+                "Project Paths",
+                format!("{} configured", self.paths.len())
+            );
             for (i, path) in self.paths.iter().enumerate() {
                 simple_table_row!(table, format!("  Path {}", i + 1), path);
             }
         }
 
         // Media limits
-        let cover_art_limit = self.max_cover_art_size_mb
-            .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
+        let cover_art_limit = self
+            .max_cover_art_size_mb
+            .map(|size| {
+                if size == 0 {
+                    "No limit".to_string()
+                } else {
+                    format!("{} MB", size)
+                }
+            })
             .unwrap_or_else(|| "Default".to_string());
         simple_table_row!(table, "Max Cover Art Size", cover_art_limit);
 
-        let audio_limit = self.max_audio_file_size_mb
-            .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
+        let audio_limit = self
+            .max_audio_file_size_mb
+            .map(|size| {
+                if size == 0 {
+                    "No limit".to_string()
+                } else {
+                    format!("{} MB", size)
+                }
+            })
             .unwrap_or_else(|| "Default".to_string());
         simple_table_row!(table, "Max Audio File Size", audio_limit);
 
@@ -202,30 +226,71 @@ impl TableDisplay for ConfigDisplay {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["setting", "value"]).map_err(|e| -> CliError { e.into() })?;
-        
-        writer.write_record(["status", if self.is_ready { "Ready" } else { "Setup Required" }]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["status_message", &self.status_message]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["grpc_port", &self.grpc_port.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["log_level", &self.log_level]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["database_path", &self.database_path]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["media_storage_dir", &self.media_storage_dir]).map_err(|e| -> CliError { e.into() })?;
-        
+        writer
+            .write_record(["setting", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+
+        writer
+            .write_record([
+                "status",
+                if self.is_ready {
+                    "Ready"
+                } else {
+                    "Setup Required"
+                },
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["status_message", &self.status_message])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["grpc_port", &self.grpc_port.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["log_level", &self.log_level])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["database_path", &self.database_path])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["media_storage_dir", &self.media_storage_dir])
+            .map_err(|e| -> CliError { e.into() })?;
+
         // Project paths
         for (i, path) in self.paths.iter().enumerate() {
-            writer.write_record([&format!("project_path_{}", i + 1), path]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record([&format!("project_path_{}", i + 1), path])
+                .map_err(|e| -> CliError { e.into() })?;
         }
 
         // Media limits
-        let cover_art_limit = self.max_cover_art_size_mb
-            .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
+        let cover_art_limit = self
+            .max_cover_art_size_mb
+            .map(|size| {
+                if size == 0 {
+                    "No limit".to_string()
+                } else {
+                    format!("{} MB", size)
+                }
+            })
             .unwrap_or_else(|| "Default".to_string());
-        writer.write_record(["max_cover_art_size", &cover_art_limit]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["max_cover_art_size", &cover_art_limit])
+            .map_err(|e| -> CliError { e.into() })?;
 
-        let audio_limit = self.max_audio_file_size_mb
-            .map(|size| if size == 0 { "No limit".to_string() } else { format!("{} MB", size) })
+        let audio_limit = self
+            .max_audio_file_size_mb
+            .map(|size| {
+                if size == 0 {
+                    "No limit".to_string()
+                } else {
+                    format!("{} MB", size)
+                }
+            })
             .unwrap_or_else(|| "Default".to_string());
-        writer.write_record(["max_audio_file_size", &audio_limit]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["max_audio_file_size", &audio_limit])
+            .map_err(|e| -> CliError { e.into() })?;
 
         Ok(())
     }
@@ -240,7 +305,8 @@ pub struct ConfigValidationResult {
 
 impl TableDisplay for ConfigValidationResult {
     fn to_simple_table(&self) -> SimpleTable {
-        let mut table = SimpleTable::new(vec!["Validation Result".to_string(), "Details".to_string()]);
+        let mut table =
+            SimpleTable::new(vec!["Validation Result".to_string(), "Details".to_string()]);
 
         let status_cell = if self.is_valid {
             colored_cell!("Valid", green)
@@ -275,16 +341,24 @@ impl TableDisplay for ConfigValidationResult {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["type", "message"]).map_err(|e| -> CliError { e.into() })?;
-        
-        writer.write_record(["status", if self.is_valid { "Valid" } else { "Invalid" }]).map_err(|e| -> CliError { e.into() })?;
-        
+        writer
+            .write_record(["type", "message"])
+            .map_err(|e| -> CliError { e.into() })?;
+
+        writer
+            .write_record(["status", if self.is_valid { "Valid" } else { "Invalid" }])
+            .map_err(|e| -> CliError { e.into() })?;
+
         for error in &self.errors {
-            writer.write_record(["error", error]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record(["error", error])
+                .map_err(|e| -> CliError { e.into() })?;
         }
-        
+
         for warning in &self.warnings {
-            writer.write_record(["warning", warning]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record(["warning", warning])
+                .map_err(|e| -> CliError { e.into() })?;
         }
 
         Ok(())
@@ -313,17 +387,29 @@ impl TableDisplay for ConfigEditResult {
 
         if self.success {
             table.add_row(vec!["".to_string(), "".to_string()]);
-            simple_table_row!(table, "Note", "After editing, run 'seula config validate' to check your changes");
+            simple_table_row!(
+                table,
+                "Note",
+                "After editing, run 'seula config validate' to check your changes"
+            );
         }
 
         table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["property", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["success", &self.success.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["message", &self.message]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["config_path", &self.config_path]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["property", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["success", &self.success.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["message", &self.message])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["config_path", &self.config_path])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }

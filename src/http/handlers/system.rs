@@ -15,13 +15,13 @@ use axum::response::IntoResponse;
 use axum::Json;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::http::dto::system::{
-    scan_status_name, AddMultipleProjectsRequest, AddMultipleProjectsResponse, AddProjectResponse,
-    AddSingleProjectRequest, ExportStatisticsQuery, StatisticsQuery, ScanProgressDto, ScanStatusResponse,
-    StatisticsDto, SystemInfoResponse, WatcherActionResponse, WatcherEventDto,
-};
 use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::{project_to_dto, KeySignatureDto};
+use crate::http::dto::system::{
+    scan_status_name, AddMultipleProjectsRequest, AddMultipleProjectsResponse, AddProjectResponse,
+    AddSingleProjectRequest, ExportStatisticsQuery, ScanProgressDto, ScanStatusResponse,
+    StatisticsDto, StatisticsQuery, SystemInfoResponse, WatcherActionResponse, WatcherEventDto,
+};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 use crate::services::system::send_scan_update;
@@ -223,7 +223,10 @@ pub async fn export_statistics(
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
     let csv_data = generate_csv_export(stats);
-    let filename = format!("statistics_{}.csv", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+    let filename = format!(
+        "statistics_{}.csv",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S")
+    );
 
     let headers = [
         (axum::http::header::CONTENT_TYPE, "text/csv".to_string()),
@@ -274,7 +277,10 @@ fn generate_csv_export(stats: crate::grpc::system::GetStatisticsResponse) -> Vec
     csv_content.push_str("Top Plugins\n");
     csv_content.push_str("Plugin Name,Vendor,Usage Count\n");
     for plugin in stats.top_plugins {
-        csv_content.push_str(&format!("{},{},{}\n", plugin.name, plugin.vendor, plugin.usage_count));
+        csv_content.push_str(&format!(
+            "{},{},{}\n",
+            plugin.name, plugin.vendor, plugin.usage_count
+        ));
     }
     csv_content.push('\n');
 
@@ -309,7 +315,10 @@ mod tests {
     /// so half the tasks done exported as "5000.00%".
     #[test]
     fn csv_completion_rate_is_a_percentage_once() {
-        let stats = GetStatisticsResponse { task_completion_rate: 0.5, ..Default::default() };
+        let stats = GetStatisticsResponse {
+            task_completion_rate: 0.5,
+            ..Default::default()
+        };
         let csv = String::from_utf8(generate_csv_export(stats)).unwrap();
         assert!(csv.contains("Task Completion Rate,50.00%"), "{csv}");
     }

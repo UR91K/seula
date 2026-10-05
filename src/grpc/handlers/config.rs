@@ -1,5 +1,5 @@
-use tracing::{debug, error};
 use tonic::{Code, Request, Response, Status};
+use tracing::{debug, error};
 
 use super::super::config::*;
 use crate::config::Config;
@@ -138,7 +138,11 @@ impl ConfigHandler {
                 error!("Failed to remove path: {:?}", e);
                 // Match prior behavior: report the (unchanged) current path count
                 // even on failure, rather than leaving the field unset.
-                let remaining = self.service.get().map(|c| c.paths.len() as i32).unwrap_or(0);
+                let remaining = self
+                    .service
+                    .get()
+                    .map(|c| c.paths.len() as i32)
+                    .unwrap_or(0);
                 Ok(Response::new(RemovePathResponse {
                     success: false,
                     error_message: Some(e.to_string()),
@@ -224,7 +228,10 @@ impl ConfigHandler {
 
         match self.service.validate() {
             Ok(warnings) => {
-                debug!("Config validation successful with {} warnings", warnings.len());
+                debug!(
+                    "Config validation successful with {} warnings",
+                    warnings.len()
+                );
                 Ok(Response::new(ValidateConfigResponse {
                     is_valid: true,
                     warnings,

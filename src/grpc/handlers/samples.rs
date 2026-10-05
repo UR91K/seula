@@ -1,5 +1,5 @@
-use tracing::debug;
 use tonic::{Code, Request, Response, Status};
+use tracing::debug;
 
 use super::super::common::*;
 use super::super::samples::*;
@@ -84,7 +84,13 @@ impl SamplesHandler {
 
         let (samples, total_count) = self
             .service
-            .get_samples_by_presence(req.is_present, req.limit, req.offset, req.sort_by, req.sort_desc)
+            .get_samples_by_presence(
+                req.is_present,
+                req.limit,
+                req.offset,
+                req.sort_by,
+                req.sort_desc,
+            )
             .await?;
 
         Ok(Response::new(GetSampleByPresenceResponse {
@@ -102,7 +108,13 @@ impl SamplesHandler {
 
         let (samples, total_count) = self
             .service
-            .search_samples(&req.query, req.limit, req.offset, req.present_only, req.extension_filter)
+            .search_samples(
+                &req.query,
+                req.limit,
+                req.offset,
+                req.present_only,
+                req.extension_filter,
+            )
             .await?;
 
         Ok(Response::new(SearchSamplesResponse {
@@ -149,7 +161,9 @@ impl SamplesHandler {
             })
             .collect();
 
-        Ok(Response::new(GetAllSampleUsageNumbersResponse { sample_usages }))
+        Ok(Response::new(GetAllSampleUsageNumbersResponse {
+            sample_usages,
+        }))
     }
 
     pub async fn get_projects_by_sample(
@@ -161,7 +175,12 @@ impl SamplesHandler {
 
         let (projects, total_count) = self
             .service
-            .get_projects_by_sample(&req.sample_id, req.limit, req.offset, crate::database::ProjectScope::default())
+            .get_projects_by_sample(
+                &req.sample_id,
+                req.limit,
+                req.offset,
+                crate::database::ProjectScope::default(),
+            )
             .await?;
 
         let db_arc = self.service.db_handle();

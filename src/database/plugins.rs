@@ -1,5 +1,5 @@
 use crate::error::DatabaseError;
-use crate::models::{Plugin, GrpcPlugin};
+use crate::models::{GrpcPlugin, Plugin};
 use rusqlite::params;
 
 use super::project_counts::ProjectScope;
@@ -160,7 +160,11 @@ impl ProjectDatabase {
             format!("WHERE {}", conditions.join(" AND "))
         };
 
-        let where_prefix = if conditions.is_empty() { "WHERE" } else { "AND" };
+        let where_prefix = if conditions.is_empty() {
+            "WHERE"
+        } else {
+            "AND"
+        };
 
         // Get total count with filters
         let count_query = if min_usage_count.is_some() {
@@ -177,8 +181,7 @@ impl ProjectDatabase {
                 {} 
                 {} COALESCE(usage_stats.usage_count, 0) >= ?
                 "#,
-                where_clause,
-                where_prefix
+                where_clause, where_prefix
             )
         } else {
             format!(
@@ -205,7 +208,8 @@ impl ProjectDatabase {
         let total_count: i32 = if count_params.is_empty() {
             self.conn.query_row(&count_query, [], |row| row.get(0))?
         } else {
-            self.conn.query_row(&count_query, count_params.as_slice(), |row| row.get(0))?
+            self.conn
+                .query_row(&count_query, count_params.as_slice(), |row| row.get(0))?
         };
 
         // Build main query with pagination, filtering, and usage data
@@ -229,9 +233,7 @@ impl ProjectDatabase {
                 {} COALESCE(usage_stats.usage_count, 0) >= ?
                 ORDER BY {} {}, p.name ASC LIMIT ? OFFSET ?
                 "#,
-                where_clause,
-                where_prefix,
-                sort_column, sort_order
+                where_clause, where_prefix, sort_column, sort_order
             )
         } else {
             format!(
@@ -252,8 +254,7 @@ impl ProjectDatabase {
                 {}
                 ORDER BY {} {}, p.name ASC LIMIT ? OFFSET ?
                 "#,
-                where_clause,
-                sort_column, sort_order
+                where_clause, sort_column, sort_order
             )
         };
 
@@ -270,7 +271,7 @@ impl ProjectDatabase {
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             let plugin = crate::database::helpers::row_to_plugin(row)?;
-            
+
             Ok(GrpcPlugin {
                 plugin,
                 usage_count: row.get("usage_count")?,
@@ -362,12 +363,9 @@ impl ProjectDatabase {
         );
 
         let mut stmt = self.conn.prepare(&query)?;
-        let rows = stmt.query_map(
-            params![limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| {
-                Ok(crate::database::helpers::row_to_plugin(row)?)
-            },
-        )?;
+        let rows = stmt.query_map(params![limit.unwrap_or(1000), offset.unwrap_or(0)], |row| {
+            Ok(crate::database::helpers::row_to_plugin(row)?)
+        })?;
 
         let plugins: Result<Vec<Plugin>, _> = rows.collect();
         Ok((plugins?, total_count))
@@ -440,9 +438,13 @@ impl ProjectDatabase {
 
     /// Plugin counts over the plugins a list or search with the same filter returns,
     /// so a status bar can describe what is on screen.
-    pub fn get_plugin_stats_filtered(&self, filter: &PluginFilter) -> Result<PluginStats, DatabaseError> {
+    pub fn get_plugin_stats_filtered(
+        &self,
+        filter: &PluginFilter,
+    ) -> Result<PluginStats, DatabaseError> {
         let (conditions, bound) = filter.conditions();
-        let params: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            bound.iter().map(|b| b as &dyn rusqlite::ToSql).collect();
         let where_with = |extra: &str| {
             let mut all = conditions.clone();
             if !extra.is_empty() {
@@ -456,7 +458,9 @@ impl ProjectDatabase {
         };
         let count = |extra: &str| -> Result<i32, DatabaseError> {
             let sql = format!("SELECT COUNT(*) FROM plugins {}", where_with(extra));
-            Ok(self.conn.query_row(&sql, params.as_slice(), |row| row.get(0))?)
+            Ok(self
+                .conn
+                .query_row(&sql, params.as_slice(), |row| row.get(0))?)
         };
 
         let total_plugins = count("")?;
@@ -466,7 +470,10 @@ impl ProjectDatabase {
         // `total - installed` would quietly merge the two.
         let unknown_plugins = count("installed IS NULL")?;
         let unique_vendors: i32 = self.conn.query_row(
-            &format!("SELECT COUNT(DISTINCT vendor) FROM plugins {}", where_with("vendor IS NOT NULL")),
+            &format!(
+                "SELECT COUNT(DISTINCT vendor) FROM plugins {}",
+                where_with("vendor IS NOT NULL")
+            ),
             params.as_slice(),
             |row| row.get(0),
         )?;
@@ -585,37 +592,34 @@ impl ProjectDatabase {
         );
 
         let mut stmt = self.conn.prepare(&query)?;
-        let rows = stmt.query_map(
-            params![limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| {
-                let vendor: String = row.get(0)?;
-                
-                // Get plugins by format for this vendor
-                let mut plugins_by_format = std::collections::HashMap::new();
-                let mut format_stmt = self.conn.prepare(
-                    "SELECT format, COUNT(*) FROM plugins WHERE vendor = ? GROUP BY format"
-                )?;
-                let format_rows = format_stmt.query_map(params![&vendor], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-                })?;
+        let rows = stmt.query_map(params![limit.unwrap_or(1000), offset.unwrap_or(0)], |row| {
+            let vendor: String = row.get(0)?;
 
-                for format_result in format_rows {
-                    let (format, count) = format_result?;
-                    plugins_by_format.insert(format, count);
-                }
+            // Get plugins by format for this vendor
+            let mut plugins_by_format = std::collections::HashMap::new();
+            let mut format_stmt = self
+                .conn
+                .prepare("SELECT format, COUNT(*) FROM plugins WHERE vendor = ? GROUP BY format")?;
+            let format_rows = format_stmt.query_map(params![&vendor], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+            })?;
 
-                Ok(VendorInfo {
-                    vendor,
-                    plugin_count: row.get(1)?,
-                    installed_plugins: row.get(2)?,
-                    missing_plugins: row.get(3)?,
-                    unknown_plugins: row.get(4)?,
-                    total_usage_count: row.get(5)?,
-                    unique_projects_using: row.get(6)?,
-                    plugins_by_format,
-                })
-            },
-        )?;
+            for format_result in format_rows {
+                let (format, count) = format_result?;
+                plugins_by_format.insert(format, count);
+            }
+
+            Ok(VendorInfo {
+                vendor,
+                plugin_count: row.get(1)?,
+                installed_plugins: row.get(2)?,
+                missing_plugins: row.get(3)?,
+                unknown_plugins: row.get(4)?,
+                total_usage_count: row.get(5)?,
+                unique_projects_using: row.get(6)?,
+                plugins_by_format,
+            })
+        })?;
 
         let vendors: Result<Vec<VendorInfo>, _> = rows.collect();
         Ok((vendors?, total_count))
@@ -645,11 +649,11 @@ impl ProjectDatabase {
         };
 
         // Get total count
-        let total_count: i32 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT format) FROM plugins",
-            [],
-            |row| row.get(0),
-        )?;
+        let total_count: i32 =
+            self.conn
+                .query_row("SELECT COUNT(DISTINCT format) FROM plugins", [], |row| {
+                    row.get(0)
+                })?;
 
         // Build query with format statistics
         let query = format!(
@@ -700,7 +704,7 @@ impl ProjectDatabase {
             params![limit.unwrap_or(1000), offset.unwrap_or(0)],
             |row| {
                 let format: String = row.get(0)?;
-                
+
                 // Get plugins by vendor for this format
                 let mut plugins_by_vendor = std::collections::HashMap::new();
                 let mut vendor_stmt = self.conn.prepare(
@@ -733,7 +737,11 @@ impl ProjectDatabase {
     }
 
     /// Get a single plugin by ID with usage statistics
-    pub fn get_plugin_by_id(&self, plugin_id: &str, scope: ProjectScope) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    pub fn get_plugin_by_id(
+        &self,
+        plugin_id: &str,
+        scope: ProjectScope,
+    ) -> Result<Option<GrpcPlugin>, DatabaseError> {
         let scope_join = scope.join("pp.project_id");
         // Parse the plugin ID as UUID
         let uuid = match uuid::Uuid::parse_str(plugin_id) {
@@ -742,7 +750,8 @@ impl ProjectDatabase {
         };
 
         // Build query with usage data
-        let query = format!(r#"
+        let query = format!(
+            r#"
             SELECT 
                 p.*,
                 COALESCE(usage_stats.usage_count, 0) as usage_count,
@@ -757,12 +766,13 @@ impl ProjectDatabase {
                 GROUP BY pp.plugin_id
             ) usage_stats ON usage_stats.plugin_id = p.id
             WHERE p.id = ?
-        "#);
+        "#
+        );
 
         let mut stmt = self.conn.prepare(&query)?;
         let result = stmt.query_row(params![uuid.to_string()], |row| {
             let plugin = crate::database::helpers::row_to_plugin(row)?;
-            
+
             Ok(GrpcPlugin {
                 plugin,
                 usage_count: row.get("usage_count")?,
@@ -776,8 +786,6 @@ impl ProjectDatabase {
             Err(e) => Err(DatabaseError::from(e)),
         }
     }
-
-
 }
 
 #[derive(serde::Serialize)]
@@ -833,5 +841,3 @@ pub struct FormatInfo {
     pub unique_projects_using: i32,
     pub plugins_by_vendor: std::collections::HashMap<String, i32>,
 }
-
-

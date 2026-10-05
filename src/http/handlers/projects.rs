@@ -75,7 +75,10 @@ pub async fn list_projects(
         .await?;
 
     let projects = projects_to_dtos(&state, projects).await?;
-    Ok(Json(ProjectListResponse { projects, total_count }))
+    Ok(Json(ProjectListResponse {
+        projects,
+        total_count,
+    }))
 }
 
 pub async fn get_project(
@@ -139,7 +142,12 @@ pub async fn permanently_delete_project(
     State(state): State<AppState>,
     Path(project_id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    match state.services.projects.permanently_delete(&project_id).await {
+    match state
+        .services
+        .projects
+        .permanently_delete(&project_id)
+        .await
+    {
         Ok(()) => Ok(axum::http::StatusCode::NO_CONTENT),
         Err(DatabaseError::InvalidOperation(msg))
             if msg == "Cannot permanently delete an active project" =>
@@ -166,7 +174,11 @@ pub async fn batch_delete(
     State(state): State<AppState>,
     Json(req): Json<BatchProjectIdsRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let results = state.services.projects.batch_delete(&req.project_ids).await?;
+    let results = state
+        .services
+        .projects
+        .batch_delete(&req.project_ids)
+        .await?;
     Ok(Json(BatchOperationResponse::from_results(results)))
 }
 

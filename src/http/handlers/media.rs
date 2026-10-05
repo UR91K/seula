@@ -30,7 +30,9 @@ pub async fn upload_cover_art(
     body: Bytes,
 ) -> Result<impl IntoResponse, ApiError> {
     if body.is_empty() {
-        return Err(ApiError::InvalidRequest("No file data received".to_string()));
+        return Err(ApiError::InvalidRequest(
+            "No file data received".to_string(),
+        ));
     }
 
     let response = match state
@@ -60,7 +62,9 @@ pub async fn upload_audio_file(
     body: Bytes,
 ) -> Result<impl IntoResponse, ApiError> {
     if body.is_empty() {
-        return Err(ApiError::InvalidRequest("No file data received".to_string()));
+        return Err(ApiError::InvalidRequest(
+            "No file data received".to_string(),
+        ));
     }
 
     let response = match state
@@ -130,7 +134,13 @@ pub async fn download_media(
 fn content_disposition(filename: &str) -> HeaderValue {
     let ascii: String = filename
         .chars()
-        .map(|c| if (c.is_ascii_graphic() && c != '"' && c != '\\') || c == ' ' { c } else { '_' })
+        .map(|c| {
+            if (c.is_ascii_graphic() && c != '"' && c != '\\') || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let encoded: String = filename
         .bytes()
@@ -142,8 +152,11 @@ fn content_disposition(filename: &str) -> HeaderValue {
             }
         })
         .collect();
-    HeaderValue::from_str(&format!("attachment; filename=\"{}\"; filename*=UTF-8''{}", ascii, encoded))
-        .unwrap_or_else(|_| HeaderValue::from_static("attachment"))
+    HeaderValue::from_str(&format!(
+        "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+        ascii, encoded
+    ))
+    .unwrap_or_else(|_| HeaderValue::from_static("attachment"))
 }
 
 pub async fn delete_media(
@@ -188,7 +201,12 @@ pub async fn remove_collection_cover_art(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
 ) -> Json<MutationResponse> {
-    match state.services.media.remove_collection_cover_art(&collection_id).await {
+    match state
+        .services
+        .media
+        .remove_collection_cover_art(&collection_id)
+        .await
+    {
         Ok(()) => Json(MutationResponse {
             success: true,
             error_message: None,
@@ -226,7 +244,12 @@ pub async fn remove_project_audio_file(
     State(state): State<AppState>,
     Path(project_id): Path<String>,
 ) -> Json<MutationResponse> {
-    match state.services.media.remove_project_audio_file(&project_id).await {
+    match state
+        .services
+        .media
+        .remove_project_audio_file(&project_id)
+        .await
+    {
         Ok(()) => Json(MutationResponse {
             success: true,
             error_message: None,
@@ -242,7 +265,11 @@ pub async fn list_media_files(
     State(state): State<AppState>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let (media_files, total_count) = state.services.media.list_media_files(query.limit, query.offset).await?;
+    let (media_files, total_count) = state
+        .services
+        .media
+        .list_media_files(query.limit, query.offset)
+        .await?;
     Ok(Json(MediaFileListResponse {
         media_files: media_files.into_iter().map(MediaFileDto::from).collect(),
         total_count,
@@ -279,7 +306,9 @@ pub async fn get_orphaned_media_files(
     }))
 }
 
-pub async fn get_media_statistics(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+pub async fn get_media_statistics(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
     let (total_files, total_size, cover_art_count, audio_file_count, orphaned_count, orphaned_size) =
         state.services.media.get_media_statistics().await?;
 
@@ -302,7 +331,11 @@ pub async fn cleanup_orphaned_media(
     State(state): State<AppState>,
     Query(query): Query<CleanupQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let (deleted_file_ids, bytes_freed) = state.services.media.cleanup_orphaned_media(query.dry_run).await?;
+    let (deleted_file_ids, bytes_freed) = state
+        .services
+        .media
+        .cleanup_orphaned_media(query.dry_run)
+        .await?;
 
     Ok(Json(CleanupResponse {
         files_cleaned: deleted_file_ids.len() as i32,
@@ -336,7 +369,11 @@ pub async fn add_project_audio_file(
     Path(project_id): Path<String>,
     Json(req): Json<SetAudioFileRequest>,
 ) -> Result<Json<AudioFileListResponse>, ApiError> {
-    state.services.media.add_project_audio_file(&project_id, &req.media_file_id).await?;
+    state
+        .services
+        .media
+        .add_project_audio_file(&project_id, &req.media_file_id)
+        .await?;
     list_project_audio_files(State(state), Path(project_id)).await
 }
 

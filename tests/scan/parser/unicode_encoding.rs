@@ -3,8 +3,8 @@
 //! This test focuses on the problematic Play.als project that contains
 //! samples with unicode control characters and encoding issues.
 
-use std::path::PathBuf;
 use seula::Project;
+use std::path::PathBuf;
 
 use crate::{common::setup, scan::parser::macos_sample_paths};
 

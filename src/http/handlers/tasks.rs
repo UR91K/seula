@@ -6,9 +6,9 @@ use axum::response::IntoResponse;
 use axum::Json;
 
 use crate::http::dto::tasks::{
-    BatchOperationResponse, BatchTaskIdsRequest, BatchUpdateTaskStatusRequest,
-    CreateTaskRequest, ProjectTasksResponse, SearchTasksQuery, TaskDto, TaskSearchResponse,
-    TaskStatisticsDto, TaskStatisticsQuery, UpdateTaskRequest,
+    BatchOperationResponse, BatchTaskIdsRequest, BatchUpdateTaskStatusRequest, CreateTaskRequest,
+    ProjectTasksResponse, SearchTasksQuery, TaskDto, TaskSearchResponse, TaskStatisticsDto,
+    TaskStatisticsQuery, UpdateTaskRequest,
 };
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
@@ -31,7 +31,11 @@ pub async fn create_task(
     Path(project_id): Path<String>,
     Json(req): Json<CreateTaskRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let task = state.services.tasks.create_task(&project_id, &req.description).await?;
+    let task = state
+        .services
+        .tasks
+        .create_task(&project_id, &req.description)
+        .await?;
     Ok(Json(TaskDto::from(task)))
 }
 
@@ -72,7 +76,11 @@ pub async fn batch_delete_tasks(
     State(state): State<AppState>,
     Json(req): Json<BatchTaskIdsRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let results = state.services.tasks.batch_delete_tasks(&req.task_ids).await?;
+    let results = state
+        .services
+        .tasks
+        .batch_delete_tasks(&req.task_ids)
+        .await?;
     Ok(Json(BatchOperationResponse::from_results(results)))
 }
 

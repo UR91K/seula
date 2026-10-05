@@ -1,7 +1,7 @@
 use crate::error::DatabaseError;
 use chrono::Utc;
-use tracing::debug;
 use rusqlite::params;
+use tracing::debug;
 
 use super::ProjectDatabase;
 

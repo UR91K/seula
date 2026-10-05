@@ -215,8 +215,11 @@ fn scanned_uids_are_stored_normalised() {
     // The scanner reports uppercase; Ableton writes lowercase. If the stored form
     // followed the scanner, every reference lookup would miss.
     let uid = vst3_uid(0xAB);
-    db.persist_plugin_scan(&report_of(vec![scanned_vst3(&uid, "Case Test", vec![])]), true)
-        .unwrap();
+    db.persist_plugin_scan(
+        &report_of(vec![scanned_vst3(&uid, "Case Test", vec![])]),
+        true,
+    )
+    .unwrap();
 
     let stored: String = db
         .conn
@@ -244,7 +247,10 @@ fn a_full_scan_marks_what_it_did_not_find_as_missing() {
 
     // The second scan no longer sees the first plugin.
     let result = db
-        .persist_plugin_scan(&report_of(vec![scanned_vst3(&kept, "Still Here", vec![])]), true)
+        .persist_plugin_scan(
+            &report_of(vec![scanned_vst3(&kept, "Still Here", vec![])]),
+            true,
+        )
         .unwrap();
 
     assert_eq!(result.marked_missing, 1);
@@ -493,7 +499,10 @@ fn a_full_scan_records_that_we_have_looked() {
     .unwrap();
 
     assert!(db.has_scanned_plugins().unwrap());
-    assert!(db.get_app_state(PLUGIN_SCAN_COMPLETED_KEY).unwrap().is_some());
+    assert!(db
+        .get_app_state(PLUGIN_SCAN_COMPLETED_KEY)
+        .unwrap()
+        .is_some());
 }
 
 #[test]
@@ -541,10 +550,16 @@ fn app_state_round_trips_and_overwrites() {
     assert_eq!(db.get_app_state("some_key").unwrap(), None);
 
     db.set_app_state("some_key", "first").unwrap();
-    assert_eq!(db.get_app_state("some_key").unwrap().as_deref(), Some("first"));
+    assert_eq!(
+        db.get_app_state("some_key").unwrap().as_deref(),
+        Some("first")
+    );
 
     db.set_app_state("some_key", "second").unwrap();
-    assert_eq!(db.get_app_state("some_key").unwrap().as_deref(), Some("second"));
+    assert_eq!(
+        db.get_app_state("some_key").unwrap().as_deref(),
+        Some("second")
+    );
 }
 
 // ---------------------------------------------------------------- aggregates
@@ -552,7 +567,13 @@ fn app_state_round_trips_and_overwrites() {
 /// Insert a plugin row directly, so the test can set all three install states —
 /// including `NULL`, which no write path produces on demand. Returns the generated id
 /// so callers can link it into `project_plugins`.
-fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, installed: Option<bool>) -> String {
+fn insert_plugin(
+    db: &ProjectDatabase,
+    name: &str,
+    vendor: &str,
+    format: &str,
+    installed: Option<bool>,
+) -> String {
     let id = uuid::Uuid::new_v4().to_string();
     db.conn
         .execute(
@@ -560,7 +581,10 @@ fn insert_plugin(db: &ProjectDatabase, name: &str, vendor: &str, format: &str, i
              VALUES (?, 'VST3', ?, ?, ?, ?, ?)",
             rusqlite::params![
                 id,
-                format!("{:032x}", name.len() as u128 + vendor.len() as u128 * 997 + format.len() as u128 * 31),
+                format!(
+                    "{:032x}",
+                    name.len() as u128 + vendor.len() as u128 * 997 + format.len() as u128 * 31
+                ),
                 name,
                 format,
                 vendor,
@@ -621,7 +645,9 @@ fn vendor_and_format_plugin_count_does_not_inflate_with_project_usage() {
     // ...plus a second, unrelated plugin, used once, from the same vendor and format.
     link_plugin_to_project(&db, &project_a, &_rarely_used);
 
-    let (vendors, _) = db.get_plugin_vendors(None, None, None, None, ProjectScope::All).unwrap();
+    let (vendors, _) = db
+        .get_plugin_vendors(None, None, None, None, ProjectScope::All)
+        .unwrap();
     let acme = vendors.iter().find(|v| v.vendor == "Acme").unwrap();
     // Two distinct plugins exist for this vendor, regardless of how many projects use
     // either of them.
@@ -629,7 +655,9 @@ fn vendor_and_format_plugin_count_does_not_inflate_with_project_usage() {
     assert_eq!(acme.unique_projects_using, 3);
     assert_eq!(acme.total_usage_count, 4);
 
-    let (formats, _) = db.get_plugin_formats(None, None, None, None, ProjectScope::All).unwrap();
+    let (formats, _) = db
+        .get_plugin_formats(None, None, None, None, ProjectScope::All)
+        .unwrap();
     let audiofx = formats.iter().find(|f| f.format == "VST3 AudioFx").unwrap();
     assert_eq!(audiofx.plugin_count, 2);
     assert_eq!(audiofx.unique_projects_using, 3);
@@ -650,7 +678,9 @@ fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
     insert_plugin(&db, "NeverLookedFor", "Acme", "VST3 AudioFx", None);
     insert_plugin(&db, "OtherVendorUnscanned", "Bolt", "VST2 Instrument", None);
 
-    let (vendors, _) = db.get_plugin_vendors(None, None, None, None, ProjectScope::All).unwrap();
+    let (vendors, _) = db
+        .get_plugin_vendors(None, None, None, None, ProjectScope::All)
+        .unwrap();
     assert_eq!(vendors.len(), 2);
 
     for vendor in &vendors {
@@ -671,7 +701,9 @@ fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
     let bolt = vendors.iter().find(|v| v.vendor == "Bolt").unwrap();
     assert_eq!(bolt.unknown_plugins, 1);
 
-    let (formats, _) = db.get_plugin_formats(None, None, None, None, ProjectScope::All).unwrap();
+    let (formats, _) = db
+        .get_plugin_formats(None, None, None, None, ProjectScope::All)
+        .unwrap();
     assert_eq!(formats.len(), 2);
 
     for format in &formats {

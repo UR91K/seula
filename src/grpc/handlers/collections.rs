@@ -1,5 +1,5 @@
-use tracing::debug;
 use tonic::{Code, Request, Response, Status};
+use tracing::debug;
 
 use super::super::collections::*;
 use super::super::common::*;
@@ -45,7 +45,13 @@ impl CollectionsHandler {
 
         let (collections, total_count) = self
             .service
-            .list_collections(req.limit, req.offset, req.sort_by, req.sort_desc, crate::database::ProjectScope::All)
+            .list_collections(
+                req.limit,
+                req.offset,
+                req.sort_by,
+                req.sort_desc,
+                crate::database::ProjectScope::All,
+            )
             .await?;
 
         Ok(Response::new(GetCollectionsResponse {
@@ -61,7 +67,10 @@ impl CollectionsHandler {
         debug!("GetCollection request: {:?}", request);
         let req = request.into_inner();
 
-        let collection = self.service.get_collection(&req.collection_id, crate::database::ProjectScope::All).await?;
+        let collection = self
+            .service
+            .get_collection(&req.collection_id, crate::database::ProjectScope::All)
+            .await?;
         if collection.is_none() {
             debug!("Collection {} not found", req.collection_id);
         }
@@ -160,7 +169,9 @@ impl CollectionsHandler {
             "Successfully added project {} to collection {}",
             req.project_id, req.collection_id
         );
-        Ok(Response::new(AddProjectToCollectionResponse { success: true }))
+        Ok(Response::new(AddProjectToCollectionResponse {
+            success: true,
+        }))
     }
 
     pub async fn remove_project_from_collection(
@@ -178,7 +189,9 @@ impl CollectionsHandler {
             "Successfully removed project {} from collection {}",
             req.project_id, req.collection_id
         );
-        Ok(Response::new(RemoveProjectFromCollectionResponse { success: true }))
+        Ok(Response::new(RemoveProjectFromCollectionResponse {
+            success: true,
+        }))
     }
 
     pub async fn reorder_collection(
@@ -189,7 +202,11 @@ impl CollectionsHandler {
         let req = request.into_inner();
 
         self.service
-            .reorder_collection(&req.collection_id, &req.project_ids, crate::database::ProjectScope::All)
+            .reorder_collection(
+                &req.collection_id,
+                &req.project_ids,
+                crate::database::ProjectScope::All,
+            )
             .await
             .map_err(|e| match e {
                 crate::error::DatabaseError::InvalidOperation(msg) => {
@@ -213,7 +230,10 @@ impl CollectionsHandler {
         debug!("GetCollectionTasks request: {:?}", request);
         let req = request.into_inner();
 
-        let tasks_data = self.service.get_collection_tasks(&req.collection_id, crate::database::ProjectScope::All).await?;
+        let tasks_data = self
+            .service
+            .get_collection_tasks(&req.collection_id, crate::database::ProjectScope::All)
+            .await?;
 
         let mut tasks = Vec::new();
         let mut completed_count = 0;
@@ -260,7 +280,12 @@ impl CollectionsHandler {
 
         let (collections, total_count) = self
             .service
-            .search_collections(&req.query, req.limit, req.offset, crate::database::ProjectScope::All)
+            .search_collections(
+                &req.query,
+                req.limit,
+                req.offset,
+                crate::database::ProjectScope::All,
+            )
             .await?;
 
         Ok(Response::new(SearchCollectionsResponse {
@@ -306,9 +331,11 @@ impl CollectionsHandler {
             .batch_add_to_collection(&req.project_ids, &req.collection_id)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -337,9 +364,11 @@ impl CollectionsHandler {
             .batch_remove_from_collection(&req.project_ids, &req.collection_id)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -373,9 +402,11 @@ impl CollectionsHandler {
             )
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {

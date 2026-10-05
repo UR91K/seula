@@ -1,13 +1,13 @@
 //! Batch operations gRPC tests
 
-use seula::grpc::projects::*;
-use seula::grpc::collections::*;
-use seula::grpc::tags::*;
-use seula::grpc::tasks::*;
-use seula::grpc::projects::project_service_server::ProjectService;
 use seula::grpc::collections::collection_service_server::CollectionService;
+use seula::grpc::collections::*;
+use seula::grpc::projects::project_service_server::ProjectService;
+use seula::grpc::projects::*;
 use seula::grpc::tags::tag_service_server::TagService;
+use seula::grpc::tags::*;
 use seula::grpc::tasks::task_service_server::TaskService;
+use seula::grpc::tasks::*;
 
 use super::*;
 use crate::common::setup;

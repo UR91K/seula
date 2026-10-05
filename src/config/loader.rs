@@ -1,4 +1,4 @@
-use crate::config::{Config, defaults};
+use crate::config::{defaults, Config};
 use crate::error::ConfigError;
 use dirs;
 use std::path::PathBuf;
@@ -46,9 +46,9 @@ impl Config {
 /// Processes {USER_HOME} placeholders in all configuration paths
 fn process_user_home_placeholders(config: &mut Config) -> Result<(), ConfigError> {
     let home_dir = dirs::home_dir().ok_or(ConfigError::HomeDirError)?;
-    let home_dir_str = home_dir.to_str().ok_or_else(|| {
-        ConfigError::InvalidPath("Home directory path is not valid UTF-8".into())
-    })?;
+    let home_dir_str = home_dir
+        .to_str()
+        .ok_or_else(|| ConfigError::InvalidPath("Home directory path is not valid UTF-8".into()))?;
 
     // Replace {USER_HOME} in all paths
     config.paths = config
@@ -84,9 +84,7 @@ fn set_default_database_path(config: &mut Config) -> Result<(), ConfigError> {
             app_data_dir
                 .join("seula.db")
                 .to_str()
-                .ok_or_else(|| {
-                    ConfigError::InvalidPath("Database path is not valid UTF-8".into())
-                })?
+                .ok_or_else(|| ConfigError::InvalidPath("Database path is not valid UTF-8".into()))?
                 .to_string(),
         );
     }
@@ -139,9 +137,9 @@ pub fn find_config_file() -> Result<PathBuf, ConfigError> {
     // If no config file found, create one in the user's AppData directory
     std::fs::create_dir_all(&app_config_dir).map_err(|e| ConfigError::IoError(e))?;
 
-            // Generate and write default config
-        let default_config = defaults::generate_default_config()?;
+    // Generate and write default config
+    let default_config = defaults::generate_default_config()?;
     std::fs::write(&appdata_config_path, default_config).map_err(|e| ConfigError::IoError(e))?;
 
     Ok(appdata_config_path)
-} 
+}

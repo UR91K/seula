@@ -1,17 +1,17 @@
 //! File event tests
 
-use tracing::debug;
+use seula::database::ProjectDatabase;
+use seula::watcher::file_watcher::{FileEvent, FileWatcher};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use seula::database::ProjectDatabase;
-use seula::watcher::file_watcher::{FileEvent, FileWatcher};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use tracing::debug;
 
 use crate::common::setup;
 

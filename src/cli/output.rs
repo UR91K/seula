@@ -1,10 +1,10 @@
-use crate::cli::OutputFormat;
 use crate::cli::CliError;
+use crate::cli::OutputFormat;
 use colored::Colorize;
 use serde::Serialize;
 use std::cmp;
-use terminal_size::{Width, terminal_size};
-use unicode_width::{UnicodeWidthStr, UnicodeWidthChar};
+use terminal_size::{terminal_size, Width};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Output formatter for CLI results
 pub struct OutputFormatter {
@@ -54,7 +54,7 @@ impl OutputFormatter {
     fn print_simple_table<T: Serialize + TableDisplay>(&self, data: &T) -> Result<(), CliError> {
         let table_data = data.to_simple_table();
         let terminal_width = self.get_terminal_width();
-        
+
         if table_data.rows.is_empty() {
             return Ok(());
         }
@@ -82,12 +82,12 @@ impl OutputFormatter {
         let padding = 2; // spaces between columns
         let total_padding = padding * (num_cols - 1);
         let available_width = terminal_width.saturating_sub(total_padding);
-        
+
         self.adjust_column_widths(&mut col_widths, available_width);
 
         // Print header
         self.print_table_row(&table_data.headers, &col_widths, true);
-        
+
         // Print separator line
         self.print_separator(&col_widths);
 
@@ -101,14 +101,14 @@ impl OutputFormatter {
 
     fn adjust_column_widths(&self, col_widths: &mut [usize], available_width: usize) {
         let total_preferred = col_widths.iter().sum::<usize>();
-        
+
         if total_preferred <= available_width {
             return; // All columns fit
         }
 
         // Proportionally reduce column widths
         let reduction_factor = available_width as f64 / total_preferred as f64;
-        
+
         for width in col_widths.iter_mut() {
             *width = cmp::max(8, (*width as f64 * reduction_factor) as usize); // min width 8
         }
@@ -116,16 +116,16 @@ impl OutputFormatter {
 
     fn print_table_row(&self, row: &[String], col_widths: &[usize], is_header: bool) {
         let mut output = String::new();
-        
+
         for (i, cell) in row.iter().enumerate() {
             if i > 0 {
                 output.push_str("  "); // column padding
             }
-            
+
             if i < col_widths.len() {
                 let width = col_widths[i];
                 let plain_text = strip_ansi_codes(cell);
-                
+
                 if plain_text.width() > width {
                     // Truncate with ellipsis using Unicode-aware truncation
                     let truncated = if width > 3 {
@@ -134,7 +134,7 @@ impl OutputFormatter {
                     } else {
                         truncate_to_width(&plain_text, width)
                     };
-                    
+
                     if self.no_color || !cell.contains('\x1b') {
                         output.push_str(&format!("{:<width$}", truncated, width = width));
                     } else {
@@ -166,7 +166,7 @@ impl OutputFormatter {
 
     fn print_separator(&self, col_widths: &[usize]) {
         let mut separator = String::new();
-        
+
         for (i, &width) in col_widths.iter().enumerate() {
             if i > 0 {
                 separator.push_str("  ");
@@ -182,8 +182,7 @@ impl OutputFormatter {
     }
 
     fn print_json<T: Serialize>(&self, data: &T) -> Result<(), CliError> {
-        let json = serde_json::to_string_pretty(data)
-            .map_err(|e| -> CliError { e.into() })?;
+        let json = serde_json::to_string_pretty(data).map_err(|e| -> CliError { e.into() })?;
         println!("{}", json);
         Ok(())
     }
@@ -259,7 +258,7 @@ pub fn should_use_color() -> bool {
 }
 
 /// Truncate a string to a maximum display width, respecting Unicode character boundaries
-/// 
+///
 /// This function properly handles Unicode characters that may have different display widths:
 /// - Regular ASCII characters: 1 column each
 /// - CJK characters (Chinese, Japanese, Korean): 2 columns each  
@@ -270,10 +269,10 @@ fn truncate_to_width(text: &str, max_width: usize) -> String {
     if text.width() <= max_width {
         return text.to_string();
     }
-    
+
     let mut result = String::new();
     let mut current_width = 0;
-    
+
     for ch in text.chars() {
         let char_width = ch.width().unwrap_or(0);
         if current_width + char_width > max_width {
@@ -282,7 +281,7 @@ fn truncate_to_width(text: &str, max_width: usize) -> String {
         result.push(ch);
         current_width += char_width;
     }
-    
+
     result
 }
 
@@ -290,7 +289,7 @@ fn truncate_to_width(text: &str, max_width: usize) -> String {
 fn strip_ansi_codes(text: &str) -> String {
     let mut result = String::new();
     let mut chars = text.chars();
-    
+
     while let Some(ch) = chars.next() {
         if ch == '\x1b' {
             // Skip escape sequence
@@ -306,67 +305,74 @@ fn strip_ansi_codes(text: &str) -> String {
             result.push(ch);
         }
     }
-    
+
     result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[derive(Serialize)]
     struct TestTable {
         table: SimpleTable,
     }
-    
+
     impl TableDisplay for TestTable {
         fn to_simple_table(&self) -> SimpleTable {
             self.table.clone()
         }
-        
+
         fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-            writer.write_record(["col1", "col2"]).map_err(|e| -> CliError { e.into() })?;
+            writer
+                .write_record(["col1", "col2"])
+                .map_err(|e| -> CliError { e.into() })?;
             for row in &self.table.rows {
                 if row.len() >= 2 {
-                    writer.write_record([&row[0], &row[1]]).map_err(|e| -> CliError { e.into() })?;
+                    writer
+                        .write_record([&row[0], &row[1]])
+                        .map_err(|e| -> CliError { e.into() })?;
                 }
             }
             Ok(())
         }
     }
-    
+
     #[test]
     fn test_simple_table_creation() {
         let mut table = SimpleTable::new(vec!["Name".to_string(), "Value".to_string()]);
         table.add_row(vec!["Test".to_string(), "123".to_string()]);
         table.add_row(vec!["Another".to_string(), "456".to_string()]);
-        
+
         assert_eq!(table.headers.len(), 2);
         assert_eq!(table.rows.len(), 2);
         assert_eq!(table.rows[0][0], "Test");
         assert_eq!(table.rows[1][1], "456");
     }
-    
+
     #[test]
     fn test_table_formatting() {
-        let mut table = SimpleTable::new(vec!["Short".to_string(), "Very Long Header Name".to_string()]);
+        let mut table = SimpleTable::new(vec![
+            "Short".to_string(),
+            "Very Long Header Name".to_string(),
+        ]);
         table.add_row(vec!["A".to_string(), "Short".to_string()]);
         table.add_row(vec!["Very Long Value".to_string(), "B".to_string()]);
-        
+
         let test_data = TestTable { table };
         let formatter = OutputFormatter::new(OutputFormat::Table, false);
-        
+
         // This should not panic and should handle width calculations
         let result = formatter.print(&test_data);
         assert!(result.is_ok());
     }
-    
+
     #[test]
     fn test_ansi_stripping() {
         let colored_text = "\x1b[32mGreen Text\x1b[0m";
         let stripped = strip_ansi_codes(colored_text);
         assert_eq!(stripped, "Green Text");
-        
+
         let plain_text = "Normal Text";
         let stripped_plain = strip_ansi_codes(plain_text);
         assert_eq!(stripped_plain, "Normal Text");

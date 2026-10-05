@@ -1,8 +1,8 @@
-pub mod windows_paths;
-pub mod loader;
-pub mod validator;
-pub mod paths;
 pub mod defaults;
+pub mod loader;
+pub mod paths;
+pub mod validator;
+pub mod windows_paths;
 
 use crate::error::ConfigError;
 use once_cell::sync::Lazy;
@@ -10,10 +10,11 @@ use serde::{Deserialize, Serialize};
 
 // Re-export constants from submodules for backward compatibility
 pub use defaults::{
-    DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_COVER_ART_SIZE_MB, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
+    DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
+    DEFAULT_MAX_COVER_ART_SIZE_MB,
 };
-pub use paths::MAX_PATH_LENGTH;
 pub use loader::MAX_DIRECTORY_TRAVERSAL_DEPTH;
+pub use paths::MAX_PATH_LENGTH;
 
 /// Configuration for the Seula application
 ///
@@ -121,7 +122,10 @@ impl Config {
         if self.needs_setup() {
             "Configuration incomplete: No project paths specified. Please add paths to begin scanning projects.".to_string()
         } else {
-            format!("Configuration ready: {} project path(s) configured", self.paths.len())
+            format!(
+                "Configuration ready: {} project path(s) configured",
+                self.paths.len()
+            )
         }
     }
 

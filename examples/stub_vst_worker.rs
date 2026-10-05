@@ -74,11 +74,7 @@ fn main() {
 
 /// A minimal `PluginMeta`, matching the real record's required fields.
 fn plugin_json(path: &str) -> String {
-    let name = path
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or(path)
-        .to_string();
+    let name = path.rsplit(['/', '\\']).next().unwrap_or(path).to_string();
 
     format!(
         r#"{{"path":{},"format":"VST3","name":{},"vendor":"Stub Audio","version":"1.0.0",

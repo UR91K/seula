@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::common::{generate_test_live_sets_arc, setup};
-use std::collections::HashSet;
 use seula::database::batch::BatchInsertManager;
+use std::collections::HashSet;
 use tempfile::tempdir;
 
 #[test]
@@ -122,7 +122,11 @@ fn a_rescan_that_finds_a_sample_gone_marks_it_missing() {
     };
     let present = |db: &ProjectDatabase, name: &str| -> bool {
         db.conn
-            .query_row("SELECT is_present FROM samples WHERE name = ?", [name], |r| r.get(0))
+            .query_row(
+                "SELECT is_present FROM samples WHERE name = ?",
+                [name],
+                |r| r.get(0),
+            )
             .expect("sample row")
     };
 
@@ -131,10 +135,20 @@ fn a_rescan_that_finds_a_sample_gone_marks_it_missing() {
     assert!(present(&db, "kick.wav"));
 
     // a.als rescanned after kick.wav was deleted from disk
-    scan(&mut db, "a.als", &[("kick.wav", false), ("snare.wav", true)]);
-    assert!(!present(&db, "kick.wav"), "the rescan's answer replaces the stored one");
+    scan(
+        &mut db,
+        "a.als",
+        &[("kick.wav", false), ("snare.wav", true)],
+    );
+    assert!(
+        !present(&db, "kick.wav"),
+        "the rescan's answer replaces the stored one"
+    );
     assert!(present(&db, "snare.wav"));
-    assert!(present(&db, "hat.wav"), "a sample this scan did not see is left alone");
+    assert!(
+        present(&db, "hat.wav"),
+        "a sample this scan did not see is left alone"
+    );
 
     // Within one scan, a sample any project finds is present.
     scan(&mut db, "a.als", &[("kick.wav", true)]);

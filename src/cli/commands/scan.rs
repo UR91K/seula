@@ -1,5 +1,5 @@
 use crate::cli::commands::CliContext;
-use crate::cli::output::{OutputFormatter, MessageType, SimpleTable, TableDisplay};
+use crate::cli::output::{MessageType, OutputFormatter, SimpleTable, TableDisplay};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -11,12 +11,19 @@ impl TableDisplay for ScanResults {
     fn to_simple_table(&self) -> SimpleTable {
         self.table.clone()
     }
-    
-    fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), crate::cli::CliError> {
-        writer.write_record(["metric", "value"]).map_err(|e| -> crate::cli::CliError { e.into() })?;
+
+    fn to_csv<W: std::io::Write>(
+        &self,
+        writer: &mut csv::Writer<W>,
+    ) -> Result<(), crate::cli::CliError> {
+        writer
+            .write_record(["metric", "value"])
+            .map_err(|e| -> crate::cli::CliError { e.into() })?;
         for row in &self.table.rows {
             if row.len() >= 2 {
-                writer.write_record([&row[0], &row[1]]).map_err(|e| -> crate::cli::CliError { e.into() })?;
+                writer
+                    .write_record([&row[0], &row[1]])
+                    .map_err(|e| -> crate::cli::CliError { e.into() })?;
             }
         }
         Ok(())
@@ -25,8 +32,8 @@ impl TableDisplay for ScanResults {
 use crate::cli::CliError;
 use crate::database::batch::BatchInsertManager;
 use crate::database::ProjectDatabase;
-use crate::project::Project;
 use crate::process_projects_with_progress;
+use crate::project::Project;
 use crate::scan::daw::ParseError;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::project_scanner::ProjectPathScanner;
@@ -47,37 +54,35 @@ impl crate::cli::commands::CliCommand for ScanCommand {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
         // If no explicit paths provided, use the shared scanning logic (same as gRPC)
         if self.paths.is_empty() {
-            formatter.print_message(
-                "Starting scan using configured paths",
-                MessageType::Info,
-            );
+            formatter.print_message("Starting scan using configured paths", MessageType::Info);
 
-            let progress_callback = move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
-                let phase_label = match phase {
-                    "starting" => "Starting",
-                    "scanning_plugins" => "Plugins",
-                    "discovering" => "Discovering",
-                    "preprocessing" => "Preprocessing",
-                    "parsing" => "Parsing",
-                    "inserting" => "Saving",
-                    "completed" => "Completed",
-                    _ => phase,
+            let progress_callback =
+                move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
+                    let phase_label = match phase {
+                        "starting" => "Starting",
+                        "scanning_plugins" => "Plugins",
+                        "discovering" => "Discovering",
+                        "preprocessing" => "Preprocessing",
+                        "parsing" => "Parsing",
+                        "inserting" => "Saving",
+                        "completed" => "Completed",
+                        _ => phase,
+                    };
+
+                    // Simple progress output suitable for CLI
+                    if total > 0 {
+                        println!(
+                            "[{}] {:.1}% - {} ({}/{})",
+                            phase_label,
+                            progress * 100.0,
+                            message,
+                            completed,
+                            total
+                        );
+                    } else {
+                        println!("[{}] {}", phase_label, message);
+                    }
                 };
-
-                // Simple progress output suitable for CLI
-                if total > 0 {
-                    println!(
-                        "[{}] {:.1}% - {} ({}/{})",
-                        phase_label,
-                        progress * 100.0,
-                        message,
-                        completed,
-                        total
-                    );
-                } else {
-                    println!("[{}] {}", phase_label, message);
-                }
-            };
 
             process_projects_with_progress(Some(progress_callback))
                 .map_err(|e| -> CliError { Box::new(e) })?;
@@ -95,7 +100,10 @@ impl crate::cli::commands::CliCommand for ScanCommand {
         // Discover project files
         let project_paths = self.discover_project_files().await?;
         if project_paths.is_empty() {
-            formatter.print_message("No .als files found in specified paths", MessageType::Warning);
+            formatter.print_message(
+                "No .als files found in specified paths",
+                MessageType::Warning,
+            );
             return Ok(());
         }
 
@@ -108,7 +116,8 @@ impl crate::cli::commands::CliCommand for ScanCommand {
         let paths_to_process = if self.force {
             project_paths
         } else {
-            self.filter_existing_projects(&ctx.db, project_paths).await?
+            self.filter_existing_projects(&ctx.db, project_paths)
+                .await?
         };
 
         if paths_to_process.is_empty() {
@@ -198,9 +207,7 @@ impl ScanCommand {
         let results_rx = parser.get_results_receiver();
         let mut results = Vec::with_capacity(total);
         while results.len() < total {
-            let result = results_rx
-                .recv()
-                .map_err(|e| -> CliError { Box::new(e) })?;
+            let result = results_rx.recv().map_err(|e| -> CliError { Box::new(e) })?;
             results.push(result);
             if results.len() % 10 == 0 || results.len() == total {
                 println!("Processed {} / {} projects...", results.len(), total);
@@ -244,7 +251,10 @@ impl ScanCommand {
             let mut batch_manager = BatchInsertManager::new(&mut db_guard.conn, projects);
             match batch_manager.execute() {
                 Ok(stats) => {
-                    println!("✓ Stored {} project(s) in database", stats.projects_inserted);
+                    println!(
+                        "✓ Stored {} project(s) in database",
+                        stats.projects_inserted
+                    );
                 }
                 Err(e) => {
                     eprintln!("✗ Failed to store batch: {}", e);
@@ -256,7 +266,12 @@ impl ScanCommand {
         Ok((success_count, error_count))
     }
 
-    fn display_scan_results(&self, formatter: &OutputFormatter, success_count: usize, error_count: usize) {
+    fn display_scan_results(
+        &self,
+        formatter: &OutputFormatter,
+        success_count: usize,
+        error_count: usize,
+    ) {
         let total_processed = success_count + error_count;
 
         let mut table = SimpleTable::new(vec!["Scan Results".to_string(), "Count".to_string()]);
@@ -272,10 +287,7 @@ impl ScanCommand {
         ]);
 
         if error_count > 0 {
-            table.add_row(vec![
-                "Errors".to_string(),
-                error_count.to_string(),
-            ]);
+            table.add_row(vec!["Errors".to_string(), error_count.to_string()]);
         }
 
         formatter.print_message("\nScan Complete", MessageType::Success);
@@ -284,7 +296,10 @@ impl ScanCommand {
 
         if success_count > 0 {
             formatter.print_message(
-                &format!("Successfully scanned and stored {} project(s)", success_count),
+                &format!(
+                    "Successfully scanned and stored {} project(s)",
+                    success_count
+                ),
                 MessageType::Success,
             );
         }

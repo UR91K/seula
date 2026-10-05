@@ -1,6 +1,6 @@
 use crate::cli::commands::CliContext;
+use crate::cli::output::{OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::CliError;
-use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
 use crate::database::search::SearchResult as DbSearchResult;
 use serde::Serialize;
 
@@ -18,7 +18,11 @@ impl crate::cli::commands::CliCommand for SearchCommand {
         let (page, total_count) = ctx
             .services
             .search
-            .search(&self.query, Some(self.limit as i32), Some(self.offset as i32))
+            .search(
+                &self.query,
+                Some(self.limit as i32),
+                Some(self.offset as i32),
+            )
             .await?;
 
         if total_count == 0 {
@@ -72,7 +76,10 @@ impl SearchRow {
                 .as_ref()
                 .map(|k| k.to_string())
                 .unwrap_or_else(|| "".to_string()),
-            time_signature: format!("{}/{}", p.time_signature.numerator, p.time_signature.denominator),
+            time_signature: format!(
+                "{}/{}",
+                p.time_signature.numerator, p.time_signature.denominator
+            ),
             rank: r.rank,
             reasons,
         }
@@ -114,7 +121,16 @@ impl TableDisplay for SearchResultsDisplay {
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
         writer
-            .write_record(["id", "name", "path", "tempo", "key", "time_signature", "rank", "reasons"])
+            .write_record([
+                "id",
+                "name",
+                "path",
+                "tempo",
+                "key",
+                "time_signature",
+                "rank",
+                "reasons",
+            ])
             .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer

@@ -1,13 +1,13 @@
 use crate::database::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::project::Project;
 use crate::models::{AbletonVersion, CollectionStatistics, KeySignature, Sample, TimeSignature};
+use crate::project::Project;
 use chrono::{Local, TimeZone};
-use tracing::debug;
 use rusqlite::types::ToSql;
 use rusqlite::{params, OptionalExtension};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::{ProjectDatabase, ProjectScope};
@@ -168,7 +168,10 @@ impl ProjectDatabase {
         new_description: Option<&str>,
         new_notes: Option<&str>,
     ) -> Result<String, DatabaseError> {
-        debug!("Duplicating collection: {} with new name: {}", collection_id, new_name);
+        debug!(
+            "Duplicating collection: {} with new name: {}",
+            collection_id, new_name
+        );
         let tx = self.conn.transaction()?;
         let now = Local::now();
 
@@ -222,9 +225,7 @@ impl ProjectDatabase {
             "SELECT project_id, position FROM collection_projects WHERE collection_id = ? ORDER BY position"
         )?;
         let project_positions: Vec<(String, i32)> = stmt
-            .query_map([collection_id], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })?
+            .query_map([collection_id], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt); // Explicitly drop the statement to release the borrow
@@ -610,9 +611,9 @@ impl ProjectDatabase {
         };
 
         // Get total count
-        let total_count: i32 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM collections", [], |row| row.get(0))?;
+        let total_count: i32 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM collections", [], |row| row.get(0))?;
 
         // Build query with pagination
         let query = format!(
@@ -622,20 +623,21 @@ impl ProjectDatabase {
 
         let mut stmt = self.conn.prepare(&query)?;
         let collections: Vec<(String, String, Option<String>)> = stmt
-            .query_map(
-                params![limit.unwrap_or(1000), offset.unwrap_or(0)],
-                |row| {
-                    let id: String = row.get(0)?;
-                    let name: String = row.get(1)?;
-                    let description: Option<String> = row.get(2)?;
-                    debug!("Found collection: {} ({})", name, id);
-                    Ok((id, name, description))
-                },
-            )?
+            .query_map(params![limit.unwrap_or(1000), offset.unwrap_or(0)], |row| {
+                let id: String = row.get(0)?;
+                let name: String = row.get(1)?;
+                let description: Option<String> = row.get(2)?;
+                debug!("Found collection: {} ({})", name, id);
+                Ok((id, name, description))
+            })?
             .filter_map(|r| r.ok())
             .collect();
 
-        debug!("Retrieved {} collections (total: {})", collections.len(), total_count);
+        debug!(
+            "Retrieved {} collections (total: {})",
+            collections.len(),
+            total_count
+        );
         Ok((collections, total_count))
     }
 
@@ -670,9 +672,9 @@ impl ProjectDatabase {
         offset: Option<i32>,
     ) -> Result<(Vec<(String, String, Option<String>)>, i32), DatabaseError> {
         debug!("Searching collections with query: '{}'", query);
-        
+
         let search_pattern = format!("%{}%", query);
-        
+
         // Get total count
         let total_count: i32 = self.conn.query_row(
             "SELECT COUNT(*) FROM collections WHERE name LIKE ? OR description LIKE ? OR notes LIKE ?",
@@ -706,7 +708,11 @@ impl ProjectDatabase {
             .filter_map(|r| r.ok())
             .collect();
 
-        debug!("Search returned {} collections (total: {})", collections.len(), total_count);
+        debug!(
+            "Search returned {} collections (total: {})",
+            collections.len(),
+            total_count
+        );
         Ok((collections, total_count))
     }
 
@@ -754,67 +760,95 @@ impl ProjectDatabase {
         collection_id: &str,
         scope: ProjectScope,
     ) -> Result<CollectionStatistics, DatabaseError> {
-        debug!("Getting detailed statistics for collection {}", collection_id);
+        debug!(
+            "Getting detailed statistics for collection {}",
+            collection_id
+        );
         let in_scope = scope.and_projects();
         let join = scope.join("cp.project_id");
 
         // Get basic project stats
-        let (total_duration, project_count) = self.get_collection_statistics(collection_id, scope)?;
+        let (total_duration, project_count) =
+            self.get_collection_statistics(collection_id, scope)?;
 
         // Get average tempo
-        let average_tempo: Option<f64> = self.conn.query_row(
-            &format!(r#"
+        let average_tempo: Option<f64> = self
+            .conn
+            .query_row(
+                &format!(
+                    r#"
             SELECT AVG(p.tempo) as avg_tempo
             FROM collection_projects cp
             JOIN projects p ON p.id = cp.project_id
             WHERE cp.collection_id = ? {in_scope}
-            "#),
-            [collection_id],
-            |row| row.get::<_, Option<f64>>(0),
-        ).optional()?.flatten();
+            "#
+                ),
+                [collection_id],
+                |row| row.get::<_, Option<f64>>(0),
+            )
+            .optional()?
+            .flatten();
 
         // Get total unique plugins
-        let total_plugins: i32 = self.conn.query_row(
-            &format!(r#"
+        let total_plugins: i32 = self
+            .conn
+            .query_row(
+                &format!(
+                    r#"
             SELECT COUNT(DISTINCT pp.plugin_id) as total_plugins
             FROM collection_projects cp
             {join}
             JOIN project_plugins pp ON pp.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#),
-            [collection_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+            "#
+                ),
+                [collection_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Get total unique samples
-        let total_samples: i32 = self.conn.query_row(
-            &format!(r#"
+        let total_samples: i32 = self
+            .conn
+            .query_row(
+                &format!(
+                    r#"
             SELECT COUNT(DISTINCT ps.sample_id) as total_samples
             FROM collection_projects cp
             {join}
             JOIN project_samples ps ON ps.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#),
-            [collection_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+            "#
+                ),
+                [collection_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Get total unique tags
-        let total_tags: i32 = self.conn.query_row(
-            &format!(r#"
+        let total_tags: i32 = self
+            .conn
+            .query_row(
+                &format!(
+                    r#"
             SELECT COUNT(DISTINCT pt.tag_id) as total_tags
             FROM collection_projects cp
             {join}
             JOIN project_tags pt ON pt.project_id = cp.project_id
             WHERE cp.collection_id = ?
-            "#),
-            [collection_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+            "#
+                ),
+                [collection_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Get most common key signature
-        let most_common_key: Option<String> = self.conn.query_row(
-            &format!(r#"
+        let most_common_key: Option<String> = self
+            .conn
+            .query_row(
+                &format!(
+                    r#"
             SELECT
                 p.key_signature_tonic || ' ' || p.key_signature_scale as key_sig,
                 COUNT(*) as count
@@ -827,10 +861,12 @@ impl ProjectDatabase {
             GROUP BY key_sig
             ORDER BY count DESC
             LIMIT 1
-            "#),
-            [collection_id],
-            |row| row.get(0),
-        ).optional()?;
+            "#
+                ),
+                [collection_id],
+                |row| row.get(0),
+            )
+            .optional()?;
 
         // Get most common time signature
         let most_common_time_signature: Option<String> = self.conn.query_row(

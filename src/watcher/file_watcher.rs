@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use crate::database::ProjectDatabase;
-use tracing::{debug, info, warn};
 use notify::{
     self,
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
@@ -12,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::SystemTime;
 use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
 pub struct FileWatcher {

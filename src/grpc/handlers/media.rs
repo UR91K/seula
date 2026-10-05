@@ -1,7 +1,7 @@
-use tracing::{debug, error, info};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::{debug, error, info};
 
 use super::super::collections::*;
 use super::super::common::*;
@@ -61,7 +61,11 @@ impl MediaHandler {
             return Err(Status::invalid_argument("No file data received"));
         }
 
-        match self.service.store_cover_art(&data_chunks, &filename, &collection_id).await {
+        match self
+            .service
+            .store_cover_art(&data_chunks, &filename, &collection_id)
+            .await
+        {
             Ok(media_file) => {
                 info!(
                     "Successfully uploaded cover art: {} bytes for collection {}",
@@ -106,13 +110,18 @@ impl MediaHandler {
             }
         }
 
-        let project_id = project_id.ok_or_else(|| Status::invalid_argument("Project ID is required"))?;
+        let project_id =
+            project_id.ok_or_else(|| Status::invalid_argument("Project ID is required"))?;
         let filename = filename.ok_or_else(|| Status::invalid_argument("Filename is required"))?;
         if data_chunks.is_empty() {
             return Err(Status::invalid_argument("No file data received"));
         }
 
-        match self.service.store_audio_file(&data_chunks, &filename, &project_id).await {
+        match self
+            .service
+            .store_audio_file(&data_chunks, &filename, &project_id)
+            .await
+        {
             Ok(media_file) => {
                 info!(
                     "Successfully uploaded audio file: {} bytes for project {}",
@@ -158,7 +167,9 @@ impl MediaHandler {
             .map_err(|e| Status::internal(format!("Failed to get file path: {}", e)))?;
 
         let metadata_response = DownloadMediaResponse {
-            data: Some(download_media_response::Data::Metadata(to_proto(media_file))),
+            data: Some(download_media_response::Data::Metadata(to_proto(
+                media_file,
+            ))),
         };
         if tx.send(Ok(metadata_response)).await.is_err() {
             return Err(Status::internal("Failed to send metadata"));
@@ -214,7 +225,11 @@ impl MediaHandler {
         debug!("SetCollectionCoverArt request: {:?}", request);
         let req = request.into_inner();
 
-        match self.service.set_collection_cover_art(&req.collection_id, &req.media_file_id).await {
+        match self
+            .service
+            .set_collection_cover_art(&req.collection_id, &req.media_file_id)
+            .await
+        {
             Ok(()) => Ok(Response::new(SetCollectionCoverArtResponse {
                 success: true,
                 error_message: None,
@@ -236,7 +251,11 @@ impl MediaHandler {
         debug!("RemoveCollectionCoverArt request: {:?}", request);
         let req = request.into_inner();
 
-        match self.service.remove_collection_cover_art(&req.collection_id).await {
+        match self
+            .service
+            .remove_collection_cover_art(&req.collection_id)
+            .await
+        {
             Ok(()) => Ok(Response::new(RemoveCollectionCoverArtResponse {
                 success: true,
                 error_message: None,
@@ -258,7 +277,11 @@ impl MediaHandler {
         debug!("SetProjectAudioFile request: {:?}", request);
         let req = request.into_inner();
 
-        match self.service.set_project_audio_file(&req.project_id, &req.media_file_id).await {
+        match self
+            .service
+            .set_project_audio_file(&req.project_id, &req.media_file_id)
+            .await
+        {
             Ok(()) => Ok(Response::new(SetProjectAudioFileResponse {
                 success: true,
                 error_message: None,
@@ -280,7 +303,11 @@ impl MediaHandler {
         debug!("RemoveProjectAudioFile request: {:?}", request);
         let req = request.into_inner();
 
-        match self.service.remove_project_audio_file(&req.project_id).await {
+        match self
+            .service
+            .remove_project_audio_file(&req.project_id)
+            .await
+        {
             Ok(()) => Ok(Response::new(RemoveProjectAudioFileResponse {
                 success: true,
                 error_message: None,
@@ -357,7 +384,14 @@ impl MediaHandler {
         &self,
         _request: Request<GetMediaStatisticsRequest>,
     ) -> Result<Response<GetMediaStatisticsResponse>, Status> {
-        let (total_files, total_size, cover_art_count, audio_file_count, orphaned_count, orphaned_size) = self
+        let (
+            total_files,
+            total_size,
+            cover_art_count,
+            audio_file_count,
+            orphaned_count,
+            orphaned_size,
+        ) = self
             .service
             .get_media_statistics()
             .await

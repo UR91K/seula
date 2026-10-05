@@ -2,9 +2,9 @@
 
 use super::*;
 use crate::common::{setup, LiveSetBuilder};
-use std::path::PathBuf;
 use seula::grpc::SeulaServer;
 use seula::media::{MediaConfig, MediaStorageManager};
+use std::path::PathBuf;
 
 pub async fn create_test_server() -> SeulaServer {
     setup("error");
@@ -82,7 +82,7 @@ pub async fn setup_test_server() -> (SeulaServer, Arc<Mutex<ProjectDatabase>>) {
 pub async fn create_test_project(server: &SeulaServer, name: &str, path: &str) -> String {
     let db = server.db();
     let project_id = uuid::Uuid::new_v4().to_string();
-    
+
     {
         let db_lock = db.lock().await;
         db_lock.conn.execute(
@@ -98,36 +98,47 @@ pub async fn create_test_project(server: &SeulaServer, name: &str, path: &str) -
             rusqlite::params![project_id, 11, 0, 0, false],
         ).expect("Failed to insert test project ableton metadata");
     }
-    
+
     project_id
 }
 
 /// Create a test sample with the given parameters
-pub async fn create_test_sample(server: &SeulaServer, name: &str, path: &str, is_present: bool) -> String {
+pub async fn create_test_sample(
+    server: &SeulaServer,
+    name: &str,
+    path: &str,
+    is_present: bool,
+) -> String {
     let db = server.db();
     let sample_id = uuid::Uuid::new_v4().to_string();
-    
+
     {
         let db_lock = db.lock().await;
-        db_lock.conn.execute(
-            "INSERT INTO samples (id, name, path, is_present) VALUES (?, ?, ?, ?)",
-            rusqlite::params![sample_id, name, path, is_present],
-        ).expect("Failed to insert test sample");
+        db_lock
+            .conn
+            .execute(
+                "INSERT INTO samples (id, name, path, is_present) VALUES (?, ?, ?, ?)",
+                rusqlite::params![sample_id, name, path, is_present],
+            )
+            .expect("Failed to insert test sample");
     }
-    
+
     sample_id
 }
 
 /// Link a sample to a project (create usage relationship)
 pub async fn add_sample_to_project(server: &SeulaServer, project_id: &str, sample_id: &str) {
     let db = server.db();
-    
+
     {
         let db_lock = db.lock().await;
-        db_lock.conn.execute(
-            "INSERT INTO project_samples (project_id, sample_id) VALUES (?, ?)",
-            rusqlite::params![project_id, sample_id],
-        ).expect("Failed to link sample to project");
+        db_lock
+            .conn
+            .execute(
+                "INSERT INTO project_samples (project_id, sample_id) VALUES (?, ?)",
+                rusqlite::params![project_id, sample_id],
+            )
+            .expect("Failed to link sample to project");
     }
 }
 
@@ -136,7 +147,7 @@ pub fn create_sample_struct(name: &str, path: &str, is_present: bool) -> seula::
     use seula::models::Sample;
     use std::path::PathBuf;
     use uuid::Uuid;
-    
+
     Sample {
         id: Uuid::new_v4(),
         name: name.to_string(),
@@ -148,8 +159,8 @@ pub fn create_sample_struct(name: &str, path: &str, is_present: bool) -> seula::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use seula::grpc::scanning::*;
     use seula::grpc::common::*;
+    use seula::grpc::scanning::*;
     use tonic::Request;
 
     #[tokio::test]
@@ -174,8 +185,18 @@ mod tests {
         };
 
         // Set the progress using the system service
-        *server.system_handler.service.scan_progress_handle().lock().await = Some(progress_response.clone());
-        *server.system_handler.service.scan_status_handle().lock().await = ScanStatus::ScanParsing;
+        *server
+            .system_handler
+            .service
+            .scan_progress_handle()
+            .lock()
+            .await = Some(progress_response.clone());
+        *server
+            .system_handler
+            .service
+            .scan_status_handle()
+            .lock()
+            .await = ScanStatus::ScanParsing;
 
         // Now check that the progress is returned
         let request = Request::new(GetScanStatusRequest {});
@@ -205,7 +226,13 @@ mod tests {
             let server = create_test_server().await;
             let system = server.system_handler.service.clone();
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-            assert!(system.start_sample_check(move |event, result| { let _ = tx.send((event, result)); }).await);
+            assert!(
+                system
+                    .start_sample_check(move |event, result| {
+                        let _ = tx.send((event, result));
+                    })
+                    .await
+            );
 
             let last = tokio::time::timeout(std::time::Duration::from_secs(30), async {
                 let mut last = None;
@@ -221,9 +248,17 @@ mod tests {
         rt.shutdown_timeout(std::time::Duration::from_secs(1));
         let (last, system) = outcome;
         let last = last.expect("the check finishes").expect("it reports");
-        assert_eq!(last.0.status, ScanStatus::ScanCompleted as i32, "{}", last.0.message);
+        assert_eq!(
+            last.0.status,
+            ScanStatus::ScanCompleted as i32,
+            "{}",
+            last.0.message
+        );
         assert!(last.1.is_some(), "the final event carries the result");
-        assert_eq!(*system.scan_status_handle().blocking_lock(), ScanStatus::ScanCompleted);
+        assert_eq!(
+            *system.scan_status_handle().blocking_lock(),
+            ScanStatus::ScanCompleted
+        );
     }
 
     /// A project scan and a plugin scan share the status; neither starts while the
@@ -237,7 +272,10 @@ mod tests {
         assert!(!system.start_plugin_scan(|_, _| {}).await);
         assert!(!system.start_sample_check(|_, _| {}).await);
         assert!(!system.start_scan(|_| {}).await);
-        assert_eq!(*system.scan_status_handle().lock().await, ScanStatus::ScanParsing);
+        assert_eq!(
+            *system.scan_status_handle().lock().await,
+            ScanStatus::ScanParsing
+        );
 
         *system.scan_status_handle().lock().await = ScanStatus::ScanScanningPlugins;
         assert!(!system.start_scan(|_| {}).await);

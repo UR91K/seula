@@ -1,8 +1,8 @@
 use crate::error::DatabaseError;
 use crate::models::{Sample, SampleFormat};
 use crate::scan::sample_check::SampleFileState;
-use std::collections::HashMap;
 use rusqlite::params;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -31,7 +31,8 @@ impl SampleFilter {
             bound.push(Box::new(like));
         }
         if let Some(format) = &self.format {
-            conditions.push(SampleFormat::sql_filter(format, "s.path").unwrap_or_else(|| "0".into()));
+            conditions
+                .push(SampleFormat::sql_filter(format, "s.path").unwrap_or_else(|| "0".into()));
         }
         if let Some(present) = self.present {
             conditions.push("s.is_present = ?".to_string());
@@ -51,7 +52,9 @@ impl ProjectDatabase {
             let mut stmt = self.conn.prepare(&format!(
                 "SELECT sample_id, size_bytes FROM sample_files WHERE sample_id IN ({placeholders})"
             ))?;
-            let rows = stmt.query_map(rusqlite::params_from_iter(chunk), |row| Ok((row.get(0)?, row.get(1)?)))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(chunk), |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?;
             for row in rows {
                 let (id, size) = row?;
                 sizes.insert(id, size);
@@ -62,7 +65,10 @@ impl ProjectDatabase {
 
     /// What the last check found for one sample: (size, file modified, checked at).
     /// `None` when no check has found the file.
-    pub fn sample_file(&self, sample_id: &str) -> Result<Option<(i64, Option<i64>, i64)>, DatabaseError> {
+    pub fn sample_file(
+        &self,
+        sample_id: &str,
+    ) -> Result<Option<(i64, Option<i64>, i64)>, DatabaseError> {
         use rusqlite::OptionalExtension;
         Ok(self
             .conn
@@ -118,7 +124,8 @@ impl ProjectDatabase {
         // Format filter: a format id, one of its extensions, or "other". A value that is
         // none of those matches nothing rather than being ignored.
         if let Some(format) = format_filter {
-            conditions.push(SampleFormat::sql_filter(&format, "s.path").unwrap_or_else(|| "0".into()));
+            conditions
+                .push(SampleFormat::sql_filter(&format, "s.path").unwrap_or_else(|| "0".into()));
         }
 
         // Project counts, in scope (ADR-0040). Always joined: the list is sorted and
@@ -166,7 +173,13 @@ impl ProjectDatabase {
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             let id_str: String = row.get("id")?;
             Ok(Sample {
-                id: Uuid::parse_str(&id_str).map_err(|_e| rusqlite::Error::InvalidColumnType(0, "id".to_string(), rusqlite::types::Type::Text))?,
+                id: Uuid::parse_str(&id_str).map_err(|_e| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "id".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?,
                 name: row.get("name")?,
                 path: PathBuf::from(row.get::<_, String>("path")?),
                 is_present: row.get("is_present")?,
@@ -183,7 +196,13 @@ impl ProjectDatabase {
         let result = stmt.query_row(params![sample_id], |row| {
             let id_str: String = row.get("id")?;
             Ok(Sample {
-                id: Uuid::parse_str(&id_str).map_err(|_e| rusqlite::Error::InvalidColumnType(0, "id".to_string(), rusqlite::types::Type::Text))?,
+                id: Uuid::parse_str(&id_str).map_err(|_e| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "id".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?,
                 name: row.get("name")?,
                 path: PathBuf::from(row.get::<_, String>("path")?),
                 is_present: row.get("is_present")?,
@@ -238,7 +257,13 @@ impl ProjectDatabase {
             |row| {
                 let id_str: String = row.get("id")?;
                 Ok(Sample {
-                    id: Uuid::parse_str(&id_str).map_err(|_e| rusqlite::Error::InvalidColumnType(0, "id".to_string(), rusqlite::types::Type::Text))?,
+                    id: Uuid::parse_str(&id_str).map_err(|_e| {
+                        rusqlite::Error::InvalidColumnType(
+                            0,
+                            "id".to_string(),
+                            rusqlite::types::Type::Text,
+                        )
+                    })?,
                     name: row.get("name")?,
                     path: PathBuf::from(row.get::<_, String>("path")?),
                     is_present: row.get("is_present")?,
@@ -271,7 +296,8 @@ impl ProjectDatabase {
         }
 
         if let Some(format) = format_filter {
-            conditions.push(SampleFormat::sql_filter(&format, "path").unwrap_or_else(|| "0".into()));
+            conditions
+                .push(SampleFormat::sql_filter(&format, "path").unwrap_or_else(|| "0".into()));
         }
 
         let where_clause = conditions.join(" AND ");
@@ -296,7 +322,13 @@ impl ProjectDatabase {
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             let id_str: String = row.get("id")?;
             Ok(Sample {
-                id: Uuid::parse_str(&id_str).map_err(|_e| rusqlite::Error::InvalidColumnType(0, "id".to_string(), rusqlite::types::Type::Text))?,
+                id: Uuid::parse_str(&id_str).map_err(|_e| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "id".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?,
                 name: row.get("name")?,
                 path: PathBuf::from(row.get::<_, String>("path")?),
                 is_present: row.get("is_present")?,
@@ -316,7 +348,10 @@ impl ProjectDatabase {
     /// so a status bar can describe what is on screen. Sizes are the ones a sample
     /// check measured (ADR-0041); a present sample no check has measured yet adds
     /// nothing, and `sized_samples` says how many were.
-    pub fn get_sample_stats_filtered(&self, filter: &SampleFilter) -> Result<SampleStats, DatabaseError> {
+    pub fn get_sample_stats_filtered(
+        &self,
+        filter: &SampleFilter,
+    ) -> Result<SampleStats, DatabaseError> {
         let (conditions, bound) = filter.conditions();
         let params: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b.as_ref()).collect();
         let where_with = |extra: &str| {
@@ -331,19 +366,23 @@ impl ProjectDatabase {
             }
         };
 
-        let (total_samples, present_samples, sized_samples, total_size_bytes): (i32, i32, i32, i64) =
-            self.conn.query_row(
-                &format!(
-                    "SELECT COUNT(*),
+        let (total_samples, present_samples, sized_samples, total_size_bytes): (
+            i32,
+            i32,
+            i32,
+            i64,
+        ) = self.conn.query_row(
+            &format!(
+                "SELECT COUNT(*),
                             COALESCE(SUM(s.is_present), 0),
                             COALESCE(SUM(s.is_present AND f.size_bytes IS NOT NULL), 0),
                             COALESCE(SUM(CASE WHEN s.is_present THEN f.size_bytes END), 0)
                      FROM samples s LEFT JOIN sample_files f ON f.sample_id = s.id {}",
-                    where_with("")
-                ),
-                params.as_slice(),
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-            )?;
+                where_with("")
+            ),
+            params.as_slice(),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )?;
 
         let mut samples_by_extension = HashMap::new();
         let mut stmt = self.conn.prepare(&format!(
@@ -351,7 +390,9 @@ impl ProjectDatabase {
             SampleFormat::sql_case("s.path"),
             where_with("")
         ))?;
-        let rows = stmt.query_map(params.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)))?;
+        let rows = stmt.query_map(params.as_slice(), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+        })?;
         for row in rows {
             let (format, count) = row?;
             samples_by_extension.insert(format, count);
@@ -403,7 +444,9 @@ impl ProjectDatabase {
     /// Every sample's path, for a check to look at (ADR-0041).
     pub fn sample_paths(&self) -> Result<Vec<String>, DatabaseError> {
         let mut stmt = self.conn.prepare("SELECT path FROM samples")?;
-        let paths = stmt.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?;
+        let paths = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<_, _>>()?;
         Ok(paths)
     }
 
@@ -441,7 +484,9 @@ impl ProjectDatabase {
                     checked_at = EXCLUDED.checked_at",
             )?;
             for (id, path, was_present) in rows {
-                let Some(state) = found.get(&path) else { continue };
+                let Some(state) = found.get(&path) else {
+                    continue;
+                };
                 result.total_samples_checked += 1;
                 let present = state.is_some();
                 if present != was_present {
@@ -467,19 +512,19 @@ impl ProjectDatabase {
     pub fn get_sample_analytics(&self) -> Result<SampleAnalytics, DatabaseError> {
         // Get usage distribution
         let usage_distribution = self.get_usage_distribution()?;
-        
+
         // Get extension analytics
         let extensions = self.get_extension_analytics()?;
-        
+
         // Get missing vs present percentages
         let (missing_percentage, present_percentage) = self.get_presence_percentages()?;
-        
+
         // Get storage usage
         let (total_storage, present_storage, missing_storage) = self.get_storage_usage()?;
-        
+
         // Get top used samples
         let top_used_samples = self.get_top_used_samples(10)?;
-        
+
         // Get recently added samples (last 30 days)
         let recently_added = self.get_recently_added_samples()?;
 
@@ -550,12 +595,16 @@ impl ProjectDatabase {
     }
 
     /// Get sample extension statistics for filtering UI and storage analysis
-    pub fn get_sample_extensions(&self) -> Result<std::collections::HashMap<String, ExtensionAnalytics>, DatabaseError> {
+    pub fn get_sample_extensions(
+        &self,
+    ) -> Result<std::collections::HashMap<String, ExtensionAnalytics>, DatabaseError> {
         self.get_extension_analytics()
     }
 
     /// Get extension analytics with detailed statistics
-    fn get_extension_analytics(&self) -> Result<std::collections::HashMap<String, ExtensionAnalytics>, DatabaseError> {
+    fn get_extension_analytics(
+        &self,
+    ) -> Result<std::collections::HashMap<String, ExtensionAnalytics>, DatabaseError> {
         let mut stmt = self.conn.prepare(&format!(
             r#"
             SELECT 
@@ -594,14 +643,18 @@ impl ProjectDatabase {
 
         let mut extensions = std::collections::HashMap::new();
         for row in rows {
-            let (extension, count, present_count, missing_count, avg_usage_count, total_size_bytes) = row?;
-            extensions.insert(extension, ExtensionAnalytics {
-                count,
-                total_size_bytes,
-                present_count,
-                missing_count,
-                average_usage_count: avg_usage_count,
-            });
+            let (extension, count, present_count, missing_count, avg_usage_count, total_size_bytes) =
+                row?;
+            extensions.insert(
+                extension,
+                ExtensionAnalytics {
+                    count,
+                    total_size_bytes,
+                    present_count,
+                    missing_count,
+                    average_usage_count: avg_usage_count,
+                },
+            );
         }
 
         Ok(extensions)
@@ -609,7 +662,9 @@ impl ProjectDatabase {
 
     /// Get missing vs present percentages
     fn get_presence_percentages(&self) -> Result<(i32, i32), DatabaseError> {
-        let total_samples: i32 = self.conn.query_row("SELECT COUNT(*) FROM samples", [], |row| row.get(0))?;
+        let total_samples: i32 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM samples", [], |row| row.get(0))?;
         let present_samples: i32 = self.conn.query_row(
             "SELECT COUNT(*) FROM samples WHERE is_present = true",
             [],
@@ -638,7 +693,12 @@ impl ProjectDatabase {
             "SELECT SUM(f.size_bytes), SUM(CASE WHEN s.is_present THEN f.size_bytes ELSE 0 END)
              FROM samples s JOIN sample_files f ON f.sample_id = s.id",
             [],
-            |row| Ok((row.get::<_, Option<i64>>(0)?.unwrap_or(0), row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+            |row| {
+                Ok((
+                    row.get::<_, Option<i64>>(0)?.unwrap_or(0),
+                    row.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                ))
+            },
         )?;
 
         let missing_storage = total_storage - present_storage;

@@ -43,9 +43,9 @@ pub mod database;
 pub mod error;
 pub mod grpc;
 pub mod http;
-pub mod project;
 pub mod media;
 pub mod models;
+pub mod project;
 pub mod scan;
 pub mod services;
 pub mod tray;
@@ -133,11 +133,11 @@ use crate::project::ProjectPreprocessed;
 use crate::scan::parallel::ParallelParser;
 use crate::scan::plugins::scan_system_with_progress;
 use crate::scan::project_scanner::ProjectPathScanner;
-use tracing::{debug, error, info, trace, warn};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 /// Processes all Ableton Live projects found in configured directories.
 ///
@@ -245,9 +245,7 @@ pub fn process_projects() -> Result<(), LiveSetError> {
 /// - `"parsing"`: Full parsing of project files
 /// - `"inserting"`: Saving results to database
 /// - `"completed"`: Operation finished successfully
-pub fn process_projects_with_progress<F>(
-    progress_callback: Option<F>,
-) -> Result<(), LiveSetError>
+pub fn process_projects_with_progress<F>(progress_callback: Option<F>) -> Result<(), LiveSetError>
 where
     F: FnMut(u32, u32, f32, String, &str) + Send + 'static,
 {
@@ -282,7 +280,9 @@ fn open_scan_database(config: &config::Config) -> Result<ScanDatabase<'static>, 
         .as_ref()
         .expect("Database path should be set by config initialization");
     debug!("Initializing database at {}", database_path);
-    Ok(ScanDatabase::Own(ProjectDatabase::new(PathBuf::from(database_path))?))
+    Ok(ScanDatabase::Own(ProjectDatabase::new(PathBuf::from(
+        database_path,
+    ))?))
 }
 
 /// Where a scan reads and writes: a connection of its own (the CLI), or the daemon's
@@ -354,7 +354,13 @@ where
     // Check if configuration is ready for scanning
     if config.needs_setup() {
         info!("Configuration needs setup - no project paths configured");
-        progress!(1, 1, 1.0, "Setup required: No project paths configured".to_string(), "completed");
+        progress!(
+            1,
+            1,
+            1.0,
+            "Setup required: No project paths configured".to_string(),
+            "completed"
+        );
         return Ok(());
     }
 
@@ -765,11 +771,15 @@ mod tests {
         ))
         .unwrap();
 
-        let shared = tokio::sync::Mutex::new(ProjectDatabase::new(PathBuf::from(":memory:")).unwrap());
+        let shared =
+            tokio::sync::Mutex::new(ProjectDatabase::new(PathBuf::from(":memory:")).unwrap());
         process_projects_into::<fn(u32, u32, f32, String, &str)>(&shared, &config, None).unwrap();
 
         let mut db = shared.blocking_lock();
         let project = db.get_project_by_path(&als.to_string_lossy()).unwrap();
-        assert!(project.is_some(), "the scanned project is not in the database the scan was given");
+        assert!(
+            project.is_some(),
+            "the scanned project is not in the database the scan was given"
+        );
     }
 }

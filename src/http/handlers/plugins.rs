@@ -9,20 +9,20 @@ use axum::response::IntoResponse;
 use axum::Json;
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::database::plugins::PluginFilter;
+use crate::database::ProjectScope;
+use crate::http::dto::parse_project_scope;
 use crate::http::dto::plugins::{
     parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FormatListResponse,
     GetAllPluginsQuery, GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse,
     PluginScanEventDto, PluginStatsQuery, ProjectsByPluginQuery, ScopeQuery, SearchPluginsQuery,
     VendorListResponse,
 };
-use crate::database::plugins::PluginFilter;
-use crate::database::ProjectScope;
-use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
-use crate::services::system::send_scan_update;
 use crate::models::Plugin as DomainPlugin;
+use crate::services::system::send_scan_update;
 
 /// Attach each plugin's project count with one query for the page (ADR-0034), counting
 /// the projects in `scope` (ADR-0040).
@@ -132,7 +132,11 @@ pub async fn get_plugin_stats(
         format: query.format_filter,
         install_states: parse_install_states(query.install_states.as_deref()),
     };
-    let stats = state.services.plugins.get_plugin_stats_filtered(&filter).await?;
+    let stats = state
+        .services
+        .plugins
+        .get_plugin_stats_filtered(&filter)
+        .await?;
     Ok(Json(stats))
 }
 
@@ -151,7 +155,10 @@ pub async fn get_plugin_vendors(
             parse_project_scope(query.scope.as_deref())?,
         )
         .await?;
-    Ok(Json(VendorListResponse { vendors, total_count }))
+    Ok(Json(VendorListResponse {
+        vendors,
+        total_count,
+    }))
 }
 
 pub async fn get_plugin_formats(
@@ -169,7 +176,10 @@ pub async fn get_plugin_formats(
             parse_project_scope(query.scope.as_deref())?,
         )
         .await?;
-    Ok(Json(FormatListResponse { formats, total_count }))
+    Ok(Json(FormatListResponse {
+        formats,
+        total_count,
+    }))
 }
 
 pub async fn get_plugin(
@@ -179,7 +189,12 @@ pub async fn get_plugin(
 ) -> Result<impl IntoResponse, ApiError> {
     let scope = parse_project_scope(query.scope.as_deref())?;
     let not_found = || ApiError::NotFound(format!("Plugin with ID {} not found", plugin_id));
-    let grpc_plugin = state.services.plugins.get_plugin(&plugin_id, scope).await?.ok_or_else(not_found)?;
+    let grpc_plugin = state
+        .services
+        .plugins
+        .get_plugin(&plugin_id, scope)
+        .await?
+        .ok_or_else(not_found)?;
     let details = state
         .services
         .plugins
@@ -201,7 +216,12 @@ pub async fn get_projects_by_plugin(
     let (projects, total_count) = state
         .services
         .plugins
-        .get_projects_by_plugin(&plugin_id, query.limit, query.offset, parse_project_scope(query.scope.as_deref())?)
+        .get_projects_by_plugin(
+            &plugin_id,
+            query.limit,
+            query.offset,
+            parse_project_scope(query.scope.as_deref())?,
+        )
         .await?;
 
     let db_arc = state.services.plugins.db_handle();
@@ -211,7 +231,10 @@ pub async fn get_projects_by_plugin(
         .map(|p| project_to_dto(p, &mut db))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(Json(ProjectListResponse { projects, total_count }))
+    Ok(Json(ProjectListResponse {
+        projects,
+        total_count,
+    }))
 }
 
 /// Rescan the system's plugins in the background, streaming progress as Server-Sent
@@ -248,6 +271,10 @@ pub async fn scan_plugins(
 pub async fn refresh_plugin_installation_status(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let result = state.services.plugins.refresh_plugin_installation_status().await?;
+    let result = state
+        .services
+        .plugins
+        .refresh_plugin_installation_status()
+        .await?;
     Ok(Json(result))
 }

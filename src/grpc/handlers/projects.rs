@@ -1,8 +1,8 @@
-use tracing::{debug, error};
 use tonic::{Request, Response, Status};
+use tracing::{debug, error};
 
-use super::super::common::*;
 use super::super::common::Project as ProtoProject;
+use super::super::common::*;
 use super::super::projects::*;
 use super::utils::convert_live_set_to_proto;
 use crate::error::DatabaseError;
@@ -171,8 +171,8 @@ impl ProjectsHandler {
         let (projects, total_count) = self
             .service
             .list_projects(
-                scope, req.limit, req.offset, None, None, None, None, None, None, None, None,
-                None, None, None, None, None, None, None, None,
+                scope, req.limit, req.offset, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None,
             )
             .await?;
 
@@ -193,14 +193,24 @@ impl ProjectsHandler {
 
         match self.service.permanently_delete(&req.project_id).await {
             Ok(()) => {
-                debug!("Successfully permanently deleted project {}", req.project_id);
-                Ok(Response::new(PermanentlyDeleteProjectResponse { success: true }))
+                debug!(
+                    "Successfully permanently deleted project {}",
+                    req.project_id
+                );
+                Ok(Response::new(PermanentlyDeleteProjectResponse {
+                    success: true,
+                }))
             }
             Err(DatabaseError::InvalidOperation(msg))
                 if msg == "Cannot permanently delete an active project" =>
             {
-                debug!("Cannot permanently delete active project {}", req.project_id);
-                Ok(Response::new(PermanentlyDeleteProjectResponse { success: false }))
+                debug!(
+                    "Cannot permanently delete active project {}",
+                    req.project_id
+                );
+                Ok(Response::new(PermanentlyDeleteProjectResponse {
+                    success: false,
+                }))
             }
             Err(e) => {
                 error!(
@@ -225,9 +235,11 @@ impl ProjectsHandler {
             .batch_mark_archived(&req.project_ids, req.archived)
             .await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -257,9 +269,11 @@ impl ProjectsHandler {
 
         let results = self.service.batch_delete(&req.project_ids).await?;
 
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
         let batch_results = results
             .into_iter()
             .map(|(id, result)| BatchOperationResult {
@@ -314,7 +328,10 @@ impl ProjectsHandler {
         let key_signature_distribution = stats
             .key_signature_distribution
             .into_iter()
-            .map(|(key_signature, count)| KeySignatureStatistic { key_signature, count })
+            .map(|(key_signature, count)| KeySignatureStatistic {
+                key_signature,
+                count,
+            })
             .collect();
 
         let time_signature_distribution = stats
@@ -349,7 +366,14 @@ impl ProjectsHandler {
             .most_complex_projects
             .into_iter()
             .map(
-                |(project_id, project_name, plugin_count, sample_count, tag_count, complexity_score)| {
+                |(
+                    project_id,
+                    project_name,
+                    plugin_count,
+                    sample_count,
+                    tag_count,
+                    complexity_score,
+                )| {
                     ProjectComplexityStatistic {
                         project_id,
                         project_name,

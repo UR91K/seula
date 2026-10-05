@@ -97,9 +97,11 @@ pub struct BatchOperationResponse {
 
 impl BatchOperationResponse {
     pub fn from_results(results: Vec<(String, Result<(), crate::error::DatabaseError>)>) -> Self {
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
 
         let results = results
             .into_iter()
@@ -159,16 +161,18 @@ impl From<TaskAnalytics> for TaskStatisticsDto {
             monthly_trends: stats
                 .monthly_trends
                 .into_iter()
-                .map(|(year, month, completed_tasks, total_tasks, completion_rate)| TaskTrendDto {
-                    year,
-                    month,
-                    completed_tasks,
-                    total_tasks,
-                    // Matches src/grpc/handlers/tasks.rs: monthly trend rates are
-                    // converted to a percentage, unlike the top-level
-                    // completion_rate above, which isn't. Preserved as-is.
-                    completion_rate: completion_rate * 100.0,
-                })
+                .map(
+                    |(year, month, completed_tasks, total_tasks, completion_rate)| TaskTrendDto {
+                        year,
+                        month,
+                        completed_tasks,
+                        total_tasks,
+                        // Matches src/grpc/handlers/tasks.rs: monthly trend rates are
+                        // converted to a percentage, unlike the top-level
+                        // completion_rate above, which isn't. Preserved as-is.
+                        completion_rate: completion_rate * 100.0,
+                    },
+                )
                 .collect(),
         }
     }

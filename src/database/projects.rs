@@ -3,14 +3,14 @@ use super::helpers::{
 };
 use super::models::SqlDateTime;
 use crate::error::DatabaseError;
-use crate::project::Project;
 use crate::models::{AbletonVersion, KeySignature, Sample, TimeSignature};
+use crate::project::Project;
 use crate::utils::metadata::load_file_hash;
 use chrono::{Local, TimeZone, Utc};
-use tracing::{debug, info};
 use rusqlite::{params, OptionalExtension, Result as SqliteResult};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::ProjectDatabase;
@@ -139,9 +139,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([id], |row| {
-                crate::database::helpers::row_to_plugin(row)
-            })?
+            .query_map([id], |row| crate::database::helpers::row_to_plugin(row))?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -311,9 +309,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([id], |row| {
-                crate::database::helpers::row_to_plugin(row)
-            })?
+            .query_map([id], |row| crate::database::helpers::row_to_plugin(row))?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -478,9 +474,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([path], |row| {
-                crate::database::helpers::row_to_plugin(row)
-            })?
+            .query_map([path], |row| crate::database::helpers::row_to_plugin(row))?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -718,7 +712,8 @@ impl ProjectDatabase {
     ) -> Result<Vec<Project>, DatabaseError> {
         let mut results = Vec::new();
 
-        let base_query = "SELECT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta \
+        let base_query =
+            "SELECT p.*, a.version_major, a.version_minor, a.version_patch, a.version_beta \
              FROM projects p JOIN project_ableton_metadata a ON a.project_id = p.id";
         let query = match is_active {
             Some(status) => {
@@ -1223,7 +1218,7 @@ impl ProjectDatabase {
         );
 
         let mut stmt = self.conn.prepare(&query)?;
-        
+
         // Add pagination parameters
         let mut all_params = params;
         all_params.push(Box::new(limit.unwrap_or(1000)));
@@ -1360,37 +1355,45 @@ impl ProjectDatabase {
 
         // Compare with existing project to detect changes
         let mut changes = Vec::new();
-        
+
         if new_live_set.name != existing_project.name {
-            changes.push(format!("Name: '{}' -> '{}'", existing_project.name, new_live_set.name));
+            changes.push(format!(
+                "Name: '{}' -> '{}'",
+                existing_project.name, new_live_set.name
+            ));
         }
-        
+
         if new_live_set.tempo != existing_project.tempo {
-            changes.push(format!("Tempo: {} -> {}", existing_project.tempo, new_live_set.tempo));
+            changes.push(format!(
+                "Tempo: {} -> {}",
+                existing_project.tempo, new_live_set.tempo
+            ));
         }
-        
+
         if new_live_set.time_signature != existing_project.time_signature {
             changes.push(format!(
-                "Time signature: {}/{} -> {}/{}", 
-                existing_project.time_signature.numerator, 
+                "Time signature: {}/{} -> {}/{}",
+                existing_project.time_signature.numerator,
                 existing_project.time_signature.denominator,
-                new_live_set.time_signature.numerator, 
+                new_live_set.time_signature.numerator,
                 new_live_set.time_signature.denominator
             ));
         }
-        
+
         if new_live_set.key_signature != existing_project.key_signature {
-            let old_key = existing_project.key_signature
+            let old_key = existing_project
+                .key_signature
                 .as_ref()
                 .map(|k| format!("{} {}", k.tonic, k.scale))
                 .unwrap_or_else(|| "None".to_string());
-            let new_key = new_live_set.key_signature
+            let new_key = new_live_set
+                .key_signature
                 .as_ref()
                 .map(|k| format!("{} {}", k.tonic, k.scale))
                 .unwrap_or_else(|| "None".to_string());
             changes.push(format!("Key signature: {} -> {}", old_key, new_key));
         }
-        
+
         if new_live_set.ableton_metadata != existing_project.ableton_metadata {
             changes.push(format!(
                 "Ableton version: {}.{}.{} -> {}.{}.{}",
@@ -1402,27 +1405,45 @@ impl ProjectDatabase {
                 new_live_set.ableton_metadata.patch
             ));
         }
-        
+
         let old_plugin_count = existing_project.plugins.len();
         let new_plugin_count = new_live_set.plugins.len();
         if old_plugin_count != new_plugin_count {
-            changes.push(format!("Plugins: {} -> {}", old_plugin_count, new_plugin_count));
+            changes.push(format!(
+                "Plugins: {} -> {}",
+                old_plugin_count, new_plugin_count
+            ));
         }
-        
+
         let old_sample_count = existing_project.samples.len();
         let new_sample_count = new_live_set.samples.len();
         if old_sample_count != new_sample_count {
-            changes.push(format!("Samples: {} -> {}", old_sample_count, new_sample_count));
+            changes.push(format!(
+                "Samples: {} -> {}",
+                old_sample_count, new_sample_count
+            ));
         }
 
         // Update the project in the database
         let tx = self.conn.transaction()?;
 
         // Delete existing project data
-        tx.execute("DELETE FROM project_plugins WHERE project_id = ?", params![project_id])?;
-        tx.execute("DELETE FROM project_samples WHERE project_id = ?", params![project_id])?;
-        tx.execute("DELETE FROM project_tags WHERE project_id = ?", params![project_id])?;
-        tx.execute("DELETE FROM project_search WHERE project_id = ?", params![project_id])?;
+        tx.execute(
+            "DELETE FROM project_plugins WHERE project_id = ?",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_samples WHERE project_id = ?",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_tags WHERE project_id = ?",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_search WHERE project_id = ?",
+            params![project_id],
+        )?;
 
         // Update the project record
         tx.execute(
@@ -1441,8 +1462,14 @@ impl ProjectDatabase {
                 new_live_set.tempo,
                 new_live_set.time_signature.numerator,
                 new_live_set.time_signature.denominator,
-                new_live_set.key_signature.as_ref().map(|k| k.tonic.to_string()),
-                new_live_set.key_signature.as_ref().map(|k| k.scale.to_string()),
+                new_live_set
+                    .key_signature
+                    .as_ref()
+                    .map(|k| k.tonic.to_string()),
+                new_live_set
+                    .key_signature
+                    .as_ref()
+                    .map(|k| k.scale.to_string()),
                 new_live_set.furthest_bar,
                 new_live_set.estimated_duration.map(|d| d.num_seconds()),
                 new_live_set.daw_type,

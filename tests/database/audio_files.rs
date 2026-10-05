@@ -58,7 +58,10 @@ fn setting_a_primary_lists_it_and_adding_does_not_change_the_primary() {
     db.add_project_audio_file("p", &master).unwrap();
     db.add_project_audio_file("p", &master).unwrap(); // already listed: no-op
 
-    assert_eq!(listed(&db, "p"), vec![("rough.wav".into(), true), ("master.wav".into(), false)]);
+    assert_eq!(
+        listed(&db, "p"),
+        vec![("rough.wav".into(), true), ("master.wav".into(), false)]
+    );
 }
 
 #[test]
@@ -72,13 +75,19 @@ fn removing_the_primary_promotes_the_next_and_the_last_leaves_none() {
 
     assert!(db.remove_project_audio_file_from_list("p", &a).unwrap());
     assert_eq!(listed(&db, "p"), vec![("b.wav".into(), true)]);
-    assert_eq!(db.get_project_audio_file("p").unwrap().map(|m| m.id), Some(b.clone()));
+    assert_eq!(
+        db.get_project_audio_file("p").unwrap().map(|m| m.id),
+        Some(b.clone())
+    );
 
     assert!(db.remove_project_audio_file_from_list("p", &b).unwrap());
     assert!(listed(&db, "p").is_empty());
     assert!(db.get_project_audio_file("p").unwrap().is_none());
 
-    assert!(!db.remove_project_audio_file_from_list("p", &b).unwrap(), "not listed any more");
+    assert!(
+        !db.remove_project_audio_file_from_list("p", &b).unwrap(),
+        "not listed any more"
+    );
 }
 
 #[test]
@@ -104,7 +113,12 @@ fn a_listed_audio_that_is_not_primary_is_not_an_orphan() {
     db.update_project_audio_file("p", Some(&a)).unwrap();
     db.add_project_audio_file("p", &b).unwrap();
 
-    let orphans: Vec<String> = db.get_orphaned_media_files(None, None).unwrap().into_iter().map(|m| m.id).collect();
+    let orphans: Vec<String> = db
+        .get_orphaned_media_files(None, None)
+        .unwrap()
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
     assert_eq!(orphans, vec![loose]);
 }
 
@@ -120,8 +134,12 @@ fn an_existing_single_audio_is_listed_as_primary_on_open() {
         add_project(&db, "p");
         a = add_audio(&mut db, "old.wav");
         // Simulate the old write path: the column only, no list row.
-        db.conn.execute("UPDATE projects SET audio_file_id = ? WHERE id = 'p'", [&a]).unwrap();
-        db.conn.execute("DELETE FROM project_audio_files", []).unwrap();
+        db.conn
+            .execute("UPDATE projects SET audio_file_id = ? WHERE id = 'p'", [&a])
+            .unwrap();
+        db.conn
+            .execute("DELETE FROM project_audio_files", [])
+            .unwrap();
         assert!(listed(&db, "p").is_empty());
     }
     let db = ProjectDatabase::new(path).unwrap();

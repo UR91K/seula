@@ -3,11 +3,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
+use crate::config::CONFIG;
 use crate::database::plugin_details::PluginDetails;
 use crate::database::plugins::{
     FormatInfo, InstallState, PluginFilter, PluginRefreshResult, PluginStats, VendorInfo,
 };
-use crate::config::CONFIG;
 use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
 use crate::models::GrpcPlugin;
@@ -86,7 +86,14 @@ impl PluginsService {
         format_filter: Option<String>,
     ) -> Result<(Vec<crate::models::Plugin>, i32), DatabaseError> {
         let db = self.db.lock().await;
-        db.search_plugins(query, limit, offset, install_states, vendor_filter, format_filter)
+        db.search_plugins(
+            query,
+            limit,
+            offset,
+            install_states,
+            vendor_filter,
+            format_filter,
+        )
     }
 
     pub async fn get_plugin_stats(&self) -> Result<PluginStats, DatabaseError> {
@@ -95,12 +102,18 @@ impl PluginsService {
     }
 
     /// The same counts over only the plugins `filter` selects.
-    pub async fn get_plugin_stats_filtered(&self, filter: &PluginFilter) -> Result<PluginStats, DatabaseError> {
+    pub async fn get_plugin_stats_filtered(
+        &self,
+        filter: &PluginFilter,
+    ) -> Result<PluginStats, DatabaseError> {
         let db = self.db.lock().await;
         db.get_plugin_stats_filtered(filter)
     }
 
-    pub async fn get_plugin_details(&self, plugin_id: &str) -> Result<Option<PluginDetails>, DatabaseError> {
+    pub async fn get_plugin_details(
+        &self,
+        plugin_id: &str,
+    ) -> Result<Option<PluginDetails>, DatabaseError> {
         let db = self.db.lock().await;
         db.get_plugin_details(plugin_id)
     }
@@ -129,7 +142,11 @@ impl PluginsService {
         db.get_plugin_formats(limit, offset, sort_by, sort_desc, scope)
     }
 
-    pub async fn get_plugin(&self, plugin_id: &str, scope: ProjectScope) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    pub async fn get_plugin(
+        &self,
+        plugin_id: &str,
+        scope: ProjectScope,
+    ) -> Result<Option<GrpcPlugin>, DatabaseError> {
         let db = self.db.lock().await;
         db.get_plugin_by_id(plugin_id, scope)
     }
@@ -148,10 +165,14 @@ impl PluginsService {
     /// Rescan the system's plugins and record the result. Returns when the scan is
     /// done, which takes minutes; the database is locked only to write the result
     /// (ADR-0038). The HTTP API's background scan is `SystemService::start_plugin_scan`.
-    pub async fn refresh_plugin_installation_status(&self) -> Result<PluginRefreshResult, DatabaseError> {
+    pub async fn refresh_plugin_installation_status(
+        &self,
+    ) -> Result<PluginRefreshResult, DatabaseError> {
         let report = tokio::task::spawn_blocking(|| scan_configured_plugins(&mut |_, _, _| {}))
             .await
-            .map_err(|e| DatabaseError::ConnectionError(format!("Plugin scan task failed: {}", e)))??;
+            .map_err(|e| {
+                DatabaseError::ConnectionError(format!("Plugin scan task failed: {}", e))
+            })??;
         self.db.lock().await.record_plugin_refresh(&report)
     }
 }

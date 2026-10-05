@@ -1,9 +1,9 @@
 //! Task service tests
 
+use crate::grpc::server_setup::{create_test_project, setup_test_server};
 use crate::grpc::*;
-use crate::grpc::server_setup::{setup_test_server, create_test_project};
-use seula::grpc::tasks::*;
 use seula::grpc::tasks::task_service_server::TaskService;
+use seula::grpc::tasks::*;
 
 #[tokio::test]
 async fn test_search_tasks() {
@@ -53,7 +53,7 @@ async fn test_search_tasks() {
     });
     let search_response = server.search_tasks(search_req).await.unwrap();
     let search_result = search_response.into_inner();
-    
+
     assert_eq!(search_result.tasks.len(), 1);
     assert_eq!(search_result.total_count, 1);
     assert_eq!(search_result.tasks[0].description, "Finish the intro");
@@ -69,7 +69,7 @@ async fn test_search_tasks() {
     });
     let completed_response = server.search_tasks(completed_search_req).await.unwrap();
     let completed_result = completed_response.into_inner();
-    
+
     assert_eq!(completed_result.tasks.len(), 1);
     assert_eq!(completed_result.total_count, 1);
     assert_eq!(completed_result.tasks[0].description, "Mix the vocals");
@@ -86,7 +86,7 @@ async fn test_search_tasks() {
     });
     let pending_response = server.search_tasks(pending_search_req).await.unwrap();
     let pending_result = pending_response.into_inner();
-    
+
     assert_eq!(pending_result.tasks.len(), 2);
     assert_eq!(pending_result.total_count, 2);
     assert!(pending_result.tasks.iter().all(|task| !task.completed));
@@ -148,9 +148,7 @@ async fn test_get_task_statistics() {
     assert!((stats.completion_rate - 66.66666666666667).abs() < 0.1); // ~66.67%
 
     // Test getting global statistics (all projects)
-    let global_stats_req = Request::new(GetTaskStatisticsRequest {
-        project_id: None,
-    });
+    let global_stats_req = Request::new(GetTaskStatisticsRequest { project_id: None });
     let global_stats_response = server.get_task_statistics(global_stats_req).await.unwrap();
     let global_stats = global_stats_response.into_inner().statistics.unwrap();
 

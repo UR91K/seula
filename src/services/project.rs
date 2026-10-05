@@ -234,7 +234,8 @@ impl ProjectsService {
     }
 
     fn parse_uuid(id: &str) -> Result<Uuid, DatabaseError> {
-        Uuid::parse_str(id)
-            .map_err(|e| DatabaseError::InvalidOperation(format!("Invalid project ID format: {}", e)))
+        Uuid::parse_str(id).map_err(|e| {
+            DatabaseError::InvalidOperation(format!("Invalid project ID format: {}", e))
+        })
     }
 }

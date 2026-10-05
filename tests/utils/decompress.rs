@@ -9,7 +9,11 @@ use seula::utils::decompress_gzip_file;
 fn test_pre_8_2_set_is_unsupported_version() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("old.als");
-    std::fs::write(&path, [0xAB, 0x1E, 0x56, 0x78, 0x03, 0x7C, 0x00, 0x00, 0x00, 0x00]).unwrap();
+    std::fs::write(
+        &path,
+        [0xAB, 0x1E, 0x56, 0x78, 0x03, 0x7C, 0x00, 0x00, 0x00, 0x00],
+    )
+    .unwrap();
 
     match decompress_gzip_file(&path) {
         Err(FileError::UnsupportedVersion { path: p }) => assert_eq!(p, path),

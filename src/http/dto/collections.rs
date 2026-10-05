@@ -31,7 +31,10 @@ impl From<CollectionStatistics> for CollectionStatisticsDto {
             total_plugins: s.total_plugins,
             total_samples: s.total_samples,
             total_tags: s.total_tags,
-            most_common_key: s.most_common_key.as_deref().and_then(KeySignatureDto::from_joined),
+            most_common_key: s
+                .most_common_key
+                .as_deref()
+                .and_then(KeySignatureDto::from_joined),
             most_common_time_signature: s.most_common_time_signature,
         }
     }
@@ -169,9 +172,11 @@ pub struct BatchOperationResponse {
 
 impl BatchOperationResponse {
     pub fn from_results(results: Vec<(String, Result<(), crate::error::DatabaseError>)>) -> Self {
-        let (successful_count, failed_count) = results
-            .iter()
-            .fold((0, 0), |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) });
+        let (successful_count, failed_count) =
+            results.iter().fold(
+                (0, 0),
+                |(s, f), (_, r)| if r.is_ok() { (s + 1, f) } else { (s, f + 1) },
+            );
 
         let results = results
             .into_iter()

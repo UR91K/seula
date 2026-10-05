@@ -1,4 +1,4 @@
-use crate::config::{Config, paths};
+use crate::config::{paths, Config};
 use crate::error::ConfigError;
 use std::path::PathBuf;
 
@@ -9,7 +9,9 @@ impl Config {
 
         // Allow empty paths but issue a warning - this enables "setup required" mode
         if self.paths.is_empty() {
-            warnings.push("No project paths configured - application will run in setup mode".to_string());
+            warnings.push(
+                "No project paths configured - application will run in setup mode".to_string(),
+            );
         }
 
         // Validate gRPC port range (u16 is already limited to 0-65535, so just check for 0)
@@ -93,4 +95,4 @@ impl Config {
 
         Ok(warnings)
     }
-} 
+}

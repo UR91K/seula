@@ -17,10 +17,9 @@ use axum::Json;
 use crate::http::dto::collections::{
     BatchCollectionProjectsRequest, BatchCreateCollectionFromRequest,
     BatchCreateCollectionFromResponse, BatchOperationResponse, CollectionDto,
-    CollectionStatisticsDto,
-    CollectionListResponse, CollectionTasksResponse, CreateCollectionRequest,
-    DuplicateCollectionRequest, ListCollectionsQuery, ReorderCollectionRequest, ScopeQuery,
-    SearchCollectionsQuery, TaskDto, UpdateCollectionRequest,
+    CollectionListResponse, CollectionStatisticsDto, CollectionTasksResponse,
+    CreateCollectionRequest, DuplicateCollectionRequest, ListCollectionsQuery,
+    ReorderCollectionRequest, ScopeQuery, SearchCollectionsQuery, TaskDto, UpdateCollectionRequest,
 };
 use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::project_to_dto;
@@ -35,7 +34,13 @@ pub async fn list_collections(
     let (collections, total_count) = state
         .services
         .collections
-        .list_collections(query.limit, query.offset, query.sort_by, query.sort_desc, scope)
+        .list_collections(
+            query.limit,
+            query.offset,
+            query.sort_by,
+            query.sort_desc,
+            scope,
+        )
         .await?;
 
     Ok(Json(CollectionListResponse {
@@ -135,7 +140,11 @@ pub async fn delete_collection(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    state.services.collections.delete_collection(&collection_id).await?;
+    state
+        .services
+        .collections
+        .delete_collection(&collection_id)
+        .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 

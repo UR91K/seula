@@ -79,8 +79,12 @@ pub fn enumerate(path: &Path) -> Result<Vec<ShellEntry>, String> {
     // This deliberately does not reuse the caller's `PluginLoader`. We need a raw
     // `AEffect` to dispatch against, and we close this handle as soon as the list
     // is read so the real per-sub-plugin loads start from a clean state.
-    let lib = unsafe { Library::new(path) }
-        .map_err(|e| format!("Failed to open the VST2 binary for shell enumeration: {}", e))?;
+    let lib = unsafe { Library::new(path) }.map_err(|e| {
+        format!(
+            "Failed to open the VST2 binary for shell enumeration: {}",
+            e
+        )
+    })?;
 
     let mut entries = Vec::new();
 

@@ -1,13 +1,13 @@
 //! Scanning integration tests
 
 use crate::common::setup;
-use std::collections::HashSet;
-use std::path::PathBuf;
-use std::sync::Arc;
 use seula::{
     config::CONFIG, database::ProjectDatabase, process_projects, process_projects_with_progress,
     scan::project_scanner::ProjectPathScanner,
 };
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[test]
 #[ignore = "scans and parses every .als under the real configured project paths, then \

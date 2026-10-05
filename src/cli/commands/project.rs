@@ -1,7 +1,7 @@
 use crate::cli::commands::{CliCommand, CliContext};
-use crate::cli::ProjectCommands;
+use crate::cli::output::{OutputFormatter, SimpleTable, TableDisplay};
 use crate::cli::CliError;
-use crate::cli::output::{OutputFormatter, TableDisplay, SimpleTable};
+use crate::cli::ProjectCommands;
 use crate::services::DeletionScope;
 
 use serde::Serialize;
@@ -10,12 +10,15 @@ use serde::Serialize;
 impl CliCommand for ProjectCommands {
     async fn execute(&self, ctx: &CliContext) -> Result<(), CliError> {
         match self {
-            ProjectCommands::List { deleted, limit, offset } => {
-                self.list_projects(ctx, *deleted, *limit, *offset).await
-            }
+            ProjectCommands::List {
+                deleted,
+                limit,
+                offset,
+            } => self.list_projects(ctx, *deleted, *limit, *offset).await,
             ProjectCommands::Show { id } => self.show_project(ctx, id).await,
             ProjectCommands::Update { id, name, notes } => {
-                self.update_project(ctx, id, name.as_deref(), notes.as_deref()).await
+                self.update_project(ctx, id, name.as_deref(), notes.as_deref())
+                    .await
             }
             ProjectCommands::Delete { id } => self.delete_project(ctx, id).await,
             ProjectCommands::Restore { id } => self.restore_project(ctx, id).await,
@@ -26,10 +29,20 @@ impl CliCommand for ProjectCommands {
 }
 
 impl ProjectCommands {
-    async fn list_projects(&self, ctx: &CliContext, deleted: bool, limit: usize, offset: usize) -> Result<(), CliError> {
+    async fn list_projects(
+        &self,
+        ctx: &CliContext,
+        deleted: bool,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
 
-        let scope = if deleted { DeletionScope::DeletedOnly } else { DeletionScope::ActiveOnly };
+        let scope = if deleted {
+            DeletionScope::DeletedOnly
+        } else {
+            DeletionScope::ActiveOnly
+        };
         let (projects, total_count) = ctx
             .services
             .projects
@@ -56,11 +69,17 @@ impl ProjectCommands {
                     .as_ref()
                     .map(|k| k.to_string())
                     .unwrap_or_else(|| "".to_string()),
-                time_signature: format!("{}/{}", p.time_signature.numerator, p.time_signature.denominator),
+                time_signature: format!(
+                    "{}/{}",
+                    p.time_signature.numerator, p.time_signature.denominator
+                ),
             })
             .collect();
 
-        let data = ProjectsList { total: total_count as usize, displayed: rows };
+        let data = ProjectsList {
+            total: total_count as usize,
+            displayed: rows,
+        };
         formatter.print(&data)
     }
 
@@ -72,18 +91,30 @@ impl ProjectCommands {
                 formatter.print(&details)
             }
             None => {
-                formatter.print_message(&format!("Project not found: {}", id), crate::cli::output::MessageType::Warning);
+                formatter.print_message(
+                    &format!("Project not found: {}", id),
+                    crate::cli::output::MessageType::Warning,
+                );
                 Ok(())
             }
         }
     }
 
-    async fn update_project(&self, ctx: &CliContext, id: &str, name: Option<&str>, notes: Option<&str>) -> Result<(), CliError> {
+    async fn update_project(
+        &self,
+        ctx: &CliContext,
+        id: &str,
+        name: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<(), CliError> {
         if name.is_none() && notes.is_none() {
             return Ok(());
         }
 
-        ctx.services.projects.update_project(id, name, notes).await?;
+        ctx.services
+            .projects
+            .update_project(id, name, notes)
+            .await?;
 
         // Show updated project summary
         self.show_project(ctx, id).await
@@ -92,7 +123,10 @@ impl ProjectCommands {
     async fn delete_project(&self, ctx: &CliContext, id: &str) -> Result<(), CliError> {
         ctx.services.projects.mark_deleted(id).await?;
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-        formatter.print_message(&format!("Project {} marked as deleted", id), crate::cli::output::MessageType::Success);
+        formatter.print_message(
+            &format!("Project {} marked as deleted", id),
+            crate::cli::output::MessageType::Success,
+        );
         Ok(())
     }
 
@@ -102,12 +136,18 @@ impl ProjectCommands {
         match ctx.services.projects.reactivate(id).await {
             Ok(()) => {
                 let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-                formatter.print_message(&format!("Project {} restored", id), crate::cli::output::MessageType::Success);
+                formatter.print_message(
+                    &format!("Project {} restored", id),
+                    crate::cli::output::MessageType::Success,
+                );
                 Ok(())
             }
             Err(DatabaseError::NotFound(_)) => {
                 let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-                formatter.print_message(&format!("Project not found: {}", id), crate::cli::output::MessageType::Warning);
+                formatter.print_message(
+                    &format!("Project not found: {}", id),
+                    crate::cli::output::MessageType::Warning,
+                );
                 Ok(())
             }
             Err(e) => Err(e.into()),
@@ -118,17 +158,32 @@ impl ProjectCommands {
         let result = ctx.services.projects.rescan(id, false).await?;
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
         if result.success {
-            formatter.print_message(&result.scan_summary, crate::cli::output::MessageType::Success);
+            formatter.print_message(
+                &result.scan_summary,
+                crate::cli::output::MessageType::Success,
+            );
         } else {
-            formatter.print_message(&format!("Rescan failed: {}", result.error_message.unwrap_or_else(|| "Unknown error".to_string())), crate::cli::output::MessageType::Error);
+            formatter.print_message(
+                &format!(
+                    "Rescan failed: {}",
+                    result
+                        .error_message
+                        .unwrap_or_else(|| "Unknown error".to_string())
+                ),
+                crate::cli::output::MessageType::Error,
+            );
         }
         Ok(())
     }
 
     async fn show_project_stats(&self, ctx: &CliContext) -> Result<(), CliError> {
-        let stats = ctx.services.projects.get_statistics(
-            None, None, None, None, None, None, None, None, None, None, None, None,
-        ).await?;
+        let stats = ctx
+            .services
+            .projects
+            .get_statistics(
+                None, None, None, None, None, None, None, None, None, None, None, None,
+            )
+            .await?;
 
         let display = ProjectStatisticsDisplay::from_stats(&stats);
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
@@ -178,7 +233,9 @@ impl TableDisplay for ProjectsList {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["id", "name", "path", "tempo", "key", "time_signature"]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", "name", "path", "tempo", "key", "time_signature"])
+            .map_err(|e| -> CliError { e.into() })?;
         for row in &self.displayed {
             writer
                 .write_record([
@@ -217,8 +274,15 @@ impl ProjectDetails {
             name: p.name.clone(),
             path: p.file_path.display().to_string(),
             tempo: p.tempo,
-            time_signature: format!("{}/{}", p.time_signature.numerator, p.time_signature.denominator),
-            key: p.key_signature.as_ref().map(|k| k.to_string()).unwrap_or_else(|| "".to_string()),
+            time_signature: format!(
+                "{}/{}",
+                p.time_signature.numerator, p.time_signature.denominator
+            ),
+            key: p
+                .key_signature
+                .as_ref()
+                .map(|k| k.to_string())
+                .unwrap_or_else(|| "".to_string()),
             ableton_version: p.daw_version_display.clone(),
             created_at: p.created_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             modified_at: p.modified_time.format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -235,9 +299,15 @@ impl TableDisplay for ProjectDetails {
         table.add_row(vec!["Name".to_string(), self.name.clone()]);
         table.add_row(vec!["Path".to_string(), self.path.clone()]);
         table.add_row(vec!["Tempo".to_string(), format!("{:.1}", self.tempo)]);
-        table.add_row(vec!["Time Signature".to_string(), self.time_signature.clone()]);
+        table.add_row(vec![
+            "Time Signature".to_string(),
+            self.time_signature.clone(),
+        ]);
         table.add_row(vec!["Key".to_string(), self.key.clone()]);
-        table.add_row(vec!["Ableton Version".to_string(), self.ableton_version.clone()]);
+        table.add_row(vec![
+            "Ableton Version".to_string(),
+            self.ableton_version.clone(),
+        ]);
         table.add_row(vec!["Created".to_string(), self.created_at.clone()]);
         table.add_row(vec!["Modified".to_string(), self.modified_at.clone()]);
         table.add_row(vec!["Plugins".to_string(), self.plugins.to_string()]);
@@ -246,18 +316,42 @@ impl TableDisplay for ProjectDetails {
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["field", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["id", &self.id]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["name", &self.name]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["path", &self.path]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["tempo", &format!("{:.1}", self.tempo)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["time_signature", &self.time_signature]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["key", &self.key]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["ableton_version", &self.ableton_version]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["created_at", &self.created_at]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["modified_at", &self.modified_at]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["plugins", &self.plugins.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["samples", &self.samples.to_string()]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["field", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["id", &self.id])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["name", &self.name])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["path", &self.path])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["tempo", &format!("{:.1}", self.tempo)])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["time_signature", &self.time_signature])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["key", &self.key])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["ableton_version", &self.ableton_version])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["created_at", &self.created_at])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["modified_at", &self.modified_at])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["plugins", &self.plugins.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["samples", &self.samples.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
@@ -300,35 +394,121 @@ impl ProjectStatisticsDisplay {
 impl TableDisplay for ProjectStatisticsDisplay {
     fn to_simple_table(&self) -> SimpleTable {
         let mut table = SimpleTable::new(vec!["Metric".to_string(), "Value".to_string()]);
-        table.add_row(vec!["Total Projects".to_string(), self.total_projects.to_string()]);
-        table.add_row(vec!["Projects with Audio".to_string(), self.projects_with_audio_files.to_string()]);
-        table.add_row(vec!["Projects without Audio".to_string(), self.projects_without_audio_files.to_string()]);
-        table.add_row(vec!["Average Tempo".to_string(), format!("{:.2}", self.average_tempo)]);
-        table.add_row(vec!["Min Tempo".to_string(), format!("{:.2}", self.min_tempo)]);
-        table.add_row(vec!["Max Tempo".to_string(), format!("{:.2}", self.max_tempo)]);
-        table.add_row(vec!["Average Duration (s)".to_string(), format!("{:.2}", self.average_duration_seconds)]);
-        table.add_row(vec!["Min Duration (s)".to_string(), format!("{:.2}", self.min_duration_seconds)]);
-        table.add_row(vec!["Max Duration (s)".to_string(), format!("{:.2}", self.max_duration_seconds)]);
-        table.add_row(vec!["Average Plugins/Project".to_string(), format!("{:.2}", self.average_plugins_per_project)]);
-        table.add_row(vec!["Average Samples/Project".to_string(), format!("{:.2}", self.average_samples_per_project)]);
-        table.add_row(vec!["Average Tags/Project".to_string(), format!("{:.2}", self.average_tags_per_project)]);
+        table.add_row(vec![
+            "Total Projects".to_string(),
+            self.total_projects.to_string(),
+        ]);
+        table.add_row(vec![
+            "Projects with Audio".to_string(),
+            self.projects_with_audio_files.to_string(),
+        ]);
+        table.add_row(vec![
+            "Projects without Audio".to_string(),
+            self.projects_without_audio_files.to_string(),
+        ]);
+        table.add_row(vec![
+            "Average Tempo".to_string(),
+            format!("{:.2}", self.average_tempo),
+        ]);
+        table.add_row(vec![
+            "Min Tempo".to_string(),
+            format!("{:.2}", self.min_tempo),
+        ]);
+        table.add_row(vec![
+            "Max Tempo".to_string(),
+            format!("{:.2}", self.max_tempo),
+        ]);
+        table.add_row(vec![
+            "Average Duration (s)".to_string(),
+            format!("{:.2}", self.average_duration_seconds),
+        ]);
+        table.add_row(vec![
+            "Min Duration (s)".to_string(),
+            format!("{:.2}", self.min_duration_seconds),
+        ]);
+        table.add_row(vec![
+            "Max Duration (s)".to_string(),
+            format!("{:.2}", self.max_duration_seconds),
+        ]);
+        table.add_row(vec![
+            "Average Plugins/Project".to_string(),
+            format!("{:.2}", self.average_plugins_per_project),
+        ]);
+        table.add_row(vec![
+            "Average Samples/Project".to_string(),
+            format!("{:.2}", self.average_samples_per_project),
+        ]);
+        table.add_row(vec![
+            "Average Tags/Project".to_string(),
+            format!("{:.2}", self.average_tags_per_project),
+        ]);
         table
     }
 
     fn to_csv<W: std::io::Write>(&self, writer: &mut csv::Writer<W>) -> Result<(), CliError> {
-        writer.write_record(["metric", "value"]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["total_projects", &self.total_projects.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["projects_with_audio_files", &self.projects_with_audio_files.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["projects_without_audio_files", &self.projects_without_audio_files.to_string()]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["average_tempo", &format!("{:.2}", self.average_tempo)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["min_tempo", &format!("{:.2}", self.min_tempo)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["max_tempo", &format!("{:.2}", self.max_tempo)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["average_duration_seconds", &format!("{:.2}", self.average_duration_seconds)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["min_duration_seconds", &format!("{:.2}", self.min_duration_seconds)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["max_duration_seconds", &format!("{:.2}", self.max_duration_seconds)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["average_plugins_per_project", &format!("{:.2}", self.average_plugins_per_project)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["average_samples_per_project", &format!("{:.2}", self.average_samples_per_project)]).map_err(|e| -> CliError { e.into() })?;
-        writer.write_record(["average_tags_per_project", &format!("{:.2}", self.average_tags_per_project)]).map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["metric", "value"])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["total_projects", &self.total_projects.to_string()])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "projects_with_audio_files",
+                &self.projects_with_audio_files.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "projects_without_audio_files",
+                &self.projects_without_audio_files.to_string(),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["average_tempo", &format!("{:.2}", self.average_tempo)])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["min_tempo", &format!("{:.2}", self.min_tempo)])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record(["max_tempo", &format!("{:.2}", self.max_tempo)])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "average_duration_seconds",
+                &format!("{:.2}", self.average_duration_seconds),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "min_duration_seconds",
+                &format!("{:.2}", self.min_duration_seconds),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "max_duration_seconds",
+                &format!("{:.2}", self.max_duration_seconds),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "average_plugins_per_project",
+                &format!("{:.2}", self.average_plugins_per_project),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "average_samples_per_project",
+                &format!("{:.2}", self.average_samples_per_project),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
+        writer
+            .write_record([
+                "average_tags_per_project",
+                &format!("{:.2}", self.average_tags_per_project),
+            ])
+            .map_err(|e| -> CliError { e.into() })?;
         Ok(())
     }
 }
