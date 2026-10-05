@@ -11,7 +11,7 @@ import type { View } from "./view";
 
 const NAV: { id: RouteId | null; label: string; icon: string }[] = [
   { id: "projects", label: "Projects", icon: "audio_file" },
-  { id: null, label: "Collections", icon: "album" },
+  { id: "collections", label: "Collections", icon: "album" },
   { id: "plugins", label: "Plugins", icon: "plug_connect" },
   { id: "samples", label: "Samples", icon: "earthquake" },
   { id: null, label: "Stats", icon: "bar_chart" },

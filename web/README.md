@@ -68,14 +68,27 @@ measured until a check has run. "Check samples" runs `POST /api/v1/samples/check
 no Play item: it needs a Tauri command and an ADR first. The `scope` preference is not
 exposed, so used-in lists stay on the daemon's default (active projects).
 
+**Collections.** A grid of cover cards or a details table (the layout is not persisted,
+ADR-0059); the server sorts, so a Sort change or a header click reloads the list; server-side
+search; an inspector with the facts, the first ten tracks and every task naming its project
+(read-only: the project inspector has no task toggling to share). New, edit details
+(name, description, cover), duplicate and delete are dialogs on one shared component
+(ADR-0056); a cover is chosen or dropped in the edit dialog and sent as bytes (ADR-0058).
+Double-click or Enter opens a collection into its tracklist, which is the projects table
+over a state factory (ADR-0055) with a place column and pointer-event drag handles
+(ADR-0057); a sort there reorders the view only, and `#` returns to collection order.
+Selected tracks can be removed from the collection. "Show in Projects" searches
+`collection:"name"`. A cover the daemon cannot serve falls back to the album glyph. Not
+built: adding projects to a collection from Projects (the Collection button there is
+disabled), "new from selection", and the `scope=all` preference.
+
 **Push-speed state** is a scan's progress in the status bar, for the project scan, the
 plugin scan and the sample check alike. The daemon's real scan
 finishes at once on the mock library (it has no project folders), so **Simulate** streams
 600 events at about 40 a second in the real stream's shape. **Scan** runs the real one.
 
 Not built: tag, collection and archive edits (the batch buttons are the mockup's, disabled),
-audition playback, drag to reorder columns, the collections and stats views, and ADR-0032's custom
-window controls (the shell uses the native frame). The CSP is `null` and the icon font loads
+audition playback, drag to reorder columns, and the stats view. The CSP is `null` and the icon font loads
 from Google Fonts, both fine for a trial and neither for shipping.
 
 The plugin scan needs the `vst-meta` worker next to the daemon: `cargo build -p vst-meta`.

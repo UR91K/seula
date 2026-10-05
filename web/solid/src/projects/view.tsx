@@ -1,40 +1,49 @@
 import { Show, createEffect, on, onMount } from "solid-js";
 import { plural } from "../../../shared/projects";
 import { Icon } from "../shell/parts";
-import { shell } from "../shell/shell";
+import { loadCollectionNames, shell } from "../shell/shell";
 import type { View } from "../shell/view";
-import { Inspector } from "./Inspector";
+import { SelectionInspector } from "./Inspector";
 import { ColumnChooser, ContextMenu, HoverList } from "./Popovers";
 import { ProjectTable } from "./Table";
 import { Viewbar } from "./Viewbar";
-import { load, loadCollections, loadError, selectedCount, selectedProjects, setQuery, setUi, total, ui } from "./state";
+import { load, loadError, setQuery, table as t, ui } from "./state";
 
 function Content() {
-  onMount(() => { load(); loadCollections(); });
+  onMount(() => { load(); loadCollectionNames(); });
   // The list follows the scope and the search, nothing else.
   createEffect(on(() => [ui.scope, ui.query], () => { load(); }, { defer: true }));
   return (
     <>
       <Show when={loadError()}><div class="error-banner">Cannot reach the daemon: {loadError()}</div></Show>
-      <Show when={total() > 0} fallback={
+      <Show when={t.total() > 0} fallback={
         <Show when={!loadError()}>
           <div class="empty">
             <Icon name={ui.query ? "search_off" : "inventory_2"} />
             <h2>{ui.query ? `No projects match “${ui.query}”` : ui.scope === "archived" ? "No archived projects" : "No projects yet"}</h2>
           </div>
         </Show>}>
-        <ProjectTable />
+        <ProjectTable t={t} />
       </Show>
     </>
   );
 }
 
+function Inspector() {
+  return (
+    <aside class="inspector">
+      <SelectionInspector t={t} fallback={
+        <div class="empty"><Icon name="right_panel_open" /><p>Select a project to see its details here.</p></div>} />
+    </aside>
+  );
+}
+
 function Status() {
-  const count = () => ui.query ? plural(total(), "result") : `${total()} ${ui.scope === "archived" ? "archived" : "projects"}`;
+  const count = () => ui.query ? plural(t.total(), "result") : `${t.total()} ${ui.scope === "archived" ? "archived" : "projects"}`;
   return (
     <>
       <span>{count()}</span>
-      <Show when={selectedCount()}><span>{selectedCount()} selected</span></Show>
+      <Show when={t.selectedCount()}><span>{t.selectedCount()} selected</span></Show>
     </>
   );
 }
@@ -42,9 +51,9 @@ function Status() {
 function Popovers() {
   return (
     <>
-      <Show when={shell.menu} keyed>{(m) => <ContextMenu menu={m} />}</Show>
-      <Show when={ui.hot} keyed>{(h) => <HoverList hot={h} />}</Show>
-      <Show when={shell.popover === "columns"}><ColumnChooser /></Show>
+      <Show when={shell.menu} keyed>{(m) => <ContextMenu t={t} menu={m} />}</Show>
+      <Show when={t.hot()} keyed>{(h) => <HoverList t={t} hot={h} />}</Show>
+      <Show when={shell.popover === "columns"}><ColumnChooser t={t} /></Show>
     </>
   );
 }
@@ -54,9 +63,9 @@ export const projectsView: View = {
   query: () => ui.query,
   setQuery,
   onKey(e) {
-    if (e.key === "F2" && ui.renaming == null) {
-      const sel = selectedProjects();
-      if (sel.length === 1) { e.preventDefault(); setUi("renaming", sel[0].id); }
+    if (e.key === "F2" && t.renaming() == null) {
+      const sel = t.selectedProjects();
+      if (sel.length === 1) { e.preventDefault(); t.setRenaming(sel[0].id); }
     }
   },
 };

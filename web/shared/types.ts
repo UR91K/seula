@@ -106,3 +106,29 @@ export interface SampleFormat {
   format: string; name: string; extensions: string[]; count: number; present_count: number;
   missing_count: number; total_size_bytes: number;
 }
+
+// ---------------------------------------------------------------- collections
+
+/** A collection as the list routes send it (CollectionDto). Counts and length are in the
+ *  project scope the request named (ADR-0043). */
+export interface CollectionRow {
+  id: string; name: string; description: string | null; notes: string | null;
+  created_at: number; modified_at: number; project_ids: string[];
+  cover_art_id: string | null; total_duration_seconds: number | null; project_count: number;
+}
+
+/** GET /collections/:id/statistics. */
+export interface CollectionStats {
+  project_count: number; total_duration_seconds: number | null; average_tempo: number | null;
+  total_plugins: number; total_samples: number; total_tags: number;
+  most_common_key: Key | null; most_common_time_signature: string | null;
+}
+
+/** A task in a collection's consolidated list: it names the project it belongs to. */
+export interface CollectionTask {
+  id: string; project_id: string; project_name: string; description: string;
+  completed: boolean; created_at: number;
+}
+
+/** What the server sorts the list by (`sort_by`). */
+export type CollectionSortKey = "name" | "project_count" | "total_duration" | "created_at" | "modified_at";

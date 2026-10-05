@@ -1,20 +1,20 @@
 // The projects view's toolbar row: filters and paging, or batch actions at >1 selected.
 
 import { Show } from "solid-js";
-import { plural } from "../../../shared/projects";
+import { PAGE_SIZE, plural } from "../../../shared/projects";
 import { Icon, TbBtn } from "../shell/parts";
 import { runScan, scan, setShell, shell } from "../shell/shell";
-import { clearSelection, goPage, load, pageCount, selectedCount, setQuery, setScope, total, ui } from "./state";
-import { PAGE_SIZE } from "../../../shared/projects";
+import { load, setQuery, setScope, table as t, ui } from "./state";
+
 
 function Pager() {
-  const from = () => (total() ? ui.page * PAGE_SIZE + 1 : 0);
-  const to = () => Math.min(total(), (ui.page + 1) * PAGE_SIZE);
+  const from = () => (t.total() ? t.page() * PAGE_SIZE + 1 : 0);
+  const to = () => Math.min(t.total(), (t.page() + 1) * PAGE_SIZE);
   return (
     <span class="pager">
-      {from()}–{to()} of {total()}
-      <TbBtn icon="chevron_left" title="Previous page" disabled={ui.page === 0} onClick={() => goPage(-1)} />
-      <TbBtn icon="chevron_right" title="Next page" disabled={ui.page >= pageCount() - 1} onClick={() => goPage(1)} />
+      {from()}–{to()} of {t.total()}
+      <TbBtn icon="chevron_left" title="Previous page" disabled={t.page() === 0} onClick={() => t.goPage(-1)} />
+      <TbBtn icon="chevron_right" title="Next page" disabled={t.page() >= t.pageCount() - 1} onClick={() => t.goPage(1)} />
       <span class="select"><span class="k">Show</span> {PAGE_SIZE} <Icon name="expand_more" /></span>
     </span>
   );
@@ -25,8 +25,8 @@ function Batch() {
   // the mockup's, disabled.
   return (
     <>
-      <span class="count-sel">{selectedCount()} selected</span>
-      <TbBtn icon="close" title="Clear selection" onClick={clearSelection} />
+      <span class="count-sel">{t.selectedCount()} selected</span>
+      <TbBtn icon="close" title="Clear selection" onClick={t.clearSelection} />
       <span class="sep" />
       <TbBtn icon="sell" label="Tags" caret disabled />
       <TbBtn icon="album" label="Collection" caret disabled />
@@ -45,10 +45,10 @@ function Filters() {
         <span class="select"><span class="k">Tag</span> Any <Icon name="expand_more" /></span>
       </>}>
       <span class="chip">
-        <Icon name="search" />“{ui.query}” · {plural(total(), "result")}
+        <Icon name="search" />“{ui.query}” · {plural(t.total(), "result")}
         <span onClick={() => setQuery("")}><Icon name="close" /></span>
       </span>
-      <span class="muted">{ui.sort ? "" : "by relevance"}</span>
+      <span class="muted">{t.sort() ? "" : "by relevance"}</span>
     </Show>
   );
 }
@@ -56,7 +56,7 @@ function Filters() {
 export function Viewbar() {
   return (
     <>
-      <Show when={selectedCount() > 1} fallback={
+      <Show when={t.selectedCount() > 1} fallback={
         <>
           <h1>Projects</h1>
           <Filters />

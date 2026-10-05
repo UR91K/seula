@@ -5,17 +5,17 @@
 //   click-speed  `shell`, a store.
 //   push-speed   `scan`, its own signal, read only by the status bar's scan segment.
 
-import { createSignal } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Api, DEFAULT_URL, simulatedScan } from "../../../shared/api";
 import { revealInExplorer } from "../../../shared/os";
-import type { KeySpelling, ScanKind, ScanProgress, SystemInfo } from "../../../shared/types";
+import type { Collection, KeySpelling, ScanKind, ScanProgress, SystemInfo } from "../../../shared/types";
 
 export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
 
 // ---------------------------------------------------------------- routing (ADR-0052)
 
-export type RouteId = "projects" | "plugins" | "samples";
+export type RouteId = "projects" | "collections" | "plugins" | "samples";
 export const [route, setRoute] = createSignal<RouteId>("projects");
 
 /** The one way a view hands off to the projects view: switch to it and search. The projects
@@ -42,18 +42,27 @@ export const [shell, setShell] = createStore({
 
 export const closePopups = () => setShell({ menu: null, popover: null });
 
+/** Every collection's id and name, for the project inspector's "Collections" lists. The
+ *  collections view keeps this current after its own edits. */
+export const [collectionNames, setCollectionNames] = createSignal<Collection[]>([]);
+export const collectionById = createMemo(() => new Map(collectionNames().map((c) => [c.id, c])));
+export async function loadCollectionNames() {
+  try { setCollectionNames(await api.collections()); } catch { /* the inspector shows none */ }
+}
+
 export const [notice, setNotice] = createSignal<string | null>(null);
 export const [system, setSystem] = createSignal<SystemInfo | null>(null);
 
 /** Sidebar counts. A view keeps its own up to date once it has loaded its list. */
-export const [counts, setCounts] = createStore<Record<RouteId, number | null>>({ projects: null, plugins: null, samples: null });
+export const [counts, setCounts] = createStore<Record<RouteId, number | null>>({ projects: null, collections: null, plugins: null, samples: null });
 
 export async function loadChrome() {
-  const [s, p, q, r] = await Promise.allSettled([
-    api.systemInfo(), api.count("projects"), api.count("plugins"), api.count("samples"),
+  const [s, p, c, q, r] = await Promise.allSettled([
+    api.systemInfo(), api.count("projects"), api.count("collections"), api.count("plugins"), api.count("samples"),
   ]);
   if (s.status === "fulfilled") setSystem(s.value);
   if (p.status === "fulfilled") setCounts("projects", p.value);
+  if (c.status === "fulfilled") setCounts("collections", c.value);
   if (q.status === "fulfilled") setCounts("plugins", q.value);
   if (r.status === "fulfilled") setCounts("samples", r.value);
 }

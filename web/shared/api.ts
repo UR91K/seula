@@ -1,8 +1,8 @@
 // The daemon's HTTP client: plain fetch, as ADR-0048 says. No Tauri IPC for data.
 
 import type {
-  Collection, FormatRollup, PluginDetails, PluginRow, Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope,
-  SystemInfo, VendorRollup,
+  Collection, CollectionRow, CollectionSortKey, CollectionStats, CollectionTask, FormatRollup, PluginDetails, PluginRow,
+  Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope, SystemInfo, VendorRollup,
 } from "./types";
 
 /** The mock daemon `mockup/data/generate.py` seeds (its HTTP_PORT). The real default is
@@ -50,9 +50,77 @@ export class Api {
   }
 
   /** The total the daemon reports for a list route, without fetching the list. */
-  async count(route: "projects" | "plugins" | "samples"): Promise<number> {
+  async count(route: "projects" | "plugins" | "samples" | "collections"): Promise<number> {
     return (await this.json<{ total_count: number }>(`/api/v1/${route}?limit=1`)).total_count;
   }
+
+  // ---------------------------------------------------------------- collections
+
+  /** The server sorts this list (unlike plugins and samples), counting in the active scope
+   *  (ADR-0043). */
+  async collectionList(sortBy: CollectionSortKey, desc: boolean): Promise<CollectionRow[]> {
+    return (await this.json<{ collections: CollectionRow[] }>(
+      `/api/v1/collections?sort_by=${sortBy}&sort_desc=${desc}&${BIG}`)).collections;
+  }
+
+  async searchCollections(query: string): Promise<CollectionRow[]> {
+    return (await this.json<{ collections: CollectionRow[] }>(
+      `/api/v1/collections/search?query=${encodeURIComponent(query)}&${BIG}`)).collections;
+  }
+
+  collectionStats(id: string) { return this.json<CollectionStats>(`/api/v1/collections/${id}/statistics`); }
+
+  collectionTasks(id: string) {
+    return this.json<{ tasks: CollectionTask[]; total_tasks: number; completed_tasks: number }>(`/api/v1/collections/${id}/tasks`);
+  }
+
+  /** The tracklist, in collection order. */
+  async collectionProjects(id: string): Promise<Project[]> {
+    return this.json<Project[]>(`/api/v1/collections/${id}/projects`);
+  }
+
+  createCollection(name: string, description: string | null) {
+    return this.json<CollectionRow>("/api/v1/collections", post({ name, description }));
+  }
+
+  updateCollection(id: string, change: { name?: string; description?: string; notes?: string }) {
+    return this.json<CollectionRow>(`/api/v1/collections/${id}`, put(change));
+  }
+
+  duplicateCollection(id: string, newName: string) {
+    return this.json<CollectionRow>(`/api/v1/collections/${id}/duplicate`, post({ new_name: newName }));
+  }
+
+  async deleteCollection(id: string) { await this.send(`/api/v1/collections/${id}`, { method: "DELETE" }); }
+
+  async reorderCollection(id: string, projectIds: string[]) {
+    await this.send(`/api/v1/collections/${id}/reorder`, put({ project_ids: projectIds }));
+  }
+
+  async removeFromCollection(id: string, projectIds: string[]) {
+    await this.send(`/api/v1/collections/${id}/batch-remove`, post({ project_ids: projectIds }));
+  }
+
+  /** Send an image's bytes and make it the collection's cover (ADR-0058). The daemon keeps
+   *  its own copy. The media routes report a failure as a 200 with `success: false`. */
+  async setCollectionCover(id: string, file: File): Promise<void> {
+    const up = await this.json<{ media_file_id: string; success: boolean; error_message: string | null }>(
+      `/api/v1/media/cover-art?collection_id=${id}&filename=${encodeURIComponent(file.name)}`,
+      { method: "POST", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
+    if (!up.success) throw new Error(up.error_message ?? "The cover was not stored");
+    const set = await this.json<{ success: boolean; error_message: string | null }>(
+      `/api/v1/collections/${id}/cover-art`, put({ media_file_id: up.media_file_id }));
+    if (!set.success) throw new Error(set.error_message ?? "The cover was not set");
+  }
+
+  async removeCollectionCover(id: string): Promise<void> {
+    const res = await this.json<{ success: boolean; error_message: string | null }>(
+      `/api/v1/collections/${id}/cover-art`, { method: "DELETE" });
+    if (!res.success) throw new Error(res.error_message ?? "The cover was not removed");
+  }
+
+  /** A cover's URL: media is served over HTTP (ADR-0033). */
+  mediaUrl(id: string) { return `${this.base}/api/v1/media/${id}`; }
 
   // ---------------------------------------------------------------- plugins
 
@@ -118,6 +186,10 @@ export class Api {
 
 const put = (body: unknown): RequestInit => ({
   method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+});
+
+const post = (body: unknown): RequestInit => ({
+  method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 });
 
 /** Parse a text/event-stream response body into its `data:` payloads. */
