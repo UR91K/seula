@@ -3,7 +3,6 @@
 *.als
 /test_output.txt
 /specification.md
-Cargo.lock
 tests/MIGRATION_GUIDE.md
 spec.md
 appdata_roaming_junction/
