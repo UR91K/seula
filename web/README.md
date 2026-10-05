@@ -1,20 +1,22 @@
 # web/
 
 The frontend: a Solid app in a Tauri shell over the daemon's HTTP API (ADR-0047, ADR-0048).
-Right now it holds three views, projects, plugins and samples, built from the approved mockups
-against the real API.
+Right now it holds all five approved views, projects, collections, plugins, samples and stats,
+built from the approved mockups against the real API.
 It was first built twice, in Solid and in Svelte 5, for the comparison ADR-0047 asked for;
 Solid won and the Svelte copy was removed (see `docs/status.md`).
 
 ```
 shared/    framework-free TypeScript: DTO types, the HTTP and SSE client, the projects and
-           plugins and samples rules (columns, sorting, filtering, grouping), formatting,
-           popover placement
+           plugins, samples, collections and stats rules (columns, sorting, filtering,
+           grouping, chart marks), formatting, popover placement
 solid/     Solid + Vite; src-tauri/ is the Tauri shell
   src/shell/     the frame, the route signal, the scan runner (ADR-0052, ADR-0053)
   src/projects/  the projects view
   src/plugins/   the plugins view
   src/samples/   the samples view
+  src/collections/  the collections view
+  src/stats/     the stats view
 ```
 
 The stylesheets are the mockup's (`../mockup/colors.css`, `shell.css`, `components.css`),
@@ -82,13 +84,22 @@ Selected tracks can be removed from the collection. "Show in Projects" searches
 built: adding projects to a collection from Projects (the Collection button there is
 disabled), "new from selection", and the `scope=all` preference.
 
+**Stats.** One scrolling page from `/api/v1/system/statistics`, with no inspector: six
+overview tiles with their split bars, then Music, Plugins and samples, Activity and Library
+bands of panels. The charts are CSS bars, as the mockup draws them, with a tooltip on every
+mark. A scope picker (Counting) chooses active or all projects, and under `all` archived
+projects are marked by name and the status bar says they are counted. Export CSV downloads
+`/system/statistics/export` for the same scope. The scope is an in-memory signal, the search
+box does nothing on this view, and the download is untested inside Tauri (ADR-0060, proposed).
+The figures are fetched each time the view is opened.
+
 **Push-speed state** is a scan's progress in the status bar, for the project scan, the
 plugin scan and the sample check alike. The daemon's real scan
 finishes at once on the mock library (it has no project folders), so **Simulate** streams
 600 events at about 40 a second in the real stream's shape. **Scan** runs the real one.
 
 Not built: tag, collection and archive edits (the batch buttons are the mockup's, disabled),
-audition playback, drag to reorder columns, and the stats view. The CSP is `null` and the icon font loads
+audition playback and drag to reorder columns. The CSP is `null` and the icon font loads
 from Google Fonts, both fine for a trial and neither for shipping.
 
 The plugin scan needs the `vst-meta` worker next to the daemon: `cargo build -p vst-meta`.
