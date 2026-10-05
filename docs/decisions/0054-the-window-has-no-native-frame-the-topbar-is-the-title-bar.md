@@ -14,7 +14,7 @@
   ADR-0032 (the frame: top bar, sidebar, status bar); ADR-0052 (the shell owns the frame);
   `web/solid/src-tauri/tauri.conf.json` (one window, default decorations, so a native
   title bar); `web/solid/src-tauri/capabilities/default.json` (no permissions granted);
-  `Topbar` in `web/solid/src/shell/Frame.tsx` (ends in an empty spacer where controls
+  the `Topbar` component in `web/solid/src/shell/` (ends in an empty spacer where controls
   would go)
 
 ## Context
@@ -150,7 +150,8 @@ in `references/` (read, not run):
   three, and the README's install line says 0.2 while the crate says 0.1.0.
 
 Direction, agreed in conversation 2026-10-04, written the same day and not yet run: **the
-overlay is our own, modelled on `snap-layout`'s `snap.rs`** (`web/solid/src-tauri/src/snap.rs`,
+overlay is our own, modelled on the `snap-layout` crate's snap module** (a module of the
+Tauri shell in `web/solid/src-tauri/`,
 one command `set_snap_bounds`, one `snap-hover` event), added after the plain buttons.
 Known limit: the overlay is native and sits above the webview, so a dialog scrim or popup
 drawn over the maximise button does not cover it, and a click there still maximises. `snap-layout`'s division of labour is the right one (the page owns the button, the
