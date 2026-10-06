@@ -46,13 +46,12 @@ jobs:
       - name: Test
         run: cargo test --workspace --no-fail-fast --locked
 
-  # Advisory for now: lint debt would otherwise make the required check permanently red.
-  # Drop continue-on-error once these are clean.
+  # fmt is enforced. clippy runs without -D warnings, so its existing warnings do not fail
+  # the job; a new Rust release adding a lint should not turn CI red.
   lint:
-    name: Rust (fmt + clippy, advisory)
+    name: Rust (fmt + clippy)
     runs-on: windows-latest
     timeout-minutes: 30
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-protoc@v3
