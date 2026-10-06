@@ -195,14 +195,14 @@ impl Config {
     pub fn save_to_file(&self) -> Result<(), ConfigError> {
         let config_path = loader::find_config_file()?;
         let config_content = self.to_toml_string()?;
-        std::fs::write(&config_path, config_content).map_err(|e| ConfigError::IoError(e))?;
+        std::fs::write(&config_path, config_content).map_err(ConfigError::IoError)?;
         Ok(())
     }
 
     /// Converts the configuration to TOML string format
     pub fn to_toml_string(&self) -> Result<String, ConfigError> {
         // Create a simplified structure for TOML serialization
-        let config_toml = toml::to_string(self).map_err(|e| ConfigError::SerializeError(e))?;
+        let config_toml = toml::to_string(self).map_err(ConfigError::SerializeError)?;
         Ok(config_toml)
     }
 

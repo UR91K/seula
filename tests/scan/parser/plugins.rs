@@ -38,7 +38,7 @@ fn test_vst3_audio_fx() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(plugin.name, "Pro-Q 3");
@@ -81,7 +81,7 @@ fn test_vst2_audio_fx() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(plugin.name, "Altiverb 7");
@@ -124,7 +124,7 @@ fn test_vst3_instrument() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(plugin.name, "Omnisphere");
@@ -167,7 +167,7 @@ fn test_empty_plugin_name() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     // The parser records the reference exactly as the project file writes it. There is
@@ -213,7 +213,7 @@ fn test_whitespace_only_plugin_name() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     // As above: no backfill since ADR-0006, so the whitespace-only name is preserved
@@ -258,7 +258,7 @@ fn test_empty_plugin_name_unique_device_id() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     // This should be empty because the device ID won't be found in the database
@@ -304,7 +304,7 @@ fn test_plugin_with_non_empty_xml_name_but_empty_db_name() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     // The plugin should have the name from the XML, not from the database
@@ -402,7 +402,7 @@ fn test_psp_springbox_xml_parsing() {
     assert_eq!(result.plugins.len(), 1);
     let plugin = result.plugins.iter().next().unwrap();
     assert!(
-        plugin.id.to_string().len() > 0,
+        !plugin.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(

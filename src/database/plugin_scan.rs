@@ -357,8 +357,7 @@ fn sweep_unseen(
     let placeholders = if seen.is_empty() {
         "''".to_string()
     } else {
-        std::iter::repeat("?")
-            .take(seen.len())
+        std::iter::repeat_n("?", seen.len())
             .collect::<Vec<_>>()
             .join(", ")
     };

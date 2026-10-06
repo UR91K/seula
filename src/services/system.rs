@@ -369,7 +369,7 @@ impl SystemService {
                 // One event per folder would be thousands on a big library; about 200
                 // is plenty for a progress bar.
                 let mut on_folder = |done: usize, total: usize, folder: &Path| {
-                    if done != total && done % (total / 200).max(1) != 0 {
+                    if done != total && !done.is_multiple_of((total / 200).max(1)) {
                         return;
                     }
                     let name = folder
@@ -420,7 +420,7 @@ impl SystemService {
         if !file_path.exists() {
             return Err("File does not exist".to_string());
         }
-        if !file_path.extension().map_or(false, |ext| ext == "als") {
+        if file_path.extension().is_none_or(|ext| ext != "als") {
             return Err("File must have .als extension".to_string());
         }
 
@@ -465,7 +465,7 @@ impl SystemService {
                     failures.push((file_path_str, "File does not exist".to_string()));
                     continue;
                 }
-                if !file_path.extension().map_or(false, |ext| ext == "als") {
+                if file_path.extension().is_none_or(|ext| ext != "als") {
                     failures.push((file_path_str, "File must have .als extension".to_string()));
                     continue;
                 }

@@ -28,7 +28,7 @@ fn test_load_real_project() {
 
     // Version check
     assert!(live_set.ableton_metadata.major >= 9);
-    assert!(live_set.ableton_metadata.beta == false);
+    assert!(!live_set.ableton_metadata.beta);
 
     // Musical properties
     assert!(live_set.tempo > 0.0);
@@ -114,8 +114,7 @@ fn test_parse_performance() {
         );
 
         // Get XML size before creating LiveSet
-        let xml_data =
-            decompress_gzip_file(&path.to_path_buf()).expect("Failed to decompress file");
+        let xml_data = decompress_gzip_file(path).expect("Failed to decompress file");
         let xml_size_mb = xml_data.len() as f64 / 1_000_000.0;
         total_size += xml_size_mb;
 

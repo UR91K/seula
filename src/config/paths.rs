@@ -12,7 +12,7 @@ impl Config {
         #[cfg(windows)]
         {
             use crate::config::windows_paths::validate_path_with_long_path_support;
-            validate_path_with_long_path_support(path).map_err(|msg| ConfigError::InvalidPath(msg))
+            validate_path_with_long_path_support(path).map_err(ConfigError::InvalidPath)
         }
 
         #[cfg(not(windows))]

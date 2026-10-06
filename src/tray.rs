@@ -147,7 +147,7 @@ impl TrayApp {
         // Main event loop
         loop {
             // Check for shutdown signal
-            if let Ok(_) = self.shutdown_rx.try_recv() {
+            if self.shutdown_rx.try_recv().is_ok() {
                 break;
             }
 

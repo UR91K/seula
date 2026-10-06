@@ -328,6 +328,12 @@ pub struct CleanupStats {
     pub bytes_freed: u64,
 }
 
+impl Default for CleanupStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CleanupStats {
     pub fn new() -> Self {
         Self {

@@ -148,7 +148,7 @@ impl crate::cli::commands::CliCommand for ScanCommand {
 
 impl ScanCommand {
     async fn discover_project_files(&self) -> Result<Vec<PathBuf>, CliError> {
-        let scanner = ProjectPathScanner::new().map_err(|e| CliError::from(e))?;
+        let scanner = ProjectPathScanner::new().map_err(CliError::from)?;
         let mut all_paths = HashSet::new();
 
         for path in &self.paths {

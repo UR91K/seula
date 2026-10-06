@@ -501,10 +501,10 @@ impl ProjectDatabase {
                         (Some(tonic), Some(scale)) => Some(KeySignature {
                             tonic: tonic
                                 .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                .map_err(rusqlite::Error::InvalidParameterName)?,
                             scale: scale
                                 .parse()
-                                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                .map_err(rusqlite::Error::InvalidParameterName)?,
                         }),
                         _ => None,
                     },

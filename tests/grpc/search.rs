@@ -46,7 +46,7 @@ async fn test_search_basic_query() {
     let search_response = response.into_inner();
 
     // Should find the test projects
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     assert_eq!(
         search_response.total_count as usize,
         search_response.projects.len()
@@ -425,7 +425,7 @@ async fn test_search_name_operator() {
     let search_response = response.into_inner();
 
     // Should find projects with "Test" in the name
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         assert!(project.name.to_lowercase().contains("test"));
     }
@@ -452,7 +452,7 @@ async fn test_search_bpm_operator() {
     let search_response = response.into_inner();
 
     // Should find projects with 140 BPM
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         assert_eq!(project.tempo, 140.0);
     }
@@ -479,7 +479,7 @@ async fn test_search_plugin_operator() {
     let search_response = response.into_inner();
 
     // Should find projects using Serum plugin
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let has_serum = project.plugins.iter().any(|p| p.name.contains("Serum"));
         assert!(has_serum, "Project should contain Serum plugin");
@@ -507,7 +507,7 @@ async fn test_search_sample_operator() {
     let search_response = response.into_inner();
 
     // Should find projects using kick sample
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let has_kick = project
             .samples
@@ -554,7 +554,7 @@ async fn test_search_tag_operator() {
     let search_response = response.into_inner();
 
     // Should find projects with Electronic tag
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let has_electronic_tag = project.tags.iter().any(|t| t.name == "Electronic");
         assert!(has_electronic_tag, "Project should have Electronic tag");
@@ -582,7 +582,7 @@ async fn test_search_path_operator() {
     let search_response = response.into_inner();
 
     // Should find projects with "Test" in the path
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         assert!(project.path.to_lowercase().contains("test"));
     }
@@ -609,7 +609,7 @@ async fn test_search_version_operator() {
     let search_response = response.into_inner();
 
     // Should find projects with version containing "11"
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let version = &project.ableton_version.as_ref().unwrap();
         assert_eq!(version.major, 11);
@@ -637,7 +637,7 @@ async fn test_search_key_operator() {
     let search_response = response.into_inner();
 
     // Should find projects in C key
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let key_sig = project.key_signature.as_ref().unwrap();
         assert_eq!(key_sig.tonic, "C");
@@ -665,7 +665,7 @@ async fn test_search_ts_operator() {
     let search_response = response.into_inner();
 
     // Should find projects in 4/4 time
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         let time_sig = project.time_signature.as_ref().unwrap();
         assert_eq!(time_sig.numerator, 4);
@@ -694,7 +694,7 @@ async fn test_search_multiple_operators() {
     let search_response = response.into_inner();
 
     // Should find projects matching all criteria
-    assert!(search_response.projects.len() > 0);
+    assert!(!search_response.projects.is_empty());
     for project in &search_response.projects {
         // Check BPM
         assert_eq!(project.tempo, 140.0);

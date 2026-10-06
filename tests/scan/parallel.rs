@@ -170,7 +170,7 @@ impl ProjectStats {
                 .unwrap_or(0);
 
             let num_columns = (width.0 as usize / max_line_length).max(1);
-            let num_rows = (formatted_plugins.len() + num_columns - 1) / num_columns;
+            let num_rows = formatted_plugins.len().div_ceil(num_columns);
 
             // Print in columns
             for row in 0..num_rows {

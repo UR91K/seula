@@ -364,7 +364,7 @@ impl ProjectDatabase {
 
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(params![limit.unwrap_or(1000), offset.unwrap_or(0)], |row| {
-            Ok(crate::database::helpers::row_to_plugin(row)?)
+            crate::database::helpers::row_to_plugin(row)
         })?;
 
         let plugins: Result<Vec<Plugin>, _> = rows.collect();
@@ -424,7 +424,7 @@ impl ProjectDatabase {
         let mut stmt = self.conn.prepare(&main_query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
-            Ok(crate::database::helpers::row_to_plugin(row)?)
+            crate::database::helpers::row_to_plugin(row)
         })?;
 
         let plugins: Result<Vec<Plugin>, _> = rows.collect();

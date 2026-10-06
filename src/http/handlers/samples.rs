@@ -353,7 +353,7 @@ mod tests {
         let last = text
             .lines()
             .filter_map(|l| l.strip_prefix("data:"))
-            .last()
+            .next_back()
             .unwrap();
         let last: serde_json::Value = serde_json::from_str(last.trim()).unwrap();
         assert!(

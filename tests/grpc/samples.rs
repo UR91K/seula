@@ -43,7 +43,7 @@ async fn test_get_sample_success() {
     assert_eq!(sample.id, sample_id);
     assert_eq!(sample.name, sample_name);
     assert_eq!(sample.path, sample_path);
-    assert_eq!(sample.is_present, true);
+    assert!(sample.is_present);
 }
 
 #[tokio::test]

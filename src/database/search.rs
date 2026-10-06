@@ -234,12 +234,10 @@ impl SearchQuery {
             conditions.join(" AND ")
         };
 
-        let query = format!(
-            "SELECT project_id, rank, name, path, plugins, samples, tags, notes, created_at, modified_at, tempo, key_signature, time_signature, version
+        let query = "SELECT project_id, rank, name, path, plugins, samples, tags, notes, created_at, modified_at, tempo, key_signature, time_signature, version
              FROM project_search 
              WHERE project_search MATCH ? 
-             ORDER BY rank"
-        );
+             ORDER BY rank".to_string();
 
         (query, vec![fts5_query])
     }
@@ -364,10 +362,10 @@ impl ProjectDatabase {
                                 Some(KeySignature {
                                     tonic: tonic
                                         .parse()
-                                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                        .map_err(rusqlite::Error::InvalidParameterName)?,
                                     scale: scale
                                         .parse()
-                                        .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                        .map_err(rusqlite::Error::InvalidParameterName)?,
                                 })
                             }
                             _ => None,

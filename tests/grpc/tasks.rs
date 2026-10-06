@@ -73,7 +73,7 @@ async fn test_search_tasks() {
     assert_eq!(completed_result.tasks.len(), 1);
     assert_eq!(completed_result.total_count, 1);
     assert_eq!(completed_result.tasks[0].description, "Mix the vocals");
-    assert_eq!(completed_result.tasks[0].completed, true);
+    assert!(completed_result.tasks[0].completed);
 
     // Test searching for pending tasks only
     let pending_search_req = Request::new(SearchTasksRequest {

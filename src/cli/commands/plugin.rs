@@ -159,8 +159,8 @@ impl PluginCommands {
                 Some(offset as i32),
                 sort_by.clone(),
                 Some(sort_desc),
-                vendor.as_ref().map(|s| s.clone()),
-                format.as_ref().map(|s| s.clone()),
+                vendor.clone(),
+                format.clone(),
                 &install_states(installed),
                 None, // min_usage_count
                 crate::database::ProjectScope::default(),
@@ -206,8 +206,8 @@ impl PluginCommands {
                 Some(limit as i32),
                 Some(0),
                 &install_states(installed),
-                vendor.as_ref().map(|s| s.clone()),
-                format.as_ref().map(|s| s.clone()),
+                vendor.clone(),
+                format.clone(),
             )
             .await?;
 
@@ -733,7 +733,7 @@ impl TableDisplay for PluginDetails {
             .write_record(["name", &self.plugin.name])
             .map_err(|e| -> CliError { e.into() })?;
         writer
-            .write_record(["vendor", &self.plugin.vendor.as_deref().unwrap_or("")])
+            .write_record(["vendor", self.plugin.vendor.as_deref().unwrap_or("")])
             .map_err(|e| -> CliError { e.into() })?;
         writer
             .write_record(["format", &self.plugin.plugin_format.to_string()])
@@ -745,7 +745,7 @@ impl TableDisplay for PluginDetails {
             .write_record(["installed", installed_label(self.plugin.installed)])
             .map_err(|e| -> CliError { e.into() })?;
         writer
-            .write_record(["version", &self.plugin.version.as_deref().unwrap_or("")])
+            .write_record(["version", self.plugin.version.as_deref().unwrap_or("")])
             .map_err(|e| -> CliError { e.into() })?;
         writer
             .write_record(["usage_count", &self.usage_count.to_string()])

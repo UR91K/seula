@@ -254,7 +254,7 @@ macro_rules! colored_cell {
 
 /// Check if colors should be used
 pub fn should_use_color() -> bool {
-    !std::env::var("NO_COLOR").is_ok() && colored::control::SHOULD_COLORIZE.should_colorize()
+    std::env::var("NO_COLOR").is_err() && colored::control::SHOULD_COLORIZE.should_colorize()
 }
 
 /// Truncate a string to a maximum display width, respecting Unicode character boundaries
@@ -295,7 +295,7 @@ fn strip_ansi_codes(text: &str) -> String {
             // Skip escape sequence
             if chars.next() == Some('[') {
                 // Skip until we find a letter (end of escape sequence)
-                while let Some(c) = chars.next() {
+                for c in chars.by_ref() {
                     if c.is_ascii_alphabetic() {
                         break;
                     }

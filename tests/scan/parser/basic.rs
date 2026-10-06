@@ -37,8 +37,8 @@ pub fn assert_clean_state(scanner: &Parser) {
         ParserState::Root,
         "Scanner should be in Root state"
     );
-    assert_eq!(
-        scanner.in_source_context, false,
+    assert!(
+        !scanner.in_source_context,
         "Scanner should not be in source context"
     );
     assert_eq!(
@@ -54,8 +54,7 @@ pub fn setup_valid_scanner(scanner: &mut Parser) {
 
 pub fn create_test_scanner() -> Parser {
     setup("error");
-    let xml_data = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
+    let xml_data = r#"<?xml version="1.0" encoding="UTF-8"?>
 <Ableton MajorVersion="11" MinorVersion="12.0_12049">
 <LiveSet>
     <Tempo>
@@ -73,7 +72,7 @@ pub fn create_test_scanner() -> Parser {
         </ModulationTarget>
     </Tempo>
 "#
-    )
+    .to_string()
     .into_bytes();
     Parser::new(&xml_data, ParseOptions::default()).expect("Failed to create test scanner")
 }
@@ -173,7 +172,7 @@ fn test_version_parsing() {
     assert_eq!(scanner.ableton_version.major, 12);
     assert_eq!(scanner.ableton_version.minor, 0);
     assert_eq!(scanner.ableton_version.patch, 12049);
-    assert_eq!(scanner.ableton_version.beta, false);
+    assert!(!scanner.ableton_version.beta);
 }
 
 #[test]
@@ -189,7 +188,7 @@ fn test_beta_version() {
     assert_eq!(scanner.ableton_version.major, 12);
     assert_eq!(scanner.ableton_version.minor, 0);
     assert_eq!(scanner.ableton_version.patch, 12049);
-    assert_eq!(scanner.ableton_version.beta, true);
+    assert!(scanner.ableton_version.beta);
 }
 
 #[test]

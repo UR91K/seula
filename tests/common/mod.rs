@@ -22,8 +22,8 @@ static INIT: Once = Once::new();
 /// Shared test setup function that can be used across all test files
 /// This should be called at the beginning of each test to ensure proper logging setup
 pub fn setup(log_level: &str) {
-    let _ = INIT.call_once(|| {
-        let _ = env::set_var("RUST_LOG", log_level);
+    INIT.call_once(|| {
+        env::set_var("RUST_LOG", log_level);
         // `try_init` errors if a global subscriber is already installed; the
         // `Once` makes that unlikely, but tolerating it keeps `setup` safe to
         // call from every test as before.
@@ -207,7 +207,7 @@ pub fn generate_mock_live_set(index: usize) -> Project {
     let path = Path::new(&path).to_path_buf();
 
     // Create mock plugins
-    let plugins: HashSet<_> = (0..3).map(|i| generate_mock_plugin(i)).collect();
+    let plugins: HashSet<_> = (0..3).map(generate_mock_plugin).collect();
 
     // Create mock samples
     let samples: HashSet<_> = (0..3)

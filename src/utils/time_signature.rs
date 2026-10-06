@@ -11,13 +11,12 @@ pub(crate) fn parse_encoded_time_signature(value: &str) -> Result<i32, TimeSigna
     );
 
     i32::from_str(value)
-        .map(|parsed_value| {
+        .inspect(|&parsed_value| {
             trace!(
                 "Successfully parsed encoded value '{}' to {}",
                 value,
                 parsed_value
             );
-            parsed_value
         })
         .map_err(|e| {
             error!("Failed to parse encoded value '{}': {}", value, e);

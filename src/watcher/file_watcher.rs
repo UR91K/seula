@@ -136,7 +136,7 @@ impl FileWatcher {
             debug!("Scanning directory: {:?}", watch_path);
             for entry in WalkDir::new(watch_path).into_iter().filter_map(|e| e.ok()) {
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "als") {
+                if path.extension().is_some_and(|ext| ext == "als") {
                     debug!("Found .als file: {:?}", path);
                     found_paths.insert(path.to_path_buf());
                 }
@@ -167,7 +167,7 @@ fn handle_fs_event(event: &Event, tx: &mpsc::Sender<FileEvent>) -> notify::Resul
         EventKind::Create(create_kind) => match create_kind {
             CreateKind::File => {
                 for path in &event.paths {
-                    if path.extension().map_or(false, |ext| ext == "als") {
+                    if path.extension().is_some_and(|ext| ext == "als") {
                         debug!("File created: {:?}", path);
                         tx.send(FileEvent::Created(path.clone()))?;
                     }
@@ -178,7 +178,7 @@ fn handle_fs_event(event: &Event, tx: &mpsc::Sender<FileEvent>) -> notify::Resul
         EventKind::Modify(modify_kind) => match modify_kind {
             ModifyKind::Data(_) => {
                 for path in &event.paths {
-                    if path.extension().map_or(false, |ext| ext == "als") {
+                    if path.extension().is_some_and(|ext| ext == "als") {
                         debug!("File modified: {:?}", path);
                         tx.send(FileEvent::Modified(path.clone()))?;
                     }
@@ -189,7 +189,7 @@ fn handle_fs_event(event: &Event, tx: &mpsc::Sender<FileEvent>) -> notify::Resul
                     if event.paths.len() == 2 {
                         let from = &event.paths[0];
                         let to = &event.paths[1];
-                        if to.extension().map_or(false, |ext| ext == "als") {
+                        if to.extension().is_some_and(|ext| ext == "als") {
                             debug!("File renamed: {:?} -> {:?}", from, to);
                             tx.send(FileEvent::Renamed {
                                 from: from.clone(),
@@ -208,7 +208,7 @@ fn handle_fs_event(event: &Event, tx: &mpsc::Sender<FileEvent>) -> notify::Resul
         EventKind::Remove(remove_kind) => match remove_kind {
             RemoveKind::File => {
                 for path in &event.paths {
-                    if path.extension().map_or(false, |ext| ext == "als") {
+                    if path.extension().is_some_and(|ext| ext == "als") {
                         debug!("File deleted: {:?}", path);
                         tx.send(FileEvent::Deleted(path.clone()))?;
                     }

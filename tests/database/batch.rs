@@ -36,7 +36,7 @@ fn test_batch_insert() {
         .len();
 
     // Execute batch insert
-    let mut batch_manager = BatchInsertManager::new(&mut conn, test_sets.clone());
+    let mut batch_manager = BatchInsertManager::new(conn, test_sets.clone());
     let stats = batch_manager.execute().expect("Batch insert failed");
 
     // Verify stats

@@ -61,7 +61,7 @@ fn test_sample_v12() {
     assert_eq!(result.samples.len(), 1, "Should have collected one sample");
     let sample = result.samples.iter().next().unwrap();
     assert!(
-        sample.id.to_string().len() > 0,
+        !sample.id.to_string().is_empty(),
         "Sample should have a valid UUID"
     );
     assert_eq!(sample.path.to_str().unwrap(), "C:/Users/judee/Samples/Vintage Drum Machines/KB6_Archives_7_2017_Relaximus/Yamaha/Yamaha DTXpress/11 e - Effect 2/74 Vocal04.wav");

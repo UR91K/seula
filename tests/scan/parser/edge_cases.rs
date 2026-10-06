@@ -62,7 +62,7 @@ fn test_interleaved_plugins_and_sample() {
     // Check plugins
     let proq3 = result.plugins.iter().find(|p| p.name == "Pro-Q 3").unwrap();
     assert!(
-        proq3.id.to_string().len() > 0,
+        !proq3.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(
@@ -77,7 +77,7 @@ fn test_interleaved_plugins_and_sample() {
         .find(|p| p.name == "Altiverb 7")
         .unwrap();
     assert!(
-        altiverb.id.to_string().len() > 0,
+        !altiverb.id.to_string().is_empty(),
         "Plugin should have a valid UUID"
     );
     assert_eq!(
@@ -89,7 +89,7 @@ fn test_interleaved_plugins_and_sample() {
     // Check sample
     let sample = result.samples.iter().next().unwrap();
     assert!(
-        sample.id.to_string().len() > 0,
+        !sample.id.to_string().is_empty(),
         "Sample should have a valid UUID"
     );
     assert_eq!(sample.name, "sample.wav");

@@ -22,8 +22,7 @@ impl Config {
             ))
         })?;
 
-        let mut config: Config =
-            toml::from_str(&config_str).map_err(|e| ConfigError::ParseError(e))?;
+        let mut config: Config = toml::from_str(&config_str).map_err(ConfigError::ParseError)?;
 
         // Process {USER_HOME} placeholders
         process_user_home_placeholders(&mut config)?;
@@ -73,12 +72,12 @@ fn set_default_database_path(config: &mut Config) -> Result<(), ConfigError> {
     if config
         .database_path
         .as_deref()
-        .map_or(true, |s| s.trim().is_empty())
+        .is_none_or(|s| s.trim().is_empty())
     {
         let data_dir = dirs::data_dir()
             .ok_or_else(|| ConfigError::InvalidPath("Could not get data directory".into()))?;
         let app_data_dir = data_dir.join("Seula");
-        std::fs::create_dir_all(&app_data_dir).map_err(|e| ConfigError::IoError(e))?;
+        std::fs::create_dir_all(&app_data_dir).map_err(ConfigError::IoError)?;
 
         config.database_path = Some(
             app_data_dir
@@ -117,7 +116,7 @@ pub fn find_config_file() -> Result<PathBuf, ConfigError> {
     }
 
     // Fall back to searching relative to executable (for development/portable use)
-    let mut dir = std::env::current_exe().map_err(|e| ConfigError::IoError(e))?;
+    let mut dir = std::env::current_exe().map_err(ConfigError::IoError)?;
     dir.pop(); // Remove the executable name to get the directory
 
     // Navigate up the directory tree until we find the config file or reach the root
@@ -135,11 +134,11 @@ pub fn find_config_file() -> Result<PathBuf, ConfigError> {
     }
 
     // If no config file found, create one in the user's AppData directory
-    std::fs::create_dir_all(&app_config_dir).map_err(|e| ConfigError::IoError(e))?;
+    std::fs::create_dir_all(&app_config_dir).map_err(ConfigError::IoError)?;
 
     // Generate and write default config
     let default_config = defaults::generate_default_config()?;
-    std::fs::write(&appdata_config_path, default_config).map_err(|e| ConfigError::IoError(e))?;
+    std::fs::write(&appdata_config_path, default_config).map_err(ConfigError::IoError)?;
 
     Ok(appdata_config_path)
 }

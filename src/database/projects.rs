@@ -87,10 +87,10 @@ impl ProjectDatabase {
                             Some(KeySignature {
                                 tonic: tonic
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                                 scale: scale
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                             })
                         }
                         _ => None,
@@ -139,7 +139,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([id], |row| crate::database::helpers::row_to_plugin(row))?
+            .query_map([id], crate::database::helpers::row_to_plugin)?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -257,10 +257,10 @@ impl ProjectDatabase {
                             Some(KeySignature {
                                 tonic: tonic
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                                 scale: scale
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                             })
                         }
                         _ => None,
@@ -309,7 +309,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([id], |row| crate::database::helpers::row_to_plugin(row))?
+            .query_map([id], crate::database::helpers::row_to_plugin)?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -422,10 +422,10 @@ impl ProjectDatabase {
                             Some(KeySignature {
                                 tonic: tonic
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                                 scale: scale
                                     .parse()
-                                    .map_err(|e| rusqlite::Error::InvalidParameterName(e))?,
+                                    .map_err(rusqlite::Error::InvalidParameterName)?,
                             })
                         }
                         _ => None,
@@ -474,7 +474,7 @@ impl ProjectDatabase {
         )?;
 
         let plugins = stmt
-            .query_map([path], |row| crate::database::helpers::row_to_plugin(row))?
+            .query_map([path], crate::database::helpers::row_to_plugin)?
             .collect::<SqliteResult<HashSet<_>>>()?;
 
         debug!("Retrieved {} plugins", plugins.len());
@@ -700,7 +700,7 @@ impl ProjectDatabase {
              FROM projects p JOIN project_ableton_metadata a ON a.project_id = p.id
              WHERE p.is_active = false AND p.hash = ?",
                 params![hash],
-                |row| row_to_project(row),
+                row_to_project,
             )
             .optional()
             .map_err(DatabaseError::from)
@@ -923,7 +923,7 @@ impl ProjectDatabase {
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             params![sample_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| row_to_project(row),
+            row_to_project,
         )?;
 
         let mut projects = Vec::new();
@@ -1013,7 +1013,7 @@ impl ProjectDatabase {
         let mut stmt = self.conn.prepare(&query)?;
         let rows = stmt.query_map(
             params![plugin_id, limit.unwrap_or(1000), offset.unwrap_or(0)],
-            |row| row_to_project(row),
+            row_to_project,
         )?;
 
         let mut projects = Vec::new();
@@ -1226,7 +1226,7 @@ impl ProjectDatabase {
 
         let rows = stmt.query_map(
             rusqlite::params_from_iter(all_params.iter().map(|p| p.as_ref())),
-            |row| row_to_project(row),
+            row_to_project,
         )?;
 
         let mut projects = Vec::new();

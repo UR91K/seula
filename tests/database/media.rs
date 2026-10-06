@@ -25,7 +25,7 @@ fn create_test_media_file(
     MediaFile {
         id: Uuid::new_v4().to_string(),
         original_filename: filename.to_string(),
-        file_extension: filename.split('.').last().unwrap_or("").to_string(),
+        file_extension: filename.split('.').next_back().unwrap_or("").to_string(),
         media_type,
         file_size_bytes: size,
         mime_type: mime_type.to_string(),

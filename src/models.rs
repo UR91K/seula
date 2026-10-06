@@ -35,7 +35,7 @@ use crate::error::{SampleError, TimeSignatureError};
 ///
 /// This is a wrapper around `u64` that provides type safety for entity IDs.
 /// Currently used internally for database operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Id(u64);
 
 /// Represents an Ableton Live version with semantic version comparison support.
@@ -66,7 +66,7 @@ pub struct Id(u64);
 ///
 /// assert!(v11_2_0 > v11_1_0);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct AbletonVersion {
     /// Major version number (e.g., 11 for Ableton Live 11)
     pub major: u32,
@@ -76,17 +76,6 @@ pub struct AbletonVersion {
     pub patch: u32,
     /// Whether this is a beta release
     pub beta: bool,
-}
-
-impl Default for AbletonVersion {
-    fn default() -> Self {
-        Self {
-            major: 0,
-            minor: 0,
-            patch: 0,
-            beta: false,
-        }
-    }
 }
 
 impl PartialOrd for AbletonVersion {
@@ -1171,7 +1160,7 @@ impl Sample {
     }
 
     pub fn from_pre_11_data(data: &str) -> Result<Self, SampleError> {
-        let cleaned_data = data.replace('\t', "").replace('\n', "");
+        let cleaned_data = data.replace(['\t', '\n'], "");
         let byte_data = hex::decode(&cleaned_data).map_err(SampleError::HexDecodeError)?;
 
         let utf16_chunks: Vec<u16> = byte_data
@@ -1247,7 +1236,7 @@ impl Sample {
 /// let invalid = TimeSignature { numerator: 4, denominator: 3 }; // 3 is not a power of 2
 /// assert!(!invalid.is_valid());
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct TimeSignature {
     /// Number of beats per measure
     pub numerator: u8,
@@ -1272,7 +1261,7 @@ impl TimeSignature {
     }
 
     pub fn from_encoded(encoded_value: i32) -> Result<Self, TimeSignatureError> {
-        if encoded_value < 0 || encoded_value > 494 {
+        if !(0..=494).contains(&encoded_value) {
             return Err(TimeSignatureError::InvalidEncodedValue(encoded_value));
         }
 
@@ -1301,15 +1290,6 @@ impl TimeSignature {
     }
 }
 
-impl Default for TimeSignature {
-    fn default() -> Self {
-        Self {
-            numerator: 0,
-            denominator: 0,
-        }
-    }
-}
-
 impl Default for KeySignature {
     fn default() -> Self {
         KeySignature {
@@ -1326,12 +1306,6 @@ impl fmt::Display for AbletonVersion {
             write!(f, " beta")?;
         }
         Ok(())
-    }
-}
-
-impl Default for Id {
-    fn default() -> Self {
-        Id(0)
     }
 }
 

@@ -609,7 +609,7 @@ impl Parser {
                             .unwrap_or(false);
 
                         // Validate major version
-                        if major < 9 || major > 12 {
+                        if !(9..=12).contains(&major) {
                             return Err(LiveSetError::UnsupportedVersion(major));
                         }
 
@@ -1473,7 +1473,7 @@ impl Parser {
                 if let Some(value) = event.try_get_attribute("Value")? {
                     let value_str = value.unescape_value()?.to_string();
                     match value_str.parse::<f64>() {
-                        Ok(tempo) if tempo >= 10.0 && tempo <= 999.0 => {
+                        Ok(tempo) if (10.0..=999.0).contains(&tempo) => {
                             trace_fn!(
                                 "handle_start_event",
                                 "[{}] Found valid tempo value: {}",

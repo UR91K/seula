@@ -289,7 +289,7 @@ impl SystemHandler {
             "Average Samples per Project,{:.2}\n",
             stats.average_samples_per_project
         ));
-        csv_content.push_str("\n");
+        csv_content.push('\n');
 
         csv_content.push_str("Top Plugins\n");
         csv_content.push_str("Plugin Name,Vendor,Usage Count\n");
@@ -299,14 +299,14 @@ impl SystemHandler {
                 plugin.name, plugin.vendor, plugin.usage_count
             ));
         }
-        csv_content.push_str("\n");
+        csv_content.push('\n');
 
         csv_content.push_str("Tempo Distribution\n");
         csv_content.push_str("Tempo,Count\n");
         for tempo in stats.tempo_distribution {
             csv_content.push_str(&format!("{},{}\n", tempo.tempo, tempo.count));
         }
-        csv_content.push_str("\n");
+        csv_content.push('\n');
 
         csv_content.push_str("Key Distribution\n");
         csv_content.push_str("Key,Count\n");

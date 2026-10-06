@@ -550,7 +550,7 @@ async fn test_batch_update_task_status() {
     let tasks = get_tasks_resp.into_inner().tasks;
 
     for task in tasks {
-        assert_eq!(task.completed, true);
+        assert!(task.completed);
     }
 }
 
@@ -833,6 +833,6 @@ async fn test_batch_operations_workflow() {
             .unwrap();
         let tasks = get_tasks_resp.into_inner().tasks;
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].completed, false);
+        assert!(!tasks[0].completed);
     }
 }

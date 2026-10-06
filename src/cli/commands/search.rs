@@ -75,7 +75,7 @@ impl SearchRow {
                 .key_signature
                 .as_ref()
                 .map(|k| k.to_string())
-                .unwrap_or_else(|| "".to_string()),
+                .unwrap_or_default(),
             time_signature: format!(
                 "{}/{}",
                 p.time_signature.numerator, p.time_signature.denominator

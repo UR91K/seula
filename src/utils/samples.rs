@@ -73,7 +73,10 @@ fn decode_utf16le_path(byte_data: &[u8]) -> Result<PathBuf, SampleError> {
 /// Decode POSIX path bytes, automatically detecting UTF-8 vs UTF-16 encoding
 pub fn decode_posix_path_bytes(bytes: &[u8]) -> Result<String, SampleError> {
     // Check if this looks like UTF-16LE (every odd byte is 0)
-    if bytes.len() >= 2 && bytes.len() % 2 == 0 && bytes[1..].iter().step_by(2).all(|&b| b == 0) {
+    if bytes.len() >= 2
+        && bytes.len().is_multiple_of(2)
+        && bytes[1..].iter().step_by(2).all(|&b| b == 0)
+    {
         // Looks like UTF-16LE
         let (cow, _, had_errors) = encoding_rs::UTF_16LE.decode(bytes);
         if had_errors {
@@ -84,7 +87,7 @@ pub fn decode_posix_path_bytes(bytes: &[u8]) -> Result<String, SampleError> {
 
     // Check if this looks like UTF-16BE (every even byte is 0)
     if bytes.len() >= 2
-        && bytes.len() % 2 == 0
+        && bytes.len().is_multiple_of(2)
         && bytes[..bytes.len() - 1].iter().step_by(2).all(|&b| b == 0)
     {
         // Looks like UTF-16BE

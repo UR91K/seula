@@ -282,7 +282,7 @@ impl ProjectDetails {
                 .key_signature
                 .as_ref()
                 .map(|k| k.to_string())
-                .unwrap_or_else(|| "".to_string()),
+                .unwrap_or_default(),
             ableton_version: p.daw_version_display.clone(),
             created_at: p.created_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             modified_at: p.modified_time.format("%Y-%m-%d %H:%M:%S").to_string(),

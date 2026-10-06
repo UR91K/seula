@@ -42,9 +42,8 @@ impl InteractiveCli {
             .max_history_size(1000)
             .build();
 
-        let mut editor = Editor::<()>::with_config(config).map_err(|e| -> CliError {
-            std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")).into()
-        })?;
+        let mut editor = Editor::<()>::with_config(config)
+            .map_err(|e| -> CliError { std::io::Error::other(format!("{e}")).into() })?;
 
         // Load command history if it exists
         let _ = editor.load_history(&Self::history_file());

@@ -41,9 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_var("SEULA_CONFIG", path);
     }
 
-    let config = CONFIG.as_ref().map_err(|e| {
+    let config = CONFIG.as_ref().inspect_err(|&e| {
         eprintln!("Failed to load configuration: {}", e);
-        e
     })?;
 
     init_logging(&config.log_level);
@@ -188,9 +187,8 @@ async fn run_tray_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn start_grpc_server(state: SharedState) -> Result<(), Box<dyn std::error::Error>> {
-    let config = CONFIG.as_ref().map_err(|e| {
+    let config = CONFIG.as_ref().inspect_err(|&e| {
         eprintln!("Failed to load configuration: {}", e);
-        e
     })?;
 
     let server = grpc::server::SeulaServer::from_shared(
@@ -243,9 +241,8 @@ async fn start_http_server(
     services: Services,
     system_service: SystemService,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config = CONFIG.as_ref().map_err(|e| {
+    let config = CONFIG.as_ref().inspect_err(|&e| {
         eprintln!("Failed to load configuration: {}", e);
-        e
     })?;
 
     let state = http::state::AppState::new(services, system_service);

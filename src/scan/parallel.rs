@@ -128,6 +128,23 @@ impl ParallelParser {
     }
 }
 
+impl Drop for ParallelParser {
+    fn drop(&mut self) {
+        trace!("ParallelParser being dropped, signaling workers to stop");
+        // Drop work sender to signal workers to stop
+        self.work_tx.lock().unwrap().take();
+
+        trace!("Waiting for {} workers to complete", self.workers.len());
+        // Wait for all workers to complete
+        for (i, worker) in self.workers.drain(..).enumerate() {
+            trace!("Waiting for worker {} to complete", i);
+            let _ = worker.join();
+            trace!("Worker {} completed", i);
+        }
+        debug!("All workers completed");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,22 +222,5 @@ mod tests {
         drain(&work_rx, |item| seen.push(item));
 
         assert_eq!(seen, vec![1, 2], "queued work must drain before exiting");
-    }
-}
-
-impl Drop for ParallelParser {
-    fn drop(&mut self) {
-        trace!("ParallelParser being dropped, signaling workers to stop");
-        // Drop work sender to signal workers to stop
-        self.work_tx.lock().unwrap().take();
-
-        trace!("Waiting for {} workers to complete", self.workers.len());
-        // Wait for all workers to complete
-        for (i, worker) in self.workers.drain(..).enumerate() {
-            trace!("Waiting for worker {} to complete", i);
-            let _ = worker.join();
-            trace!("Worker {} completed", i);
-        }
-        debug!("All workers completed");
     }
 }
