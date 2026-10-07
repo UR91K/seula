@@ -18,6 +18,7 @@ them. Run from anywhere:
     python mockup/data/generate.py            # seed + snapshot
     python mockup/data/generate.py seed       # database only
     python mockup/data/generate.py snapshot   # re-snapshot an existing database
+    python mockup/data/generate.py config     # only write mock-config.toml
 """
 
 import hashlib
@@ -699,6 +700,10 @@ def snapshot() -> None:
 
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if step == "config":
+        # Only the config the frontend's dev daemon runs from; `snapshot` writes it too.
+        MEDIA_DIR.mkdir(exist_ok=True)
+        write_config(CONFIG, DB, GRPC_PORT, HTTP_PORT, [])
     if step in ("seed", "all"):
         seed()
     if step in ("snapshot", "all"):
