@@ -94,6 +94,11 @@ missing. See ADR-0012.
 bump — `initialize()` creates missing ones on every open. A bump *discards the user's
 database* (ADR-0011), which is an absurd price for one new table.
 
+**The licence boundary is the crate boundary.** Seula is AGPL-3.0-or-later; the plugin
+scanner crates (`crates/vst-meta`, and later AAX/AU/CLAP) are MPL-2.0. Moving code from
+`src/` into a scanner crate relicenses it, so do not, unless its author agrees.
+See ADR-0054.
+
 **Store uids and class IDs through `PluginKey::uid_hex()`.** Ableton writes them
 lowercase and dashed, the scanner uppercase and undashed. Skip the normalisation and
 every lookup silently misses.

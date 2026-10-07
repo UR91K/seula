@@ -139,3 +139,21 @@ Start with [CLAUDE.md](CLAUDE.md) for the commands and the rules that are easy t
 break, then [docs/README.md](docs/README.md) for how the docs are organised. Several
 choices that look odd are deliberate and written up in
 [docs/decisions/](docs/decisions/). Open an issue before you start on anything large.
+
+Contributions are accepted under the licence of the files they change, and nothing
+more. There is no contributor licence agreement, so Seula cannot be taken proprietary
+by anyone, including its maintainer.
+
+## Licence
+
+Seula is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).
+
+The plugin scanners in `crates/vst-meta/` are under the Mozilla Public License 2.0
+instead ([crates/vst-meta/LICENSE](crates/vst-meta/LICENSE)). One additional permission,
+for linking with the Steamworks SDK, is in [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md).
+The reasoning is in [ADR-0054](docs/decisions/0054-seula-is-agpl-and-the-plugin-scanners-stay-mpl.md).
+
+Versions up to and including commit e697019 were released under the Mozilla Public
+License 2.0, and remain available under it.

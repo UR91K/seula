@@ -1,0 +1,3 @@
+# Maps commit identities to one canonical identity in git log, shortlog and blame.
+# History is deliberately not rewritten: ADRs cite commit hashes and are immutable.
+Jude Fanner <judeefanner@gmail.com> <ST10438340@vcconnect.edu.za>

@@ -2,6 +2,7 @@
 name = "vst-meta"
 version = "0.1.0"
 edition = "2024"
+license = "MPL-2.0"  # not the root AGPL: the plugin scanners stay MPL (ADR-0054)
 
 # The `host` feature gates everything that links a VST host and touches plugin
 # binaries. The parent process depends on this crate with `default-features = false`

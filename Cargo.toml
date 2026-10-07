@@ -9,6 +9,7 @@ resolver = "2"
 name = "seula"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"  # plus a section 7 exception, see LICENSE-EXCEPTIONS.md (ADR-0054)
 
 [dependencies]
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
