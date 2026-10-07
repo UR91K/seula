@@ -13,7 +13,7 @@ import type { Collection, KeySpelling, ScanKind, ScanProgress, StatsScope, Syste
 
 export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
 
-// ---------------------------------------------------------------- routing (ADR-0052)
+// ---------------------------------------------------------------- routing (ADR-0055)
 
 export type RouteId = "projects" | "collections" | "plugins" | "samples" | "stats";
 /** The routes that list things, and so carry a count in the sidebar. */
@@ -44,7 +44,7 @@ export const [shell, setShell] = createStore({
 
 /** Which projects the library-wide figures count (ADR-0045). The stats view is its first
  *  reader; it is held here so the other views can share it. In memory only, until the
- *  preferences endpoint exists (ADR-0059). */
+ *  preferences endpoint exists (ADR-0062). */
 export const [projectScope, setProjectScope] = createSignal<StatsScope>("active");
 
 export const closePopups = () => setShell({ menu: null, popover: null });

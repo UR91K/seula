@@ -1,4 +1,4 @@
-# 0054. The window has no native frame; the top bar is the title bar
+# 0057. The window has no native frame; the top bar is the title bar
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-04, with the shell built and the native title bar sitting above
@@ -11,7 +11,7 @@
   The places below marked unverified were written before that run and were not each
   recorded separately afterwards: treat them as working, not as individually measured
 - **Evidence:** ADR-0048 (Tauri is a thin shell; IPC is for OS calls only);
-  ADR-0032 (the frame: top bar, sidebar, status bar); ADR-0052 (the shell owns the frame);
+  ADR-0032 (the frame: top bar, sidebar, status bar); ADR-0055 (the shell owns the frame);
   `web/solid/src-tauri/tauri.conf.json` (one window, default decorations, so a native
   title bar); `web/solid/src-tauri/capabilities/default.json` (no permissions granted);
   the `Topbar` component in `web/solid/src/shell/` (ends in an empty spacer where controls
@@ -78,7 +78,7 @@ revisit this ADR.
   and fakes snap layouts: after the cursor rests on the maximise button for 620 ms it
   focuses the window and has `enigo` synthesise Win+Z, then taps Alt to hide the numbered
   hints. Rejected as a dependency because the part we would take is small and the part we
-  would not want is the rest: injected DOM that Solid does not own (ADR-0052), a
+  would not want is the rest: injected DOM that Solid does not own (ADR-0055), a
   synthesised-keyboard-input crate in a shell meant to do three OS calls (ADR-0048), which
   is also the kind of behaviour antivirus dislikes while the executables are unsigned
   (ADR-0050), and the hover is a timer guess, not the OS's own hit test. Its maximise icon

@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 
-# The snap-layout overlay (ADR-0054, src/snap.rs).
+# The snap-layout overlay (ADR-0057, src/snap.rs).
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",

@@ -11,7 +11,7 @@ shared/    framework-free TypeScript: DTO types, the HTTP and SSE client, the pr
            plugins, samples, collections and stats rules (columns, sorting, filtering,
            grouping, chart marks), formatting, popover placement
 solid/     Solid + Vite; src-tauri/ is the Tauri shell
-  src/shell/     the frame, the route signal, the scan runner (ADR-0052, ADR-0053)
+  src/shell/     the frame, the route signal, the scan runner (ADR-0055, ADR-0056)
   src/projects/  the projects view
   src/plugins/   the plugins view
   src/samples/   the samples view
@@ -71,14 +71,14 @@ no Play item: it needs a Tauri command and an ADR first. The `scope` preference 
 exposed, so used-in lists stay on the daemon's default (active projects).
 
 **Collections.** A grid of cover cards or a details table (the layout is not persisted,
-ADR-0059); the server sorts, so a Sort change or a header click reloads the list; server-side
+ADR-0062); the server sorts, so a Sort change or a header click reloads the list; server-side
 search; an inspector with the facts, the first ten tracks and every task naming its project
 (read-only: the project inspector has no task toggling to share). New, edit details
 (name, description, cover), duplicate and delete are dialogs on one shared component
-(ADR-0056); a cover is chosen or dropped in the edit dialog and sent as bytes (ADR-0058).
+(ADR-0059); a cover is chosen or dropped in the edit dialog and sent as bytes (ADR-0061).
 Double-click or Enter opens a collection into its tracklist, which is the projects table
-over a state factory (ADR-0055) with a place column and pointer-event drag handles
-(ADR-0057); a sort there reorders the view only, and `#` returns to collection order.
+over a state factory (ADR-0058) with a place column and pointer-event drag handles
+(ADR-0060); a sort there reorders the view only, and `#` returns to collection order.
 Selected tracks can be removed from the collection. "Show in Projects" searches
 `collection:"name"`. A cover the daemon cannot serve falls back to the album glyph. Not
 built: adding projects to a collection from Projects (the Collection button there is
@@ -90,7 +90,7 @@ bands of panels. The charts are CSS bars, as the mockup draws them, with a toolt
 mark. A scope picker (Counting) chooses active or all projects, and under `all` archived
 projects are marked by name and the status bar says they are counted. Export CSV downloads
 `/system/statistics/export` for the same scope. The scope is an in-memory signal, the search
-box does nothing on this view, and the download is untested inside Tauri (ADR-0060, proposed).
+box does nothing on this view, and the download is untested inside Tauri (ADR-0063, proposed).
 The figures are fetched each time the view is opened.
 
 **Push-speed state** is a scan's progress in the status bar, for the project scan, the

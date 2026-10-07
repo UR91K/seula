@@ -1,6 +1,6 @@
 // An opened collection (ADR-0044): a header band, then the projects table over its
-// projects in collection order, with the place column and drag handles (ADR-0055,
-// ADR-0057). Sorting here reorders the view only; the stored order is kept.
+// projects in collection order, with the place column and drag handles (ADR-0058,
+// ADR-0060). Sorting here reorders the view only; the stored order is kept.
 
 import { For, Show } from "solid-js";
 import { collectionFacts } from "../../../shared/collections";

@@ -1,8 +1,8 @@
 // The projects table. Rows are keyed by project (`For`), so a sort or a page change moves
 // the existing row nodes, and an edit to one project touches only its own cells. It takes
-// its state as a prop (ADR-0055): the projects view and a collection's tracklist each pass
+// its state as a prop (ADR-0058): the projects view and a collection's tracklist each pass
 // their own. The tracklist also passes `tracks`, which adds the place column and the
-// drag handles (ADR-0057).
+// drag handles (ADR-0060).
 
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { fileName } from "../../../shared/format";
@@ -133,7 +133,7 @@ export function ProjectTable(props: { t: TableState; tracks?: Tracks }) {
     return ids.length && on === ids.length ? true : on ? "mixed" : false;
   });
 
-  // ---------------------------------------------------------------- reordering (ADR-0057)
+  // ---------------------------------------------------------------- reordering (ADR-0060)
 
   /** The collection's order, which is the order the rows arrived in. */
   const order = () => t().items.map((p) => p.id);

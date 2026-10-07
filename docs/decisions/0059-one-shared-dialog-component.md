@@ -1,4 +1,4 @@
-# 0056. One shared dialog component
+# 0059. One shared dialog component
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-05, planning the collections view

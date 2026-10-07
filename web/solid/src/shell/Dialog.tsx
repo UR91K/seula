@@ -1,4 +1,4 @@
-// The one dialog (ADR-0056): scrim, title bar, body, and a button row. It closes on Escape,
+// The one dialog (ADR-0059): scrim, title bar, body, and a button row. It closes on Escape,
 // on the close button and on a click on the scrim, and keeps Tab inside itself. A dialog
 // supplies its body and its buttons and owns nothing else.
 

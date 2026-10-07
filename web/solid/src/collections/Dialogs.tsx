@@ -1,4 +1,4 @@
-// The four collection dialogs (ADR-0044) on the shared Dialog (ADR-0056). A dialog stays
+// The four collection dialogs (ADR-0044) on the shared Dialog (ADR-0059). A dialog stays
 // open while its write is out, and closes only when the write succeeds; a failure goes to
 // the status bar and leaves what was typed.
 
@@ -66,7 +66,7 @@ function NewDialog() {
   );
 }
 
-/** The cover, with a picker and a drop target (ADR-0058). The webview's own file input
+/** The cover, with a picker and a drop target (ADR-0061). The webview's own file input
  *  opens the native dialog; the bytes go to the daemon, which keeps its own copy. */
 function CoverEdit(props: { c: CollectionRow }) {
   let input!: HTMLInputElement;

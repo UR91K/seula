@@ -52,13 +52,13 @@ export function PathChip(props: { path: string }) {
   );
 }
 
-/** Minimise, maximise or restore, close (ADR-0054). Only rendered in the Tauri shell. */
+/** Minimise, maximise or restore, close (ADR-0057). Only rendered in the Tauri shell. */
 export function WindowControls() {
   const [maximized, setMaximized] = createSignal(false);
   const [snapHot, setSnapHot] = createSignal(false);
   let maximizeBtn!: HTMLButtonElement;
   const refresh = () => void isWindowMaximized().then(setMaximized);
-  // The native overlay covers this button (ADR-0054): keep it in step with where the button is.
+  // The native overlay covers this button (ADR-0057): keep it in step with where the button is.
   const reportBounds = () => {
     const r = maximizeBtn.getBoundingClientRect();
     const s = window.devicePixelRatio;

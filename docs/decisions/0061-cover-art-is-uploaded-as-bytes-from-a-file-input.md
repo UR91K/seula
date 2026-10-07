@@ -1,4 +1,4 @@
-# 0058. Cover art is uploaded as bytes from a file input, and the daemon keeps its own copy
+# 0061. Cover art is uploaded as bytes from a file input, and the daemon keeps its own copy
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-05, planning the collections view

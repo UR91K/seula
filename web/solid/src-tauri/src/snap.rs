@@ -1,4 +1,4 @@
-//! Windows 11 snap layouts for the page's own maximise button (ADR-0054).
+//! Windows 11 snap layouts for the page's own maximise button (ADR-0057).
 //!
 //! Windows shows the snap-layout flyout only to a window that answers `WM_NCHITTEST` with
 //! `HTMAXBUTTON`, and the page cannot: WebView2's child window covers the whole client

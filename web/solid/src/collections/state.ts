@@ -3,7 +3,7 @@
 // and the scan's are in ../shell/shell.ts.
 //
 // The server sorts this list (ADR-0044), so a change of sort or search reloads it; the layout
-// is a module-level store and is not persisted yet (ADR-0059).
+// is a module-level store and is not persisted yet (ADR-0062).
 
 import { batch, createMemo, createResource, createSignal, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
@@ -28,7 +28,7 @@ export const [cui, setCui] = createStore({
 });
 
 /** The opened collection's tracklist: the projects table over its projects. No sort means
- *  collection order, the only one that can be dragged (ADR-0057). */
+ *  collection order, the only one that can be dragged (ADR-0060). */
 export const tracks = createTableState({ sort: null, paged: false });
 
 // ---------------------------------------------------------------- data

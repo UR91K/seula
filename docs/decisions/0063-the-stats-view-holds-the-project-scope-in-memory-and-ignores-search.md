@@ -1,4 +1,4 @@
-# 0060. The stats view holds the project scope in memory, ignores search, and downloads its CSV
+# 0063. The stats view holds the project scope in memory, ignores search, and downloads its CSV
 
 - **Status:** Proposed
 - **Recognized:** 2026-10-05, building the stats view
@@ -6,7 +6,7 @@
 - **Recorded:** 2026-10-05
 - **Confidence:** decided now; the Tauri download is untested
 - **Evidence:** ADR-0045 (the stats scope is "the same preference as the other views");
-  ADR-0059 (an in-memory store until the preferences endpoint exists); ADR-0048 (an OS call
+  ADR-0062 (an in-memory store until the preferences endpoint exists); ADR-0048 (an OS call
   is a Tauri command with its own ADR); the `projectScope` signal in the shell module and the
   stats view's `state.ts` under `web/solid/src/`
 
@@ -26,7 +26,7 @@ Three things the stats view needs had no answer in the earlier records.
 ## Decision
 
 **The scope is one signal in the shell module**, `projectScope`, in memory only, like
-ADR-0059's layout. The stats view is its only reader today; the other views take it from
+ADR-0062's layout. The stats view is its only reader today; the other views take it from
 there when they expose the scope. It resets to `active` on every launch.
 
 **The search box does nothing on the stats view.** `query()` is empty and `setQuery()`

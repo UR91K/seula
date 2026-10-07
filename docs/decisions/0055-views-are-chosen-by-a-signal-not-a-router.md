@@ -1,4 +1,4 @@
-# 0052. The frontend picks its view with a signal, not a router
+# 0055. The frontend picks its view with a signal, not a router
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-04, building the second view (plugins), which is the first time

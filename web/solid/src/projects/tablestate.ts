@@ -1,7 +1,7 @@
-// The state of one projects table (ADR-0055): the rows, their sort and page, the columns,
+// The state of one projects table (ADR-0058): the rows, their sort and page, the columns,
 // the selection, the name being edited and the hover list. The projects view makes one at
 // module level and so does the collections view's tracklist, so each keeps its own sort
-// and selection and neither is lost when its view unmounts (ADR-0052).
+// and selection and neither is lost when its view unmounts (ADR-0055).
 //
 // The rows are a store reconciled by id, so an edit to one project's notes touches only
 // the nodes that show that project's notes.

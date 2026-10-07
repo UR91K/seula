@@ -1,5 +1,5 @@
 // The projects view's state. The table's own state (rows, sort, page, selection, columns)
-// is a `createTableState` (ADR-0055); what is left here is what only this view has: the
+// is a `createTableState` (ADR-0058); what is left here is what only this view has: the
 // scope and the search, and loading the list for them. The window's state and the scan's
 // are in ../shell/shell.ts.
 
@@ -56,6 +56,6 @@ export function setQuery(query: string) {
   });
 }
 
-// Other views reach this through the shell (ADR-0052); `untrack` because they may call it
+// Other views reach this through the shell (ADR-0055); `untrack` because they may call it
 // from inside a tracked scope, and a search must not subscribe that scope to our query.
 onProjectsSearch((query) => untrack(() => setQuery(query)));

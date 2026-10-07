@@ -10,7 +10,7 @@ export async function revealInExplorer(path: string): Promise<void> {
   await tauri.core.invoke("reveal_in_explorer", { path });
 }
 
-// The window itself (ADR-0054): the title bar is ours, so the buttons call these. They use
+// The window itself (ADR-0057): the title bar is ours, so the buttons call these. They use
 // Tauri's window API through the global, which the capability file grants one call at a time.
 
 type TauriWindow = {
@@ -36,7 +36,7 @@ export async function onWindowResized(handler: () => void): Promise<() => void> 
   return (await appWindow()?.onResized(handler)) ?? (() => {});
 }
 
-// Snap layouts (ADR-0054): a native overlay sits over the maximise button, so the page tells
+// Snap layouts (ADR-0057): a native overlay sits over the maximise button, so the page tells
 // the shell where the button is and hears about hover from the shell.
 
 type TauriEvents = {

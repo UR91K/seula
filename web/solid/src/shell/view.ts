@@ -1,4 +1,4 @@
-// What a view hands the shell (ADR-0052). The shell draws the frame; a view supplies the
+// What a view hands the shell (ADR-0055). The shell draws the frame; a view supplies the
 // regions that change with it. Only the active view is mounted, so a view loads its data
 // when its `Content` mounts.
 

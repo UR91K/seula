@@ -1,4 +1,4 @@
-# 0053. A scan's stream is read from the response body of the POST that starts it
+# 0056. A scan's stream is read from the response body of the POST that starts it
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-04, ADR-0047's "Not decided here" note on the client layer

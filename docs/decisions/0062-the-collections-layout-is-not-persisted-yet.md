@@ -1,4 +1,4 @@
-# 0059. The collections layout is kept in memory until the preferences endpoint exists
+# 0062. The collections layout is kept in memory until the preferences endpoint exists
 
 - **Status:** Accepted — a deliberate deferral
 - **Recognized:** 2026-10-05, planning the collections view
@@ -16,7 +16,7 @@ exist.
 
 ## Decision
 
-Keep the layout in a module-level store (ADR-0052). It survives switching views and is
+Keep the layout in a module-level store (ADR-0055). It survives switching views and is
 lost when the app closes. Do not add the endpoint as part of the collections work.
 
 The endpoint is one backend addition that every view's preferences will want. It should be

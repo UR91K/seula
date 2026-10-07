@@ -39,7 +39,7 @@ fn reveal_in_explorer(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Keep the snap-layout overlay over the page's maximise button (ADR-0054). The rectangle is
+/// Keep the snap-layout overlay over the page's maximise button (ADR-0057). The rectangle is
 /// in physical pixels, relative to the window's client area. A no-op off Windows.
 #[tauri::command]
 fn set_snap_bounds(window: tauri::WebviewWindow, x: i32, y: i32, width: i32, height: i32) -> Result<(), String> {

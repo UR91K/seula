@@ -6,13 +6,13 @@ html, body, #app { height: 100%; }
 .win { width: 100%; height: 100%; border: 0; }
 .error-banner { padding: var(--u) calc(var(--u) * 4); color: var(--danger); }
 
-/* The window buttons are real buttons (ADR-0054); the mockup draws them as spans. */
+/* The window buttons are real buttons (ADR-0057); the mockup draws them as spans. */
 .winctl button { display: flex; align-items: center; justify-content: center; width: calc(var(--u) * 23); background: none; border: 0; border-radius: 0; color: var(--text-2); cursor: default; }
-/* `.hot` is :hover for the maximise button, which the native snap overlay covers (ADR-0054). */
+/* `.hot` is :hover for the maximise button, which the native snap overlay covers (ADR-0057). */
 .winctl button:hover, .winctl button.hot { background: var(--hover); color: var(--text); }
 .winctl button.close:hover { background: var(--close); color: var(--close-text); }
 /* The glyphs are Windows' own caption-button icons, as in any native window and VS Code on
- * Windows: Segoe Fluent Icons, or Segoe MDL2 Assets before Windows 11 (ADR-0054). The
+ * Windows: Segoe Fluent Icons, or Segoe MDL2 Assets before Windows 11 (ADR-0057). The
  * mockup's `.winctl span` rules also match this span, stretching it to button width with its
  * own hover background: a grey bar across the red. Undo that. */
 .winctl button .glyph, .winctl button .glyph:hover {

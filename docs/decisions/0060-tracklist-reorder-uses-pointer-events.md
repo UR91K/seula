@@ -1,4 +1,4 @@
-# 0057. Tracklist reordering uses pointer events, not native drag and drop
+# 0060. Tracklist reordering uses pointer events, not native drag and drop
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-05, planning the collections view

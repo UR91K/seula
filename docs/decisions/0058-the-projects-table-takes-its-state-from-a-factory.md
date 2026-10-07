@@ -1,4 +1,4 @@
-# 0055. The projects table takes its state from a factory, so the tracklist can reuse it
+# 0058. The projects table takes its state from a factory, so the tracklist can reuse it
 
 - **Status:** Accepted — implemented on branch `tauri-app`
 - **Recognized:** 2026-10-05, planning the collections view
@@ -8,7 +8,7 @@
   reuse the table is the maintainer's
 - **Evidence:** ADR-0044 (an opened collection shows its projects in a table); the
   `web/solid/src/projects/` directory, where the table, inspector, popovers and view bar
-  all import one module of module-level state; ADR-0052 (module-level stores, because an
+  all import one module of module-level state; ADR-0055 (module-level stores, because an
   unmounted view loses anything held inside it)
 
 ## Context
@@ -24,7 +24,7 @@ view calls it once at module level and is the first consumer. The collections vi
 it again for the tracklist. The table component takes the store as a prop instead of
 importing it.
 
-The factory's stores stay at module level in each consumer (ADR-0052), so unmounting a
+The factory's stores stay at module level in each consumer (ADR-0055), so unmounting a
 view still discards nothing.
 
 ## Rejected alternatives

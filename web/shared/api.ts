@@ -107,7 +107,7 @@ export class Api {
     await this.send(`/api/v1/collections/${id}/batch-remove`, post({ project_ids: projectIds }));
   }
 
-  /** Send an image's bytes and make it the collection's cover (ADR-0058). The daemon keeps
+  /** Send an image's bytes and make it the collection's cover (ADR-0061). The daemon keeps
    *  its own copy. The media routes report a failure as a 200 with `success: false`. */
   async setCollectionCover(id: string, file: File): Promise<void> {
     const up = await this.json<{ media_file_id: string; success: boolean; error_message: string | null }>(
@@ -183,7 +183,7 @@ export class Api {
 
   /** Start a scan and follow it. A scan's `POST` answers with the SSE stream itself, which
    *  `EventSource` cannot read (it only makes GET requests), so the body is read by hand
-   *  (ADR-0053). A scan that is already running answers 409 and this throws. */
+   *  (ADR-0056). A scan that is already running answers 409 and this throws. */
   scan(kind: "projects" | "plugins" | "samples", signal?: AbortSignal): AsyncGenerator<ScanProgress> {
     const route = { projects: "/api/v1/system/scan", plugins: "/api/v1/plugins/scan", samples: "/api/v1/samples/check" }[kind];
     return sse<ScanProgress>(this.base + route, { method: "POST", signal });
