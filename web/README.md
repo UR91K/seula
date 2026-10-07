@@ -25,6 +25,12 @@ how state is held and how the DOM is updated.
 
 ## Running
 
+`just dev` (browser) or `just tauri` (the shell) does everything below in order: seeds the
+mock database if it is missing, writes its config, installs packages, builds and starts
+the daemon, waits for it to answer, starts the frontend, and stops the daemon when the
+frontend exits. `just dev real` / `just tauri real` use your own `config.toml` and database
+instead, on the real port (50052). `just` lists the rest. By hand:
+
 The apps read from the mock daemon that `mockup/data/generate.py` seeds, on port 50152
 (override with `VITE_SEULA_URL`):
 
@@ -34,7 +40,8 @@ cargo build --bin seula                      # needs protoc (PROTOC=...)
 target/debug/seula --config mockup/data/mock-config.toml --server
 ```
 
-`mock-config.toml` is written by `generate.py`'s `write_config`. Then, in `solid/`:
+`mock-config.toml` is written by `python mockup/data/generate.py config` (and by
+`snapshot`). Then, in `solid/`:
 
 ```bash
 npm install
