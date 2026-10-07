@@ -154,3 +154,158 @@ fn a_rescan_that_finds_a_sample_gone_marks_it_missing() {
     scan(&mut db, "a.als", &[("kick.wav", true)]);
     assert!(present(&db, "kick.wav"));
 }
+
+/// A rescan of an edited project keeps its id and everything attached to it. Each parse
+/// mints a new id, and the insert used `INSERT OR REPLACE`: `path` is unique, so the old
+/// row was deleted and the cascade took its tags, collections, tasks and audio with it
+/// (ADR-0052).
+#[test]
+fn a_rescan_keeps_the_project_and_what_is_attached_to_it() {
+    use crate::common::{create_test_live_set_from_parse, LiveSetBuilder};
+
+    setup("error");
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let mut db = ProjectDatabase::new(temp_dir.path().join("test.db")).expect("database");
+
+    let first = create_test_live_set_from_parse(
+        "Song.als",
+        LiveSetBuilder::new().with_sample("kick.wav").build(),
+    );
+    let id = first.id.to_string();
+    BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(vec![first]))
+        .execute()
+        .expect("batch");
+    let tag = db.add_tag("mixdown").unwrap();
+    db.tag_project(&id, &tag).unwrap();
+    let collection = db.create_collection("Album", None, None).unwrap();
+    db.add_project_to_collection(&collection, &id).unwrap();
+    db.set_project_notes(&id, "needs a bridge").unwrap();
+    db.batch_mark_projects_archived(&[id.clone()], true)
+        .unwrap();
+
+    // Saved in Live with the kick swapped for a snare, then rescanned: a fresh parse,
+    // and so a fresh id.
+    let edited = create_test_live_set_from_parse(
+        "Song.als",
+        LiveSetBuilder::new().with_sample("snare.wav").build(),
+    );
+    assert_ne!(edited.id.to_string(), id);
+    BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(vec![edited]))
+        .execute()
+        .expect("batch");
+
+    let ids: Vec<String> = db
+        .conn
+        .prepare("SELECT id FROM projects")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(ids, vec![id.clone()], "one project, under its original id");
+    assert_eq!(
+        db.get_project_tags(&id).unwrap(),
+        HashSet::from(["mixdown".to_string()])
+    );
+    assert_eq!(
+        db.get_collection_projects(&collection, seula::database::ProjectScope::All)
+            .unwrap()
+            .len(),
+        1
+    );
+    let (notes, active): (Option<String>, bool) = db
+        .conn
+        .query_row(
+            "SELECT notes, is_active FROM projects WHERE id = ?",
+            [&id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        notes.as_deref(),
+        Some("needs a bridge"),
+        "notes are the user's, not the scan's"
+    );
+    assert!(!active, "an archived project stays archived");
+
+    let samples: Vec<String> = db
+        .conn
+        .prepare("SELECT s.name FROM samples s JOIN project_samples ps ON ps.sample_id = s.id WHERE ps.project_id = ?")
+        .unwrap()
+        .query_map([&id], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        samples,
+        vec!["snare.wav".to_string()],
+        "links follow what the rescan found"
+    );
+
+    let indexed: String = db
+        .conn
+        .query_row(
+            "SELECT samples FROM project_search WHERE project_id = ?",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(
+        indexed.contains("snare") && !indexed.contains("kick"),
+        "search index: {indexed}"
+    );
+    let indexed_notes: String = db
+        .conn
+        .query_row(
+            "SELECT notes FROM project_search WHERE project_id = ?",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(indexed_notes, "needs a bridge");
+}
+
+/// A rescan keeps the name the user gave a project. A project is named its file until
+/// renamed (ADR-0051), and the upsert used to write the parse's name back over a rename.
+#[test]
+fn a_rescan_keeps_a_renamed_project_name() {
+    use crate::common::{create_test_live_set_from_parse, LiveSetBuilder};
+
+    setup("error");
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let mut db = ProjectDatabase::new(temp_dir.path().join("test.db")).expect("database");
+
+    let scan = |db: &mut ProjectDatabase| {
+        let project = create_test_live_set_from_parse("Song.als", LiveSetBuilder::new().build());
+        BatchInsertManager::new(&mut db.conn, std::sync::Arc::new(vec![project]))
+            .execute()
+            .expect("batch");
+    };
+    let name = |db: &ProjectDatabase| -> String {
+        db.conn
+            .query_row("SELECT name FROM projects", [], |r| r.get(0))
+            .expect("project row")
+    };
+
+    scan(&mut db);
+    let first_name = name(&db);
+    let id: String = db
+        .conn
+        .query_row("SELECT id FROM projects", [], |r| r.get(0))
+        .unwrap();
+    db.set_project_name(&id, "Summer Single").unwrap();
+
+    scan(&mut db);
+    assert_ne!(first_name, "Summer Single");
+    assert_eq!(name(&db), "Summer Single", "the rename survives a rescan");
+
+    let indexed: String = db
+        .conn
+        .query_row(
+            "SELECT name FROM project_search WHERE project_id = ?",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(indexed, "Summer Single", "and so does the search index");
+}

@@ -430,7 +430,8 @@ impl SystemService {
             .await
             .unwrap_or_else(|e| std::panic::resume_unwind(e.into_panic()))
             .map_err(|e| format!("Failed to parse project: {}", e))?;
-        let project_id = live_set.id.to_string();
+        // By path, not by the parse's id: a known path keeps the id it has (ADR-0052).
+        let stored_path = live_set.file_path.to_string_lossy().to_string();
 
         let mut db = self.db.lock().await;
         let mut batch_manager = BatchInsertManager::new(&mut db.conn, Arc::new(vec![live_set]));
@@ -438,7 +439,7 @@ impl SystemService {
             .execute()
             .map_err(|e| format!("Database error: {}", e))?;
 
-        db.get_project_by_id(&project_id)
+        db.get_project_by_path(&stored_path)
             .map_err(|e| format!("Database error: {}", e))?
             .ok_or_else(|| "Project inserted but not found".to_string())
     }
@@ -485,9 +486,10 @@ impl SystemService {
 
         let mut successes = Vec::new();
         if !parsed.is_empty() {
-            let path_ids: Vec<(String, String)> = parsed
+            // By path, not by the parse's id: a known path keeps the id it has (ADR-0052).
+            let stored_paths: Vec<(String, String)> = parsed
                 .iter()
-                .map(|(path, p)| (path.clone(), p.id.to_string()))
+                .map(|(path, p)| (path.clone(), p.file_path.to_string_lossy().to_string()))
                 .collect();
             let projects_to_insert: Vec<Project> = parsed.into_iter().map(|(_, p)| p).collect();
 
@@ -496,8 +498,8 @@ impl SystemService {
                 BatchInsertManager::new(&mut db.conn, Arc::new(projects_to_insert));
             match batch_manager.execute() {
                 Ok(_) => {
-                    for (path, project_id) in path_ids {
-                        match db.get_project_by_id(&project_id) {
+                    for (path, stored_path) in stored_paths {
+                        match db.get_project_by_path(&stored_path) {
                             Ok(Some(inserted)) => successes.push((path, inserted)),
                             Ok(None) => {
                                 failures.push((path, "Project inserted but not found".to_string()))
@@ -507,7 +509,7 @@ impl SystemService {
                     }
                 }
                 Err(e) => {
-                    for (path, _) in path_ids {
+                    for (path, _) in stored_paths {
                         failures.push((path, format!("Database error: {}", e)));
                     }
                 }
@@ -1011,5 +1013,46 @@ mod tests {
                 "parsing held the runtime (multiple: {multiple})"
             );
         }
+    }
+
+    /// Adding a file that is already a project updates that project, under its id
+    /// (ADR-0052). Both calls read the project back by the id the parse minted, which a
+    /// known path no longer gets.
+    #[tokio::test]
+    async fn adding_a_known_project_again_returns_it_under_its_id() {
+        use flate2::{write::GzEncoder, Compression};
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Song.als");
+        let mut gz = GzEncoder::new(
+            std::fs::File::create(&path).unwrap(),
+            Compression::default(),
+        );
+        gz.write_all(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12.0_12049" Creator="Ableton Live 12.0">
+    <LiveSet>
+        <Tempo>
+            <LomId Value="0" />
+            <Manual Value="120.0" />
+        </Tempo>
+        <EnumEvent Value="201" />
+    </LiveSet>
+</Ableton>"#,
+        )
+        .unwrap();
+        gz.finish().unwrap();
+        let system = test_service();
+
+        let first = system.add_single_project(&path).await.expect("first add");
+        let again = system.add_single_project(&path).await.expect("second add");
+        assert_eq!(again.id, first.id);
+
+        let (added, failed) = system
+            .add_multiple_projects(vec![path.to_string_lossy().into_owned()])
+            .await;
+        assert!(failed.is_empty(), "{failed:?}");
+        assert_eq!(added[0].1.id, first.id);
     }
 }

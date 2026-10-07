@@ -1,5 +1,5 @@
 use chrono::Local;
-use rusqlite::{params, Connection, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -47,6 +47,8 @@ struct BatchTransaction<'a> {
     batch_presence: HashMap<String, bool>,
     plugin_id_map: HashMap<String, String>, // old_uuid -> canonical_uuid
     sample_id_map: HashMap<String, String>, // old_uuid -> canonical_uuid
+    /// A parse's fresh id -> the id the project already has, when its path is known.
+    project_id_map: HashMap<String, String>,
     stats: BatchStats,
 }
 
@@ -61,6 +63,7 @@ impl<'a> BatchTransaction<'a> {
             batch_presence: HashMap::new(),
             plugin_id_map: HashMap::new(),
             sample_id_map: HashMap::new(),
+            project_id_map: HashMap::new(),
             stats: BatchStats::default(),
         })
     }
@@ -355,22 +358,51 @@ impl<'a> BatchTransaction<'a> {
 
     fn insert_projects(&mut self, live_sets: &[Project]) -> Result<(), DatabaseError> {
         for live_set in live_sets {
-            let project_id = live_set.id.to_string();
+            let path = live_set.file_path.to_string_lossy().to_string();
 
-            // Insert project
+            // A project keeps the id it was first given (ADR-0052). Every parse mints a
+            // new one, so a known path means a rescan: reuse the stored id. The upsert
+            // below then writes only what a parse knows about, leaving the name, notes,
+            // the primary audio file and the archived flag alone. The name is the file
+            // name only until the user renames it (ADR-0051), so a rescan must not
+            // reset it. `INSERT OR REPLACE` deleted the row first, and the cascade took
+            // tags, collections, tasks and audio with it.
+            let project_id = self
+                .tx
+                .query_row("SELECT id FROM projects WHERE path = ?", [&path], |row| {
+                    row.get::<_, String>(0)
+                })
+                .optional()?
+                .unwrap_or_else(|| live_set.id.to_string());
+            self.project_id_map
+                .insert(live_set.id.to_string(), project_id.clone());
+
             self.tx.execute(
-                "INSERT OR REPLACE INTO projects (
+                "INSERT INTO projects (
                     id, name, path, hash, created_at, modified_at,
                     last_parsed_at, tempo, time_signature_numerator,
                     time_signature_denominator, key_signature_tonic,
                     key_signature_scale, furthest_bar, duration_seconds,
-                    daw_type, daw_version_display,
-                    notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    daw_type, daw_version_display
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    hash = excluded.hash,
+                    created_at = excluded.created_at,
+                    modified_at = excluded.modified_at,
+                    last_parsed_at = excluded.last_parsed_at,
+                    tempo = excluded.tempo,
+                    time_signature_numerator = excluded.time_signature_numerator,
+                    time_signature_denominator = excluded.time_signature_denominator,
+                    key_signature_tonic = excluded.key_signature_tonic,
+                    key_signature_scale = excluded.key_signature_scale,
+                    furthest_bar = excluded.furthest_bar,
+                    duration_seconds = excluded.duration_seconds,
+                    daw_type = excluded.daw_type,
+                    daw_version_display = excluded.daw_version_display",
                 params![
                     project_id,
                     live_set.name,
-                    live_set.file_path.to_string_lossy().to_string(),
+                    path,
                     live_set.file_hash,
                     SqlDateTime::from(live_set.created_time),
                     SqlDateTime::from(live_set.modified_time),
@@ -384,13 +416,21 @@ impl<'a> BatchTransaction<'a> {
                     live_set.estimated_duration.map(|d| d.num_seconds()),
                     live_set.daw_type,
                     live_set.daw_version_display,
-                    None::<String>,
                 ],
             )?;
 
+            // The links follow what this parse found. The cascade used to clear them.
+            self.tx.execute(
+                "DELETE FROM project_plugins WHERE project_id = ?",
+                [&project_id],
+            )?;
+            self.tx.execute(
+                "DELETE FROM project_samples WHERE project_id = ?",
+                [&project_id],
+            )?;
+
             // Ableton's structured version data lives in its own side table
-            // (ADR-0015). `INSERT OR REPLACE` on `projects` above cascade-deletes any
-            // existing row here (ON DELETE CASCADE), so this must run after it.
+            // (ADR-0015), one row per project.
             self.tx.execute(
                 "INSERT OR REPLACE INTO project_ableton_metadata (
                     project_id, version_major, version_minor, version_patch, version_beta
@@ -435,7 +475,7 @@ impl<'a> BatchTransaction<'a> {
         debug!("Updating search indexes for {} projects", live_sets.len());
 
         for live_set in live_sets {
-            let project_id = live_set.id.to_string();
+            let project_id = &self.project_id_map[&live_set.id.to_string()];
 
             self.tx.execute(
                 "UPDATE project_search SET

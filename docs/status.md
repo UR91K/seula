@@ -102,6 +102,21 @@ were found by the first CI run on a clean runner.
 
 Resolved:
 
+- **A rescan of an edited project deleted everything attached to it** (found 2026-09-24,
+  fixed 2026-09-24). Every parse mints a new project id, and the batch insert wrote it
+  with `INSERT OR REPLACE`. `path` is unique, so the old row was deleted, and the cascade
+  took the project's tags, collections, tasks and audio files; the replace also wiped
+  its notes, its primary audio file and its archived flag. A known path now keeps its
+  id, and the upsert writes only what a parse knows about. This is step 1 of ADR-0052;
+  renames, moves and Save As are still new projects until the later steps. Regression
+  tests: `a_rescan_keeps_the_project_and_what_is_attached_to_it`
+  (`tests/database/batch.rs`), `adding_a_known_project_again_returns_it_under_its_id`
+  (`src/services/system.rs`).
+- **A rescan reset a renamed project's name to its file name** (found 2026-10-07, fixed
+  2026-10-07). The project upsert still wrote `name` from the parse, so a rename lasted
+  only until the next scan. That contradicts ADR-0051: the file name is the default only
+  until the user renames the project. A rescan now leaves `name` alone. Regression test:
+  `a_rescan_keeps_a_renamed_project_name` (`tests/database/batch.rs`).
 - **The project scan wrote through a second database connection** (found 2026-09-24,
   fixed 2026-09-24). In the daemon, `process_projects_with_progress` opened its own
   connection and held SQLite's write lock through the batch insert, so an adapter write
