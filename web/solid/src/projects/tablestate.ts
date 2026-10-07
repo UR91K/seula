@@ -1,5 +1,6 @@
-// The state of one projects table (ADR-0058): the rows, their sort and page, the columns,
-// the selection, the name being edited and the hover list. The projects view makes one at
+// The state of one projects table (ADR-0058): the rows, their sort and page, the columns
+// and their widths (ADR-0066), the selection, the name being edited and the hover list.
+// The projects view makes one at
 // module level and so does the collections view's tracklist, so each keeps its own sort
 // and selection and neither is lost when its view unmounts (ADR-0055).
 //
@@ -12,6 +13,7 @@ import {
   DEFAULT_COLUMNS, clickRow, lastPage, pageOf, sortRows, toggleAll, toggleRow, PAGE_SIZE, type Selection,
 } from "../../../shared/projects";
 import type { Project, Sort } from "../../../shared/types";
+import { createWidths } from "../shell/columns";
 import { api, setNotice, shell } from "../shell/shell";
 
 export type HotList = { id: string; kind: "plugins" | "samples" };
@@ -21,6 +23,7 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
   const [sort, setSort] = createSignal<Sort | null>(opts.sort);
   const [page, setPage] = createSignal(0);
   const [columns, setColumns] = createSignal(DEFAULT_COLUMNS);
+  const widths = createWidths();
   const [renaming, setRenaming] = createSignal<string | null>(null);
   const [hot, setHot] = createSignal<HotList | null>(null);
   const [selection, setSelection] = createSignal<Selection>({ selected: new Set(), anchor: null });
@@ -96,7 +99,7 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
   return {
     items, setItems, replace, find,
     sort, sortBy, page, goPage, pageSize: PAGE_SIZE, pageCount, total, sorted, rows, rowIds,
-    columns, toggleColumn,
+    columns, toggleColumn, widths,
     renaming, setRenaming, renameProject, editNotes,
     hot, setHot, holdHover, releaseHover,
     isSelected, selectedCount, selectedProjects, clearSelection, rowClick, rowCheck, checkAll, selectOnly, pruneSelection,

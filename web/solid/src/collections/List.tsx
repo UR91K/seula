@@ -4,6 +4,7 @@
 import { For, Show } from "solid-js";
 import { COLLECTION_COLUMNS, cardMeta } from "../../../shared/collections";
 import type { CollectionRow } from "../../../shared/types";
+import { Grip, createWidths, type Col } from "../shell/columns";
 import { Icon } from "../shell/parts";
 import { setShell } from "../shell/shell";
 import { Cover } from "./parts";
@@ -57,8 +58,6 @@ export function Grid() {
   return <div class="cards"><For each={collections}>{(c) => <Card c={c} />}</For></div>;
 }
 
-const cell = (n: number) => ({ width: `calc(var(--u) * ${n})` });
-
 function Row(props: { c: CollectionRow }) {
   return (
     <tr data-card={props.c.id} classList={{ sel: cui.selected === props.c.id }}
@@ -78,20 +77,26 @@ function Row(props: { c: CollectionRow }) {
   );
 }
 
+/** Column widths (ADR-0066), kept while the app runs. The cover column does not resize. */
+const widths = createWidths();
+const COVER: Col = { id: "cover", w: 12 };
+const ALL: Col[] = [COVER, ...COLLECTION_COLUMNS];
+const last = (id: string) => ALL[ALL.length - 1].id === id;
+
 export function Details() {
   // A search answers by relevance, so the headers show no sort and a click still sorts the list.
   const sorted = (key?: string) => !cui.query && !!key && cui.sort.col === key;
   return (
-    <table class="grid fixed collections">
+    <table class="grid fixed collections" style={widths.table(ALL)}>
       <thead>
         <tr>
-          <th class="lead" style={cell(12)} title="Cover" />
+          <th class="lead" style={widths.th(COVER, false)} title="Cover" />
           <For each={COLLECTION_COLUMNS}>{(c) => (
-            <th classList={{ num: c.num, sorted: sorted(c.key) }} style={cell(c.w)}
+            <th classList={{ num: c.num, sorted: sorted(c.key) }} style={widths.th(c, last(c.id))}
               onClick={() => { if (c.key) sortByColumn(c.key); }}>
               {c.label}
               <Show when={sorted(c.key)}><Icon name={cui.sort.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-              <span class="grip" />
+              <Grip widths={widths} col={c} />
             </th>
           )}</For>
         </tr>

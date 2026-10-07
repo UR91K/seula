@@ -19,3 +19,35 @@ html, body, #app { height: 100%; }
   display: block; width: auto; background: none; color: inherit;
   font: 10px/1 "Segoe Fluent Icons", "Segoe MDL2 Assets";
 }
+
+/* The main pane is one column no wider than its grid cell, and clips. Its grid had no
+ * column template, so the view bar's minimum width could widen it past its cell and into
+ * the inspector's, and the sticky table header (z-index 1) then painted over the
+ * inspector (bugs.md `headers-rendering-over-sidebar`). Menus and popovers are positioned
+ * against the window, not this pane, so the clip does not reach them. */
+.main { grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+
+/* Tables are Explorer's details view (ADR-0066): fixed column widths, a last column that
+ * takes the rest of the row, and everything left-aligned. A width covers the padding and
+ * the border, so the table's minimum, the sum of its columns, is exact. */
+table.grid.fixed { width: 100%; }
+table.grid.fixed th { box-sizing: border-box; }
+table.grid .num { text-align: left; }
+/* The grip straddles the column edge, centred on the border, and is wide enough to hit. The
+ * next header paints over its outer half, so a header under the pointer is raised: it is
+ * the one whose grip is being aimed at. The last header has no neighbour, and its grip
+ * stays inside it. */
+table.grid th .grip { right: calc(var(--u) * -3); width: calc(var(--u) * 6); }
+table.grid th:last-child .grip { right: 0; width: calc(var(--u) * 3); }
+table.grid th:hover { z-index: 2; }
+
+/* Nothing is selectable except what a person might copy: fields, and the inspector's
+ * text. The mockup stylesheets set no user-select anywhere but on icons. */
+body { user-select: none; }
+input, textarea, .inspector { user-select: text; }
+.inspector h3, .inspector button, .inspector .btn, .inspector .k { user-select: none; }
+
+/* Held to the pane's width, the view bar wraps onto a second row instead of squashing
+ * its controls into each other. */
+.viewbar { flex-wrap: wrap; row-gap: var(--u); }
+.viewbar > * { flex-shrink: 0; }

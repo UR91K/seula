@@ -5,12 +5,15 @@ import { For, Show } from "solid-js";
 import { fmtBytes, splitPath } from "../../../shared/format";
 import { SAMPLE_COLUMNS, folderOf, formatOf, presenceLabel } from "../../../shared/samples";
 import type { SampleRow } from "../../../shared/types";
+import { Grip, createWidths } from "../shell/columns";
 import { Icon } from "../shell/parts";
 import { setShell } from "../shell/shell";
 import { PresentDot } from "./parts";
 import { formats, pageRows, select, sortBy, sui } from "./state";
 
-const cell = (n: number) => ({ width: `calc(var(--u) * ${n})` });
+/** Column widths (ADR-0066), kept while the app runs. */
+const widths = createWidths();
+const last = (id: string) => SAMPLE_COLUMNS[SAMPLE_COLUMNS.length - 1].id === id;
 
 function Head() {
   return (
@@ -19,10 +22,10 @@ function Head() {
         <For each={SAMPLE_COLUMNS}>{(c) => {
           const sorted = () => sui.sort?.col === c.id;
           return (
-            <th classList={{ num: c.num, sorted: sorted() }} style={cell(c.w)} onClick={() => sortBy(c.id)}>
+            <th classList={{ num: c.num, sorted: sorted() }} style={widths.th(c, last(c.id))} onClick={() => sortBy(c.id)}>
               {c.label}
               <Show when={sorted()}><Icon name={sui.sort!.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-              <span class="grip" />
+              <Grip widths={widths} col={c} />
             </th>
           );
         }}</For>
@@ -80,7 +83,7 @@ function Row(props: { s: SampleRow }) {
 
 export function SampleTable() {
   return (
-    <table class="grid fixed samples">
+    <table class="grid fixed samples" style={widths.table(SAMPLE_COLUMNS)}>
       <Head />
       <tbody><For each={pageRows()}>{(s) => <Row s={s} />}</For></tbody>
     </table>

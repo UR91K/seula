@@ -8,6 +8,7 @@ import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { fileName } from "../../../shared/format";
 import { COLUMNS, columnById, missingPlugins, missingSamples, nextSort, type Column } from "../../../shared/projects";
 import type { Project } from "../../../shared/types";
+import { Grip, type Col } from "../shell/columns";
 import { Cb, Icon, TagChip } from "../shell/parts";
 import { setShell, shell } from "../shell/shell";
 import type { TableState } from "./tablestate";
@@ -18,19 +19,24 @@ export interface Tracks {
   onReorder(ids: string[]): void;
 }
 
-const cell = (n: number) => ({ width: `calc(var(--u) * ${n})` });
-
-function SortTh(props: { t: TableState; id: string; label: string; w: number; num?: boolean }) {
-  const sorted = () => props.t.sort()?.col === props.id;
+function SortTh(props: { t: TableState; col: Col; last: boolean; label: string; num?: boolean }) {
+  const sorted = () => props.t.sort()?.col === props.col.id;
   return (
-    <th classList={{ num: props.num, sorted: sorted() }} style={cell(props.w)}
-      onClick={() => props.t.sortBy(nextSort(props.t.sort(), props.id))}>
+    <th classList={{ num: props.num, sorted: sorted() }} style={props.t.widths.th(props.col, props.last)}
+      onClick={() => props.t.sortBy(nextSort(props.t.sort(), props.col.id))}>
       {props.label}
       <Show when={sorted()}><Icon name={props.t.sort()!.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-      <span class="grip" />
+      <Grip widths={props.t.widths} col={props.col} />
     </th>
   );
 }
+
+// The columns before the optional ones, with their widths in --u. The lead ones do not resize.
+const POS: Col = { id: "pos", w: 22 };
+const CHECK: Col = { id: "check", w: 11 };
+const AUDIO: Col = { id: "audio", w: 10 };
+const NAME: Col = { id: "name", w: 100 };
+const TAGS: Col = { id: "tags", w: 64 };
 
 function NameCell(props: { t: TableState; p: Project }) {
   const file = () => fileName(props.p.path);
@@ -127,6 +133,9 @@ function Row(props: {
 export function ProjectTable(props: { t: TableState; tracks?: Tracks }) {
   const t = () => props.t;
   const cols = createMemo(() => t().columns().map(columnById).sort((a, b) => COLUMNS.indexOf(a) - COLUMNS.indexOf(b)));
+  /** Every column left to right: the table's minimum width, and which one is last. */
+  const all = createMemo((): Col[] => [...(props.tracks ? [POS] : []), CHECK, AUDIO, NAME, TAGS, ...cols()]);
+  const last = (id: string) => all()[all().length - 1].id === id;
   const head = createMemo(() => {
     const ids = t().rowIds();
     const on = ids.filter(t().isSelected).length;
@@ -182,18 +191,18 @@ export function ProjectTable(props: { t: TableState; tracks?: Tracks }) {
   onCleanup(() => setDrag(null));
 
   return (
-    <table class="grid fixed" classList={{ tracks: !!props.tracks }}>
+    <table class="grid fixed" classList={{ tracks: !!props.tracks }} style={t().widths.table(all())}>
       <thead>
         <tr>
           <Show when={props.tracks}>
-            <th class="lead pos" classList={{ sorted: t().sort() === null }} style={cell(22)}
+            <th class="lead pos" classList={{ sorted: t().sort() === null }} style={t().widths.th(POS, false)}
               title="Collection order" onClick={() => t().sortBy(null)}>#</th>
           </Show>
-          <th class="lead check" style={cell(11)} title="Select all on this page" onClick={() => t().checkAll()}><Cb state={head()} /></th>
-          <th class="lead" style={cell(10)} title="Audition audio" />
-          <SortTh t={t()} id="name" label="Name" w={100} />
-          <SortTh t={t()} id="tags" label="Tags" w={64} />
-          <For each={cols()}>{(c) => <SortTh t={t()} id={c.id} label={c.label} w={c.w} num={c.num} />}</For>
+          <th class="lead check" style={t().widths.th(CHECK, false)} title="Select all on this page" onClick={() => t().checkAll()}><Cb state={head()} /></th>
+          <th class="lead" style={t().widths.th(AUDIO, false)} title="Audition audio" />
+          <SortTh t={t()} col={NAME} last={last("name")} label="Name" />
+          <SortTh t={t()} col={TAGS} last={last("tags")} label="Tags" />
+          <For each={cols()}>{(c) => <SortTh t={t()} col={c} last={last(c.id)} label={c.label} num={c.num} />}</For>
         </tr>
       </thead>
       <tbody>
