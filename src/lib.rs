@@ -131,7 +131,7 @@ use crate::database::batch::BatchInsertManager;
 use crate::error::LiveSetError;
 use crate::project::ProjectPreprocessed;
 use crate::scan::parallel::ParallelParser;
-use crate::scan::plugins::scan_system_with_progress;
+use crate::scan::plugins::{scan_files, ScanMode};
 use crate::scan::project_scanner::ProjectPathScanner;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -401,15 +401,26 @@ where
                     );
                 }
             };
-            scan_system_with_progress(&roots, timeout, &mut on_plugin)
+            // Nothing has been scanned, so every file is loaded. The files are still
+            // recorded, so the next scan for changes can skip them (ADR-0067).
+            scan_files(
+                &roots,
+                timeout,
+                ScanMode::All,
+                |_| Default::default(),
+                &mut on_plugin,
+            )
         };
 
         match scan {
-            Ok(report) => {
+            Ok(scan) => {
+                let report = &scan.report;
                 // A truncated scan has not really looked everywhere, so it neither
                 // sweeps nor counts as having run.
                 let full_scan = !report.budget_exhausted;
-                let persisted = db.lock().persist_plugin_scan(&report, full_scan);
+                let persisted = db
+                    .lock()
+                    .persist_plugin_scan_of(report, &scan.files, full_scan);
                 match persisted {
                     Ok(persisted) => info!(
                         "First-run plugin scan: {} installed, {} missing, {} failed to load",

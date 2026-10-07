@@ -10,11 +10,11 @@
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import {
-  DEFAULT_COLUMNS, clickRow, lastPage, pageOf, sortRows, toggleAll, toggleRow, PAGE_SIZE, type Selection,
+  DEFAULT_COLUMNS, clickRow, lastPage, pageOf, sortRows, toggleAll, toggleRow, type Selection,
 } from "../../../shared/projects";
 import type { Project, Sort } from "../../../shared/types";
 import { createWidths } from "../shell/columns";
-import { api, setNotice, shell } from "../shell/shell";
+import { api, pageSize, setNotice, shell } from "../shell/shell";
 
 export type HotList = { id: string; kind: "plugins" | "samples" };
 
@@ -33,9 +33,9 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
   /** Every row, in the sort's order; with no sort, in the order the list arrived in. */
   const sorted = createMemo(() => sortRows(items, sort(), shell.spelling));
   const total = () => sorted().length;
-  const rows = createMemo(() => (opts.paged ? pageOf(sorted(), page()) : sorted()));
+  const rows = createMemo(() => (opts.paged ? pageOf(sorted(), page(), pageSize()) : sorted()));
   const rowIds = createMemo(() => rows().map((p) => p.id));
-  const pageCount = () => (opts.paged ? lastPage(total()) + 1 : 1);
+  const pageCount = () => (opts.paged ? lastPage(total(), pageSize()) + 1 : 1);
 
   const byId = createMemo(() => new Map(items.map((p) => [p.id, p])));
   const find = (id: string) => byId().get(id);
@@ -98,7 +98,7 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
 
   return {
     items, setItems, replace, find,
-    sort, sortBy, page, goPage, pageSize: PAGE_SIZE, pageCount, total, sorted, rows, rowIds,
+    sort, sortBy, page, goPage, firstPage: () => setPage(0), pageSize, pageCount, total, sorted, rows, rowIds,
     columns, toggleColumn, widths,
     renaming, setRenaming, renameProject, editNotes,
     hot, setHot, holdHover, releaseHover,

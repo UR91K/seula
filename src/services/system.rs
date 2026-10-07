@@ -233,7 +233,11 @@ impl SystemService {
     /// The scan runs on a blocking thread without the database, which is locked only to
     /// write the result. Returns false, and starts nothing, when a scan is already
     /// running.
-    pub async fn start_plugin_scan<F>(&self, on_progress: F) -> bool
+    pub async fn start_plugin_scan<F>(
+        &self,
+        mode: crate::scan::plugins::ScanMode,
+        on_progress: F,
+    ) -> bool
     where
         F: Fn(ScanProgressResponse, Option<PluginRefreshResult>) + Send + Sync + 'static,
     {
@@ -291,15 +295,26 @@ impl SystemService {
                     None,
                 );
             };
-            let outcome = crate::services::plugins::scan_configured_plugins(&mut on_plugin)
-                .and_then(|scan| db.blocking_lock().record_plugin_refresh(&scan));
+            let outcome =
+                crate::services::plugins::scan_configured_plugins(mode, &db, &mut on_plugin)
+                    .and_then(|scan| db.blocking_lock().record_plugin_refresh(&scan));
 
             match outcome {
                 Ok(result) => {
-                    let message = format!(
-                        "Plugin scan completed: {} installed, {} missing, {} failed to load",
-                        result.plugins_installed, result.plugins_missing, result.scan_failures
+                    // Zero counts are left out: "0 failed to load" after a scan that
+                    // skipped two failing files as unchanged would say they were fixed.
+                    let counts = [
+                        (result.unchanged, "unchanged"),
+                        (result.scan_failures, "failed to load"),
+                        (result.plugins_missing, "missing"),
+                    ];
+                    let mut message = format!(
+                        "Plugin scan completed: {} scanned",
+                        result.candidates_scanned
                     );
+                    for (n, what) in counts.iter().filter(|(n, _)| *n > 0) {
+                        message.push_str(&format!(", {n} {what}"));
+                    }
                     let total = result.candidates_scanned.max(0) as u32;
                     on_progress(
                         report(total, total, message, ScanStatus::ScanCompleted),

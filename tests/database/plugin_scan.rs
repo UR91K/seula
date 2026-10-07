@@ -734,3 +734,177 @@ fn vendor_and_format_aggregates_account_for_unscanned_plugins() {
         stats.unknown_plugins
     );
 }
+
+// ---------------------------------------------------------------- per-file scans (ADR-0067)
+
+use seula::scan::plugins::PluginFile;
+
+/// A file as discovery would report it; `stamp` stands for its size and mtime.
+fn file(name: &str, stamp: i64) -> PluginFile {
+    PluginFile {
+        path: PathBuf::from(format!(r"C:\Plugins\{}.vst3", name)),
+        size: stamp as u64,
+        modified: Some(stamp),
+    }
+}
+
+fn failed(name: &str, error_type: ErrorType) -> PluginScanResult {
+    PluginScanResult {
+        path: PathBuf::from(format!(r"C:\Plugins\{}.vst3", name)),
+        outcome: Outcome::Error {
+            error_type,
+            error: format!("{} went wrong", name),
+        },
+    }
+}
+
+fn report_with(results: Vec<PluginScanResult>) -> ScanReport {
+    ScanReport {
+        results,
+        restarts: 0,
+        budget_exhausted: false,
+    }
+}
+
+#[test]
+fn only_new_and_changed_files_need_loading() {
+    setup("error");
+    let (_dir, mut db) = temp_db();
+    let a = vst3_uid(0x41);
+    let files = vec![file("A", 100)];
+    db.persist_plugin_scan_of(
+        &report_of(vec![scanned_vst3(&a, "A", vec![])]),
+        &files,
+        true,
+    )
+    .unwrap();
+
+    let unchanged =
+        |db: &ProjectDatabase, f: Vec<PluginFile>| db.unchanged_plugin_files(&f).unwrap();
+    assert!(unchanged(&db, vec![file("A", 100)]).contains(&file("A", 100).path));
+    assert!(
+        unchanged(&db, vec![file("A", 101)]).is_empty(),
+        "a changed file is loaded again"
+    );
+    assert!(
+        unchanged(&db, vec![file("New", 100)]).is_empty(),
+        "a new file is loaded"
+    );
+    let no_mtime = PluginFile {
+        modified: None,
+        ..file("A", 100)
+    };
+    assert!(
+        unchanged(&db, vec![no_mtime]).is_empty(),
+        "no mtime never counts as unchanged"
+    );
+}
+
+#[test]
+fn a_scan_that_loads_nothing_keeps_unchanged_plugins_installed() {
+    setup("error");
+    let (_dir, mut db) = temp_db();
+    let a = vst3_uid(0x42);
+    let b = vst3_uid(0x43);
+    db.persist_plugin_scan_of(
+        &report_of(vec![
+            scanned_vst3(&a, "A", vec![]),
+            scanned_vst3(&b, "B", vec![]),
+        ]),
+        &[file("A", 1), file("B", 1)],
+        true,
+    )
+    .unwrap();
+
+    // Both unchanged, so nothing was loaded; B's file has gone since.
+    let result = db
+        .persist_plugin_scan_of(&report_with(vec![]), &[file("A", 1)], true)
+        .unwrap();
+
+    assert_eq!(installed_state(&db, &a.to_lowercase()), Some(true));
+    assert_eq!(installed_state(&db, &b.to_lowercase()), Some(false));
+    assert_eq!(result.marked_missing, 1);
+    let rows: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM plugin_files", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(rows, 1, "the vanished file is forgotten");
+}
+
+#[test]
+fn a_plugin_whose_file_starts_failing_is_failed_not_missing() {
+    setup("error");
+    let (_dir, mut db) = temp_db();
+    let a = vst3_uid(0x44);
+    db.persist_plugin_scan_of(
+        &report_of(vec![scanned_vst3(&a, "A", vec![])]),
+        &[file("A", 1)],
+        true,
+    )
+    .unwrap();
+
+    // An update, and now it crashes the worker.
+    db.persist_plugin_scan_of(
+        &report_with(vec![failed("A", ErrorType::Crashed)]),
+        &[file("A", 2)],
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(installed_state(&db, &a.to_lowercase()), Some(true));
+    let errors = db.plugin_scan_errors().unwrap();
+    assert_eq!(errors.values().collect::<Vec<_>>(), vec!["crashed"]);
+    assert!(
+        db.failed_plugin_files().unwrap().is_empty(),
+        "it is known, so it is no file row"
+    );
+
+    // Fixed by the next update: it loads again.
+    db.persist_plugin_scan_of(
+        &report_of(vec![scanned_vst3(&a, "A", vec![])]),
+        &[file("A", 3)],
+        true,
+    )
+    .unwrap();
+    assert!(db.plugin_scan_errors().unwrap().is_empty());
+}
+
+#[test]
+fn files_that_never_loaded_are_listed_unless_they_are_not_plugins() {
+    setup("error");
+    let (_dir, mut db) = temp_db();
+    db.persist_plugin_scan_of(
+        &report_with(vec![
+            failed("Hangs", ErrorType::Timeout),
+            failed("Helper", ErrorType::InvalidFormat),
+            failed("Refuses", ErrorType::LoadFailed),
+        ]),
+        &[file("Hangs", 1), file("Helper", 1), file("Refuses", 1)],
+        true,
+    )
+    .unwrap();
+
+    let listed: Vec<(String, String)> = db
+        .failed_plugin_files()
+        .unwrap()
+        .into_iter()
+        .map(|f| (f.path, f.error_type))
+        .collect();
+    assert_eq!(
+        listed,
+        vec![
+            (r"C:\Plugins\Hangs.vst3".to_string(), "timeout".to_string()),
+            (
+                r"C:\Plugins\Refuses.vst3".to_string(),
+                "load_failed".to_string()
+            ),
+        ]
+    );
+    // All three are remembered, so a scan for changes skips them.
+    assert_eq!(
+        db.unchanged_plugin_files(&[file("Hangs", 1), file("Helper", 1), file("Refuses", 1)])
+            .unwrap()
+            .len(),
+        3
+    );
+}

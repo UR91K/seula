@@ -13,15 +13,16 @@ use crate::database::plugins::PluginFilter;
 use crate::database::ProjectScope;
 use crate::http::dto::parse_project_scope;
 use crate::http::dto::plugins::{
-    parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FormatListResponse,
-    GetAllPluginsQuery, GetPluginResponse, PaginationQuery, PluginDto, PluginListResponse,
-    PluginScanEventDto, PluginStatsQuery, ProjectsByPluginQuery, ScopeQuery, SearchPluginsQuery,
-    VendorListResponse,
+    parse_install_states, plugin_sort_key, ByInstalledStatusQuery, FailedPluginFileDto,
+    FailedPluginFilesResponse, FormatListResponse, GetAllPluginsQuery, GetPluginResponse,
+    PaginationQuery, PluginDto, PluginListResponse, PluginScanEventDto, PluginStatsQuery,
+    ProjectsByPluginQuery, ScanModeQuery, ScopeQuery, SearchPluginsQuery, VendorListResponse,
 };
 use crate::http::dto::projects::{project_to_dto, ProjectListResponse};
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 use crate::models::Plugin as DomainPlugin;
+use crate::scan::plugins::ScanMode;
 use crate::services::system::send_scan_update;
 
 /// Attach each plugin's project count with one query for the page (ADR-0034), counting
@@ -40,6 +41,48 @@ async fn with_counts(
             PluginDto::new(p, count)
         })
         .collect())
+}
+
+/// Mark the plugins whose every file failed the last scan (ADR-0067). One query for
+/// all of them: there are few, where the rows can be thousands.
+async fn with_scan_errors(
+    state: &AppState,
+    mut plugins: Vec<PluginDto>,
+) -> Result<Vec<PluginDto>, ApiError> {
+    let errors = state.services.plugins.scan_errors().await?;
+    if !errors.is_empty() {
+        for p in &mut plugins {
+            p.scan_error = errors.get(&p.id).cloned();
+        }
+    }
+    Ok(plugins)
+}
+
+fn parse_scan_mode(mode: Option<&str>) -> Result<ScanMode, ApiError> {
+    match mode {
+        None => Ok(ScanMode::Changes),
+        Some(m) => ScanMode::parse(m).ok_or_else(|| {
+            ApiError::InvalidRequest(format!("mode is `changes` or `all`, not `{m}`"))
+        }),
+    }
+}
+
+/// `GET /api/v1/plugins/failed-files`: plugin files that failed and have never loaded.
+pub async fn get_failed_plugin_files(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let files = state.services.plugins.failed_files().await?;
+    Ok(Json(FailedPluginFilesResponse {
+        files: files
+            .into_iter()
+            .map(|f| FailedPluginFileDto {
+                path: f.path,
+                error_type: f.error_type,
+                error_message: f.error_message,
+                scanned_at: f.scanned_at,
+            })
+            .collect(),
+    }))
 }
 
 pub async fn get_all_plugins(
@@ -65,7 +108,8 @@ pub async fn get_all_plugins(
         .await?;
 
     Ok(Json(PluginListResponse {
-        plugins: plugins.into_iter().map(PluginDto::from).collect(),
+        plugins: with_scan_errors(&state, plugins.into_iter().map(PluginDto::from).collect())
+            .await?,
         total_count,
     }))
 }
@@ -90,7 +134,7 @@ pub async fn get_plugins_by_installed_status(
         .await?;
 
     Ok(Json(PluginListResponse {
-        plugins: with_counts(&state, plugins, scope).await?,
+        plugins: with_scan_errors(&state, with_counts(&state, plugins, scope).await?).await?,
         total_count,
     }))
 }
@@ -116,7 +160,7 @@ pub async fn search_plugins(
         .await?;
 
     Ok(Json(PluginListResponse {
-        plugins: with_counts(&state, plugins, scope).await?,
+        plugins: with_scan_errors(&state, with_counts(&state, plugins, scope).await?).await?,
         total_count,
     }))
 }
@@ -202,10 +246,10 @@ pub async fn get_plugin(
         .await?
         .ok_or_else(not_found)?;
 
-    Ok(Json(GetPluginResponse {
-        plugin: PluginDto::from(grpc_plugin),
-        details,
-    }))
+    let plugin = with_scan_errors(&state, vec![PluginDto::from(grpc_plugin)])
+        .await?
+        .remove(0);
+    Ok(Json(GetPluginResponse { plugin, details }))
 }
 
 pub async fn get_projects_by_plugin(
@@ -243,12 +287,14 @@ pub async fn get_projects_by_plugin(
 /// it. 409 when a scan is already running.
 pub async fn scan_plugins(
     State(state): State<AppState>,
+    Query(query): Query<ScanModeQuery>,
 ) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
+    let mode = parse_scan_mode(query.mode.as_deref())?;
     let (tx, rx) = tokio::sync::mpsc::channel(100);
 
     let started = state
         .system
-        .start_plugin_scan(move |response, result| {
+        .start_plugin_scan(mode, move |response, result| {
             let status = response.status;
             let dto = PluginScanEventDto {
                 progress: response.into(),
@@ -270,11 +316,13 @@ pub async fn scan_plugins(
 /// Kept for scripts; the plugins view uses `scan_plugins`.
 pub async fn refresh_plugin_installation_status(
     State(state): State<AppState>,
+    Query(query): Query<ScanModeQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let mode = parse_scan_mode(query.mode.as_deref())?;
     let result = state
         .services
         .plugins
-        .refresh_plugin_installation_status()
+        .refresh_plugin_installation_status(mode)
         .await?;
     Ok(Json(result))
 }

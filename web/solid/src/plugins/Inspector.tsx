@@ -5,6 +5,7 @@
 
 import { For, Show, type JSX } from "solid-js";
 import { fmtDate } from "../../../shared/format";
+import { failureLabel, stateOf } from "../../../shared/plugins";
 import { plural } from "../../../shared/projects";
 import type { PluginDetails, PluginRow, Project } from "../../../shared/types";
 import { Icon, PathChip } from "../shell/parts";
@@ -32,17 +33,34 @@ function List<T>(props: { items: T[]; max?: number; render: (x: T) => JSX.Elemen
   );
 }
 
-/** What the installed flag means for this plugin, and when a scan last said so. */
+/** Why a file did not load, and what to do about it (ADR-0067). */
+function Failure(props: { code: string; message?: string | null }) {
+  return (
+    <>
+      <div class="state-line is-failed"><StatusDot state="failed" /><b>Failed</b><span class="faint">{failureLabel(props.code)}</span></div>
+      <Show when={props.message}><p class="faint">{props.message}</p></Show>
+      <p class="faint">A scan for changes leaves it alone until the file changes. Rescan all tries it again.</p>
+      <button class="btn" onClick={() => scanPlugins("all")}><Icon name="refresh" />Rescan all</button>
+    </>
+  );
+}
+
+/** What the plugin's status means, and when a scan last said so. */
 function StateSection(props: { p: PluginRow; d?: PluginDetails }) {
   const when = () => (props.d?.last_scanned_at ? fmtDate(props.d.last_scanned_at) : null);
+  const state = () => stateOf(props.p);
   return (
     <div class="insp-sec">
-      <Show when={props.p.installed === true}>
-        <div class="state-line is-installed"><StatusDot installed={true} /><b>Installed</b></div>
+      <Show when={state() === "failed"}>
+        <Failure code={props.p.scan_error!} />
+        <p class="faint">It loaded in an earlier scan, so it is known; its file is still there but no longer loads.</p>
+      </Show>
+      <Show when={state() === "installed"}>
+        <div class="state-line is-installed"><StatusDot state="installed" /><b>Installed</b></div>
         <Show when={when()}><p class="faint">Found by the scan on {when()}</p></Show>
       </Show>
-      <Show when={props.p.installed === false}>
-        <div class="state-line is-absent"><StatusDot installed={false} /><b>Missing</b></div>
+      <Show when={state() === "absent"}>
+        <div class="state-line is-absent"><StatusDot state="absent" /><b>Missing</b></div>
         <Show when={when()}><p class="faint">Not found by the scan on {when()}</p></Show>
         <Show when={props.d} fallback={null}>
           <Show when={props.d!.path} fallback={<p class="faint">No scan has ever found it on this machine. Projects know it by name only.</p>}>
@@ -51,10 +69,10 @@ function StateSection(props: { p: PluginRow; d?: PluginDetails }) {
           </Show>
         </Show>
       </Show>
-      <Show when={props.p.installed == null}>
-        <div class="state-line is-unscanned"><StatusDot installed={null} /><b>Not scanned</b></div>
+      <Show when={state() === "unscanned"}>
+        <div class="state-line is-unscanned"><StatusDot state="unscanned" /><b>Not scanned</b></div>
         <p class="faint">No plugin scan has looked for it yet, so it may be installed or not. Projects know it by name only.</p>
-        <button class="btn" onClick={scanPlugins}><Icon name="radar" />Scan plugins</button>
+        <button class="btn" onClick={() => scanPlugins()}><Icon name="radar" />Scan plugins</button>
       </Show>
     </div>
   );
@@ -172,12 +190,33 @@ function Single(props: { p: PluginRow }) {
   );
 }
 
+/** A file that failed and never loaded: all there is to know is on its row. */
+function FailedFile(props: { p: PluginRow }) {
+  const f = () => props.p.file!;
+  return (
+    <>
+      <div class="insp-head">
+        <span class="glyph"><Icon name="draft" /></span>
+        <div>
+          <h2>{props.p.name}</h2>
+          <div class="faint">{props.p.format} file · scanned {fmtDate(f().scanned_at)}</div>
+          <PathChip path={f().path} />
+        </div>
+      </div>
+      <div class="insp-sec">
+        <Failure code={f().error_type} message={f().error_message} />
+        <p class="faint">It has never loaded, so which plugin it is, and whether your projects use it, is unknown.</p>
+      </div>
+    </>
+  );
+}
+
 export function Inspector() {
   return (
     <aside class="inspector">
       <Show when={selectedPlugin()} fallback={
         <div class="empty"><Icon name="right_panel_open" /><p>Select a plugin to see what the scan recorded and which projects use it.</p></div>}>
-        {(p) => <Single p={p()} />}
+        {(p) => <Show when={p().file} fallback={<Single p={p()} />}><FailedFile p={p()} /></Show>}
       </Show>
     </aside>
   );

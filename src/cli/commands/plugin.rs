@@ -10,7 +10,7 @@ use crate::{colored_cell, simple_table_row};
 use colored::Colorize;
 
 use crate::config::CONFIG;
-use crate::scan::plugins::{scan_system, ScanReport};
+use crate::scan::plugins::{scan_system, ScanMode, ScanReport};
 use vst_meta::protocol::Outcome;
 
 use serde::Serialize;
@@ -90,9 +90,14 @@ impl CliCommand for PluginCommands {
                 let stats = self.get_plugin_stats(&ctx.services.plugins).await?;
                 formatter.print(&stats)?;
             }
-            PluginCommands::Refresh => {
+            PluginCommands::Refresh { all } => {
+                let mode = if *all {
+                    ScanMode::All
+                } else {
+                    ScanMode::Changes
+                };
                 let refresh_result = self
-                    .refresh_plugin_installation_status(&ctx.services.plugins)
+                    .refresh_plugin_installation_status(&ctx.services.plugins, mode)
                     .await?;
                 formatter.print(&refresh_result)?;
             }
@@ -262,8 +267,9 @@ impl PluginCommands {
     async fn refresh_plugin_installation_status(
         &self,
         plugins: &PluginsService,
+        mode: ScanMode,
     ) -> Result<PluginRefreshDisplay, CliError> {
-        let result = plugins.refresh_plugin_installation_status().await?;
+        let result = plugins.refresh_plugin_installation_status(mode).await?;
 
         Ok(PluginRefreshDisplay { result })
     }

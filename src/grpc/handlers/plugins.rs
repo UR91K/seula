@@ -328,7 +328,12 @@ impl PluginsHandler {
     ) -> Result<Response<RefreshPluginInstallationStatusResponse>, Status> {
         debug!("RefreshPluginInstallationStatus request");
 
-        let result = self.service.refresh_plugin_installation_status().await?;
+        // Every file, as before ADR-0067: this API is being retired (ADR-0046) and has
+        // no way to ask for less.
+        let result = self
+            .service
+            .refresh_plugin_installation_status(crate::scan::plugins::ScanMode::All)
+            .await?;
 
         Ok(Response::new(RefreshPluginInstallationStatusResponse {
             candidates_scanned: result.candidates_scanned,

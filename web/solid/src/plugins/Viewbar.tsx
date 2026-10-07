@@ -8,13 +8,22 @@ import { Icon, TbBtn } from "../shell/parts";
 import { scan, setShell, shell } from "../shell/shell";
 import { FilterSelect, Pager } from "../shell/toolbar";
 import {
-  goPage, loaded, pageCount, pageSize, plugins, pui, scanPlugins, setFormat, setPui, setQuery, setVendor, total,
+  firstPage, goPage, loaded, pageCount, plugins, pui, scanPlugins, setFormat, setPui, setQuery, setVendor, total,
 } from "./state";
 
+/** Scan plugins: a scan for changes, and a caret for the menu that also offers rescanning
+ *  every file (ADR-0067). */
 export function ScanButton(): JSX.Element {
   return (
-    <TbBtn icon={scan() ? "hourglass_top" : "radar"} label={scan() ? "Scanning…" : "Scan plugins"}
-      title={scan() ? "A scan is running" : "Rescan the plugin folders"} disabled={!!scan()} onClick={scanPlugins} />
+    <>
+      <TbBtn icon={scan() ? "hourglass_top" : "radar"} label={scan() ? "Scanning…" : "Scan plugins"}
+        title={scan() ? "A scan is running" : "Load the plugin files that are new or have changed"}
+        disabled={!!scan()} onClick={() => scanPlugins("changes")} />
+      <span data-pop="scan" data-keep="">
+        <TbBtn icon="expand_more" title="Scan options" disabled={!!scan()} on={shell.popover === "scan"}
+          onClick={() => setShell({ menu: null, popover: shell.popover === "scan" ? null : "scan" })} />
+      </span>
+    </>
   );
 }
 
@@ -43,7 +52,7 @@ export function Viewbar() {
         <span class="sep" />
         <ScanButton />
         <span class="grow" />
-        <Pager page={pui.page} total={total()} size={pageSize} pages={pageCount()} onPage={goPage} />
+        <Pager page={pui.page} total={total()} pages={pageCount()} onPage={goPage} onSize={firstPage} />
       </Show>
     </>
   );

@@ -1,12 +1,14 @@
+import type { InstallState } from "../../../shared/plugins";
 import { Icon } from "../shell/parts";
 
-/** The tri-state install marker (ADR-0012): icon and colour, never the colour alone. */
-export function StatusDot(props: { installed: boolean | null }) {
+const ICONS: Record<InstallState, string> = { installed: "check_circle", absent: "error", failed: "warning", unscanned: "help" };
+const CLASSES: Record<InstallState, string> = { installed: "is-ok", absent: "is-missing", failed: "is-failed", unscanned: "is-unknown" };
+
+/** The status marker (ADR-0012, ADR-0067): icon and colour, never the colour alone. */
+export function StatusDot(props: { state: InstallState }) {
   return (
-    <span class="status-dot" classList={{
-      "is-ok": props.installed === true, "is-missing": props.installed === false, "is-unknown": props.installed == null,
-    }}>
-      <Icon name={props.installed === true ? "check_circle" : props.installed === false ? "error" : "help"} fill={props.installed != null} />
+    <span class={`status-dot ${CLASSES[props.state]}`}>
+      <Icon name={ICONS[props.state]} fill={props.state !== "unscanned"} />
     </span>
   );
 }

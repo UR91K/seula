@@ -25,7 +25,7 @@ Last reviewed: 2026-10-04.
 | Plugin metadata via Ableton DB | **Removed** | Retired 2026-09-15. ADR-0006 |
 | Plugin scanner worker | **Done** | `crates/vst-meta`. ADR-0004 |
 | Plugin scanner supervisor | **Done** | `src/scan/plugins/`. ADR-0004 |
-| Plugin scan → database | **Done** | `src/database/plugin_scan.rs`. `seula plugin refresh` scans and persists |
+| Plugin scan → database | **Done** | `src/database/plugin_scan.rs`. `seula plugin refresh` scans and persists: by default only new and changed files, `--all` every file. Files that fail are remembered and shown as Failed. ADR-0067 |
 | First-run plugin scan | **Done** | Runs before project discovery when one has never completed. ADR-0013 |
 | Plugin identity (`PluginKey`) | **Done** | `src/models.rs`. Parses `dev_identifier`, derives from a scanned uid. ADR-0005 |
 | uid-based plugin matching | **Done** | In the batch layer, with the `plugin_classes` fallback. ADR-0005, ADR-0009 |

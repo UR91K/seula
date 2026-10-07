@@ -12,7 +12,7 @@ use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
 use crate::models::GrpcPlugin;
 use crate::project::Project;
-use crate::scan::plugins::{scan_system_with_progress, ScanReport};
+use crate::scan::plugins::{scan_files, PluginScan, ScanMode};
 
 #[derive(Clone)]
 pub struct PluginsService {
@@ -162,32 +162,64 @@ impl PluginsService {
         db.get_projects_by_plugin_id(plugin_id, limit, offset, scope)
     }
 
+    /// Plugins whose every file failed the last scan, by id, with how (ADR-0067).
+    pub async fn scan_errors(
+        &self,
+    ) -> Result<std::collections::HashMap<String, String>, DatabaseError> {
+        self.db.lock().await.plugin_scan_errors()
+    }
+
+    /// Plugin files that failed and have never loaded (ADR-0067).
+    pub async fn failed_files(
+        &self,
+    ) -> Result<Vec<crate::database::plugin_scan::FailedPluginFile>, DatabaseError> {
+        self.db.lock().await.failed_plugin_files()
+    }
+
     /// Rescan the system's plugins and record the result. Returns when the scan is
-    /// done, which takes minutes; the database is locked only to write the result
-    /// (ADR-0038). The HTTP API's background scan is `SystemService::start_plugin_scan`.
+    /// done, which takes minutes; the database is locked only to read what is unchanged
+    /// and to write the result (ADR-0038). The HTTP API's background scan is
+    /// `SystemService::start_plugin_scan`.
     pub async fn refresh_plugin_installation_status(
         &self,
+        mode: ScanMode,
     ) -> Result<PluginRefreshResult, DatabaseError> {
-        let report = tokio::task::spawn_blocking(|| scan_configured_plugins(&mut |_, _, _| {}))
-            .await
-            .map_err(|e| {
-                DatabaseError::ConnectionError(format!("Plugin scan task failed: {}", e))
-            })??;
-        self.db.lock().await.record_plugin_refresh(&report)
+        let db = Arc::clone(&self.db);
+        let scan = tokio::task::spawn_blocking(move || {
+            scan_configured_plugins(mode, &db, &mut |_, _, _| {})
+        })
+        .await
+        .map_err(|e| DatabaseError::ConnectionError(format!("Plugin scan task failed: {}", e)))??;
+        self.db.lock().await.record_plugin_refresh(&scan)
     }
 }
 
-/// Scan the configured plugin search paths with the configured timeout, reporting each
-/// plugin as it is attempted. Blocking and slow: run it on a blocking thread, and never
-/// while holding the database.
+/// Scan the configured plugin search paths with the configured timeout, loading the
+/// files `mode` asks for and reporting each as it is attempted (ADR-0067). Blocking and
+/// slow: run it on a blocking thread. It locks `db` only to read which files are
+/// unchanged, never while loading.
 pub(crate) fn scan_configured_plugins(
+    mode: ScanMode,
+    db: &Mutex<ProjectDatabase>,
     on_progress: &mut dyn FnMut(usize, usize, &Path),
-) -> Result<ScanReport, DatabaseError> {
+) -> Result<PluginScan, DatabaseError> {
     let config = CONFIG
         .as_ref()
         .map_err(|e| DatabaseError::ConfigError(e.clone()))?;
     let roots: Vec<PathBuf> = config.vst_search_paths.iter().map(PathBuf::from).collect();
     let timeout = Duration::from_secs(config.vst_scan_timeout_secs);
-    scan_system_with_progress(&roots, timeout, on_progress)
+    let unchanged = |files: &[_]| {
+        db.blocking_lock()
+            .unchanged_plugin_files(files)
+            .unwrap_or_else(|e| {
+                // Then nothing counts as unchanged, and the scan loads every file.
+                tracing::warn!(
+                    "Could not read the last plugin scan, so loading every file: {}",
+                    e
+                );
+                Default::default()
+            })
+    };
+    scan_files(&roots, timeout, mode, unchanged, on_progress)
         .map_err(|e| DatabaseError::ConnectionError(e.to_string()))
 }

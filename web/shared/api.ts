@@ -1,7 +1,8 @@
 // The daemon's HTTP client: plain fetch, as ADR-0048 says. No Tauri IPC for data.
 
 import type {
-  Collection, CollectionRow, CollectionSortKey, CollectionStats, CollectionTask, FormatRollup, PluginDetails, PluginRow,
+  Collection, CollectionRow, CollectionSortKey, CollectionStats, CollectionTask, FailedPluginFile, FormatRollup,
+  PluginDetails, PluginRow,
   Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope, Statistics, StatsScope, SystemInfo, VendorRollup,
 } from "./types";
 
@@ -170,6 +171,11 @@ export class Api {
     return (await this.json<{ details: PluginDetails }>(`/api/v1/plugins/${id}`)).details;
   }
 
+  /** Plugin files that failed and have never loaded (ADR-0067). Few, so not paged. */
+  async failedPluginFiles(): Promise<FailedPluginFile[]> {
+    return (await this.json<{ files: FailedPluginFile[] }>("/api/v1/plugins/failed-files")).files;
+  }
+
   pluginProjects(id: string): Promise<Project[]> {
     return this.all(`/api/v1/plugins/${id}/projects`, "projects");
   }
@@ -202,11 +208,15 @@ export class Api {
   /** Start a scan and follow it. A scan's `POST` answers with the SSE stream itself, which
    *  `EventSource` cannot read (it only makes GET requests), so the body is read by hand
    *  (ADR-0056). A scan that is already running answers 409 and this throws. */
-  scan(kind: "projects" | "plugins" | "samples", signal?: AbortSignal): AsyncGenerator<ScanProgress> {
-    const route = { projects: "/api/v1/system/scan", plugins: "/api/v1/plugins/scan", samples: "/api/v1/samples/check" }[kind];
+  scan(kind: "projects" | "plugins" | "samples", signal?: AbortSignal, mode?: PluginScanMode): AsyncGenerator<ScanProgress> {
+    const plugins = mode === "all" ? "/api/v1/plugins/scan?mode=all" : "/api/v1/plugins/scan";
+    const route = { projects: "/api/v1/system/scan", plugins, samples: "/api/v1/samples/check" }[kind];
     return sse<ScanProgress>(this.base + route, { method: "POST", signal });
   }
 }
+
+/** A plugin scan loads only new and changed files, or every file (ADR-0067). */
+export type PluginScanMode = "changes" | "all";
 
 const put = (body: unknown): RequestInit => ({
   method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body),

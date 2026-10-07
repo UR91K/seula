@@ -51,3 +51,8 @@ input, textarea, .inspector { user-select: text; }
  * its controls into each other. */
 .viewbar { flex-wrap: wrap; row-gap: var(--u); }
 .viewbar > * { flex-shrink: 0; }
+
+/* The plugin status Failed (ADR-0067): the file is there but did not load. Amber, apart
+ * from Missing's orange-red, and the mockups never drew it. */
+.is-failed { color: var(--warning); }
+.state-line .faint { font-weight: normal; }

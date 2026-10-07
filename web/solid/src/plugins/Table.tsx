@@ -75,8 +75,8 @@ function Row(props: { p: PluginRow }) {
       }}>
       <td><span class="n">{props.p.name}</span></td>
       <td>
-        <span class="pstate" classList={{ [`is-${stateOf(props.p.installed)}`]: true }}>
-          <StatusDot installed={props.p.installed} />{stateLabel(props.p.installed)}
+        <span class="pstate" classList={{ [`is-${stateOf(props.p)}`]: true }}>
+          <StatusDot state={stateOf(props.p)} />{stateLabel(props.p)}
         </span>
       </td>
       <td class="dim"><Show when={props.p.vendor} fallback={<span class="faint">No vendor</span>}>{props.p.vendor}</Show></td>

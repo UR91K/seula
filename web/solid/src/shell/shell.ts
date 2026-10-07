@@ -7,8 +7,9 @@
 
 import { createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { Api, DEFAULT_URL, simulatedScan } from "../../../shared/api";
+import { Api, DEFAULT_URL, simulatedScan, type PluginScanMode } from "../../../shared/api";
 import { revealInExplorer } from "../../../shared/os";
+import { PAGE_SIZE } from "../../../shared/projects";
 import type { Collection, KeySpelling, ScanKind, ScanProgress, StatsScope, SystemInfo } from "../../../shared/types";
 
 export const api = new Api(import.meta.env.VITE_SEULA_URL ?? DEFAULT_URL);
@@ -47,6 +48,11 @@ export const [shell, setShell] = createStore({
  *  preferences endpoint exists (ADR-0062). */
 export const [projectScope, setProjectScope] = createSignal<StatsScope>("active");
 
+/** Rows per page, one choice for every list view. In memory only, until the preferences
+ *  endpoint exists (ADR-0062). */
+export const PAGE_SIZES = [50, 100, 200, 500];
+export const [pageSize, setPageSize] = createSignal(PAGE_SIZE);
+
 export const closePopups = () => setShell({ menu: null, popover: null });
 
 /** Every collection's id and name, for the project inspector's "Collections" lists. The
@@ -83,14 +89,14 @@ let scanAbort: AbortController | null = null;
 
 /** Follow a scan to its end, writing each event to `scan` and nothing else. `after` runs
  *  once the stream ends, to reload whatever the scan changed. */
-export async function runScan(kind: ScanKind, after?: () => void | Promise<void>) {
+export async function runScan(kind: ScanKind, after?: () => void | Promise<void>, mode?: PluginScanMode) {
   if (scanAbort) return;
   scanAbort = new AbortController();
   const { signal } = scanAbort;
   setLastScan(null);
   let last: ScanProgress | null = null;
   try {
-    const events = kind === "simulated" ? simulatedScan(600, 40, signal) : api.scan(kind, signal);
+    const events = kind === "simulated" ? simulatedScan(600, 40, signal) : api.scan(kind, signal, mode);
     for await (const ev of events) { last = ev; setScan(ev); }
     if (last) setLastScan({ kind, event: last });
     await after?.();

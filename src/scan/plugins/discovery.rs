@@ -94,6 +94,41 @@ pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
     found
 }
 
+/// A candidate's size and mtime, which say whether it changed since a scan loaded it
+/// (ADR-0067). A VST3 bundle is a directory whose binary sits several levels down, and an
+/// installer may replace that binary without touching the directory, so a bundle is the
+/// total size and the newest mtime of the files inside it. Unreadable metadata reads as
+/// size 0 and no mtime, which never matches a recorded scan, so the file is loaded.
+pub fn stat(path: &Path) -> super::PluginFile {
+    let epoch = |m: &std::fs::Metadata| {
+        m.modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+    };
+    let (size, modified) = if path.is_dir() {
+        WalkDir::new(path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok())
+            .fold((0u64, None), |(size, newest), m| {
+                (size + m.len(), newest.max(epoch(&m)))
+            })
+    } else {
+        match path.metadata() {
+            Ok(m) => (m.len(), epoch(&m)),
+            Err(_) => (0, None),
+        }
+    };
+    super::PluginFile {
+        path: path.to_path_buf(),
+        size,
+        modified,
+    }
+}
+
 fn has_extension(path: &Path, ext: &str) -> bool {
     path.extension()
         .map(|e| e.eq_ignore_ascii_case(ext))
@@ -105,6 +140,31 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    /// An installer may replace the binary deep in a bundle and leave the bundle directory
+    /// alone, so a bundle's stat must come from what is inside it (ADR-0067).
+    #[test]
+    fn a_bundle_changes_when_its_inner_binary_does() {
+        let dir = TempDir::new().unwrap();
+        let bundle = dir.path().join("Serum.vst3");
+        let inner = bundle.join("Contents").join("x86_64-win");
+        fs::create_dir_all(&inner).unwrap();
+        fs::write(inner.join("Serum.vst3"), b"version one").unwrap();
+        fs::write(bundle.join("Contents").join("moduleinfo.json"), b"{}").unwrap();
+
+        let before = stat(&bundle);
+        assert_eq!(before.size, 13, "the size is every file inside the bundle");
+        assert!(before.modified.is_some());
+
+        fs::write(inner.join("Serum.vst3"), b"version two, larger").unwrap();
+        assert_ne!(stat(&bundle), before);
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_never_matches_a_recorded_scan() {
+        let missing = stat(Path::new("Z:\\does\\not\\exist.dll"));
+        assert_eq!((missing.size, missing.modified), (0, None));
+    }
 
     #[test]
     fn finds_plugins_and_ignores_other_files() {

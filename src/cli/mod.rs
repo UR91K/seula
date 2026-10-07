@@ -486,8 +486,13 @@ pub enum PluginCommands {
     /// Show plugin statistics
     Stats,
 
-    /// Refresh plugin installation status
-    Refresh,
+    /// Refresh plugin installation status: load the plugin files that are new or have
+    /// changed since the last scan (ADR-0067)
+    Refresh {
+        /// Load every plugin file, retrying the ones that failed last time
+        #[arg(long)]
+        all: bool,
+    },
 
     /// List plugin vendors with statistics
     Vendors,

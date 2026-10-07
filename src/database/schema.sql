@@ -146,6 +146,31 @@ CREATE TABLE IF NOT EXISTS plugin_buses (
     FOREIGN KEY (plugin_id) REFERENCES plugins(id) ON DELETE CASCADE
 );
 
+-- One row per plugin file a scan has loaded or tried to (ADR-0067). `plugins` is one
+-- row per identity and keeps only one path of possibly several (ADR-0010); this is the
+-- file side, which lets a scan skip files that have not changed and remember which
+-- ones fail. Size and mtime are what "changed" means; for a VST3 bundle directory they
+-- are the total size and the newest mtime of the files inside it.
+CREATE TABLE IF NOT EXISTS plugin_files (
+    path TEXT PRIMARY KEY,
+    size_bytes INTEGER NOT NULL,
+    modified_at INTEGER,         -- epoch seconds; NULL when the platform could not say
+    scanned_at DATETIME NOT NULL,
+    error_type TEXT,             -- NULL: it loaded. Otherwise vst_meta's ErrorType::as_str
+    error_message TEXT
+);
+
+-- The plugins a file yielded when it last loaded: several for a shell plugin. A file
+-- that fails keeps the links from its last success, which is how a plugin that has
+-- started to fail is told apart from one that is gone.
+CREATE TABLE IF NOT EXISTS plugin_file_plugins (
+    path TEXT NOT NULL,
+    plugin_id TEXT NOT NULL,
+    PRIMARY KEY (path, plugin_id),
+    FOREIGN KEY (path) REFERENCES plugin_files(path) ON DELETE CASCADE,
+    FOREIGN KEY (plugin_id) REFERENCES plugins(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS samples (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -286,6 +311,7 @@ CREATE INDEX IF NOT EXISTS idx_samples_path ON samples(path);
 -- projects use this item". These serve the per-row project counts (ADR-0034).
 CREATE INDEX IF NOT EXISTS idx_project_samples_sample ON project_samples(sample_id);
 CREATE INDEX IF NOT EXISTS idx_project_plugins_plugin ON project_plugins(plugin_id);
+CREATE INDEX IF NOT EXISTS idx_plugin_file_plugins_plugin ON plugin_file_plugins(plugin_id);
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 CREATE INDEX IF NOT EXISTS idx_collection_projects_position ON collection_projects(collection_id, position);
 CREATE INDEX IF NOT EXISTS idx_projects_is_active ON projects(is_active);

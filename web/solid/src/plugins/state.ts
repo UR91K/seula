@@ -4,12 +4,13 @@
 
 import { batch, createMemo, createResource, createSignal, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
+import type { PluginScanMode } from "../../../shared/api";
 import {
-  DEFAULT_PLUGIN_SORT, layout, nextPluginSort, pluginRows, pluginStats, type Group, type InstallState,
+  DEFAULT_PLUGIN_SORT, fileRow, layout, nextPluginSort, pluginRows, pluginStats, type Group, type InstallState,
 } from "../../../shared/plugins";
-import { PAGE_SIZE, lastPage, pageOf } from "../../../shared/projects";
+import { lastPage, pageOf } from "../../../shared/projects";
 import type { FormatRollup, PluginDetails, PluginRow, Project, Sort, VendorRollup } from "../../../shared/types";
-import { api, closePopups, loadChrome, runScan, setCounts, setNotice, showProjectsMatching } from "../shell/shell";
+import { api, closePopups, loadChrome, pageSize, runScan, setCounts, setNotice, showProjectsMatching } from "../shell/shell";
 
 export const [pui, setPui] = createStore({
   query: "",
@@ -36,12 +37,16 @@ let loadToken = 0;
 export async function load() {
   const token = ++loadToken;
   try {
-    const [list, v, f] = await Promise.all([
-      pui.query ? api.searchPlugins(pui.query) : api.plugins(), api.vendors(), api.formats(),
+    const [list, v, f, failed] = await Promise.all([
+      pui.query ? api.searchPlugins(pui.query) : api.plugins(), api.vendors(), api.formats(), api.failedPluginFiles(),
     ]);
     if (token !== loadToken) return;   // a newer load has started
+    // Files that never loaded have no plugin row, so they are rows of their own (ADR-0067).
+    // The search is the daemon's over plugins; a file is matched here, by its name.
+    const q = pui.query.toLowerCase();
+    const files = failed.map(fileRow).filter((r) => !q || r.name.toLowerCase().includes(q));
     batch(() => {
-      setPlugins(reconcile(list, { key: "id" }));
+      setPlugins(reconcile([...list, ...files], { key: "id" }));
       setVendors(v); setFormats(f);
       if (!pui.query) setCounts("plugins", list.length);
       setLoadError(null); setLoaded(true);
@@ -59,10 +64,10 @@ const rows = createMemo(() => pluginRows(plugins, {
 export const total = () => rows().length;
 export const stats = createMemo(() => pluginStats(rows()));
 export const filtered = () => !!(pui.query || pui.vendor || pui.format || pui.states.length);
-const pageRows = createMemo(() => pageOf(rows(), pui.page));
+const pageRows = createMemo(() => pageOf(rows(), pui.page, pageSize()));
 export const entries = createMemo(() => layout(rows(), pageRows(), pui.group, pui.collapsed));
-export const pageCount = () => lastPage(total()) + 1;
-export const pageSize = PAGE_SIZE;
+export const pageCount = () => lastPage(total(), pageSize()) + 1;
+export const firstPage = () => setPui("page", 0);
 
 export const selectedPlugin = createMemo(() => plugins.find((p) => p.id === pui.selected));
 
@@ -70,7 +75,8 @@ export const selectedPlugin = createMemo(() => plugins.find((p) => p.id === pui.
  *  belong to, so a stale answer is never shown against the next selection. */
 export interface Detail { id: string; details: PluginDetails; projects: Project[] }
 export const [detail, { refetch: refetchDetail }] = createResource(
-  () => pui.selected,
+  // A failed file's row is not a plugin: everything it has is on the row.
+  () => (pui.selected?.startsWith("file:") ? null : pui.selected),
   async (id): Promise<Detail> => {
     const [details, projects] = await Promise.all([api.pluginDetails(id), api.pluginProjects(id)]);
     return { id, details, projects };
@@ -103,9 +109,10 @@ export function setQuery(query: string) {
   load();
 }
 
-/** Scan the plugin folders, then reload what the scan changed. Disabled while any scan
- *  runs, a project scan included (ADR-0038); the daemon answers 409 to a second one. */
-export const scanPlugins = () => runScan("plugins", reloadAfterScan);
+/** Scan the plugin folders, then reload what the scan changed: only new and changed files,
+ *  or every file, retrying failures (ADR-0067). Disabled while any scan runs, a project
+ *  scan included (ADR-0038); the daemon answers 409 to a second one. */
+export const scanPlugins = (mode: PluginScanMode = "changes") => runScan("plugins", reloadAfterScan, mode);
 
 async function reloadAfterScan() {
   await Promise.all([load(), loadChrome()]);

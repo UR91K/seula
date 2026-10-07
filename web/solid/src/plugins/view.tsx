@@ -5,7 +5,7 @@ import { lastScan, scan, shell } from "../shell/shell";
 import type { View } from "../shell/view";
 import { StatusDot } from "./parts";
 import { Inspector } from "./Inspector";
-import { ContextMenu, FormatMenu, GroupMenu, StatesMenu, VendorPicker } from "./Popovers";
+import { ContextMenu, FormatMenu, GroupMenu, ScanMenu, StatesMenu, VendorPicker } from "./Popovers";
 import { PluginTable } from "./Table";
 import { ScanButton, Viewbar } from "./Viewbar";
 import {
@@ -48,9 +48,10 @@ function Status() {
   return (
     <Show when={loaded() && !(plugins.length === 0 && !pui.query)} fallback={<span>No plugins</span>}>
       <span>{filtered() ? `${total()} of ${counts.plugins ?? plugins.length} plugins` : plural(total(), "plugin")}</span>
-      <span><StatusDot installed={true} /> {stats().installed} installed</span>
-      <span><StatusDot installed={false} /> {stats().missing} missing</span>
-      <span><StatusDot installed={null} /> {stats().unscanned} not scanned</span>
+      <span><StatusDot state="installed" /> {stats().installed} installed</span>
+      <span><StatusDot state="absent" /> {stats().missing} missing</span>
+      <Show when={stats().failed}><span><StatusDot state="failed" /> {stats().failed} failed</span></Show>
+      <span><StatusDot state="unscanned" /> {stats().unscanned} not scanned</span>
       <span>{plural(stats().vendors, "vendor")}</span>
       <Show when={!scan() && lastScan()?.kind === "plugins" ? lastScan() : undefined}>{(l) => (
         <span class={l().event.status === "completed" ? "is-installed" : "is-absent"}>
@@ -69,6 +70,7 @@ function Popovers() {
       <Show when={shell.popover === "vendor"}><VendorPicker /></Show>
       <Show when={shell.popover === "states"}><StatesMenu /></Show>
       <Show when={shell.popover === "group"}><GroupMenu /></Show>
+      <Show when={shell.popover === "scan"}><ScanMenu /></Show>
     </>
   );
 }

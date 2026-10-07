@@ -84,6 +84,13 @@ discovery.rs ──► spawner.rs ──[spawn]──► vst-meta (subprocess)
 `seula plugin scan-system` prints results without touching the database — the
 diagnostic view. `seula plugin refresh` scans and persists.
 
+**Two modes** (ADR-0067). Discovery records each file's size and mtime, the total and the
+newest inside a bundle. A scan for changes, the default, loads only files that are new
+or whose size or mtime differs from `plugin_files`. Unchanged files keep what they gave
+last time, a failure included, so a crashing plugin costs its timeout once, not on every
+scan. Rescan all (`refresh --all`, `?mode=all`) loads every file and retries failures. A
+scan for changes still walks every folder, so it can still sweep.
+
 `seula scan` runs the same scan automatically when one has never completed, before
 discovering projects, and reports each plugin as it is attempted under a
 `scanning_plugins` phase. The trigger is a recorded fact in `app_state`, not an empty
@@ -93,10 +100,14 @@ rescan forever. See ADR-0013.
 ## Persisting, and matching
 
 ```
-plugin refresh ──► scan ──► persist_plugin_scan     (src/database/plugin_scan.rs)
+plugin refresh ──► scan ──► persist_plugin_scan_of  (src/database/plugin_scan.rs)
                               upsert on (plugin_kind, uid), installed = 1
                               replace plugin_classes / plugin_buses
-                              sweep unseen -> installed = 0   (full scans only)
+                              record each loaded file in plugin_files, and
+                                link it to its plugins (a failure keeps its links)
+                              forget files no longer found    (full scans only)
+                              sweep plugins no file yields -> installed = 0
+                                                              (full scans only)
                               reconcile phantoms
 
 project scan  ──► parser emits bare references
@@ -114,6 +125,12 @@ inside `finalize_result` — once per project, on every worker thread.
 looked, which is different from having looked and not found it (ADR-0012). A partial
 scan — narrowed with `--paths`, or cut short by the restart budget — skips the sweep,
 because it has no grounds to call anything missing.
+
+**Failed is not a value of `installed`.** A plugin whose every file failed its last scan
+keeps `installed = 1`: the file is there. The HTTP API reports it with a `scan_error`
+from `plugin_files`, and the plugins view shows it as Failed. A file that has never
+loaded has no identity, so no plugin row; `GET /api/v1/plugins/failed-files` lists those
+(not the `invalid_format` ones, which are not plugins). See ADR-0067.
 
 **Phantom reconciliation** is what makes "install the missing plugin, run refresh" work.
 A project can reference a bundle's non-primary class before that bundle is ever scanned;

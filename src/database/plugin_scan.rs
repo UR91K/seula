@@ -4,19 +4,22 @@
 //! transaction. The scan is the only thing that writes `plugins.installed` — parsing a
 //! project never does, because a project file cannot know what is installed.
 
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+
 use chrono::Local;
 use rusqlite::{params, OptionalExtension, Transaction};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use vst_meta::meta::{FormatExtra, PluginMeta};
-use vst_meta::protocol::Outcome;
+use vst_meta::protocol::{ErrorType, Outcome};
 
 use super::models::SqlDateTime;
 use crate::database::ProjectDatabase;
 use crate::error::DatabaseError;
 use crate::models::PluginKey;
-use crate::scan::plugins::ScanReport;
+use crate::scan::plugins::{PluginFile, ScanReport};
 
 /// Records when a full plugin scan last completed.
 ///
@@ -49,35 +52,97 @@ impl ProjectDatabase {
         report: &ScanReport,
         full_scan: bool,
     ) -> Result<PluginScanPersist, DatabaseError> {
+        // Every file the report covers, and nothing else: a scan of exactly these.
+        // Unknown size and mtime never match, so a later scan loads them again.
+        let files: Vec<PluginFile> = report
+            .results
+            .iter()
+            .map(|r| PluginFile {
+                path: r.path.clone(),
+                size: 0,
+                modified: None,
+            })
+            .collect();
+        self.persist_plugin_scan_of(report, &files, full_scan)
+    }
+
+    /// Write a scan of `files`, every plugin file discovery found, of which `report`
+    /// covers the ones the scan loaded (ADR-0067). The files it did not load were
+    /// unchanged, and keep what they gave last time.
+    ///
+    /// A full scan then marks a plugin not installed only when no file found on disk
+    /// yields it. A file that fails keeps the plugins it yielded when it last loaded, so
+    /// a plugin that has started to fail stays installed and reads as failed rather
+    /// than missing.
+    pub fn persist_plugin_scan_of(
+        &mut self,
+        report: &ScanReport,
+        files: &[PluginFile],
+        full_scan: bool,
+    ) -> Result<PluginScanPersist, DatabaseError> {
         let tx = self.conn.transaction()?;
         let mut result = PluginScanPersist::default();
         let now = SqlDateTime::from(Local::now());
-
-        let mut seen: Vec<String> = Vec::new();
+        let stats: HashMap<&Path, &PluginFile> =
+            files.iter().map(|f| (f.path.as_path(), f)).collect();
 
         for scanned in report.results.iter() {
-            let Outcome::Success { plugins } = &scanned.outcome else {
-                continue;
-            };
+            let path = path_text(&scanned.path);
+            let (size, modified) = stats
+                .get(scanned.path.as_path())
+                .map(|f| (f.size as i64, f.modified))
+                .unwrap_or((0, None));
 
-            for meta in plugins {
-                let Some(key) = PluginKey::from_uid_hex(&meta.uid) else {
-                    warn!(
-                        "Skipping scanned plugin with unparseable uid {:?} at {}",
-                        meta.uid, meta.path
-                    );
-                    result.skipped += 1;
-                    continue;
-                };
+            match &scanned.outcome {
+                Outcome::Success { plugins } => {
+                    let mut ids = Vec::new();
+                    for meta in plugins {
+                        let Some(key) = PluginKey::from_uid_hex(&meta.uid) else {
+                            warn!(
+                                "Skipping scanned plugin with unparseable uid {:?} at {}",
+                                meta.uid, meta.path
+                            );
+                            result.skipped += 1;
+                            continue;
+                        };
 
-                let plugin_id = upsert_scanned_plugin(&tx, &key, meta, &now, &mut result)?;
-                replace_child_rows(&tx, &plugin_id, meta)?;
-                seen.push(key.uid_hex());
+                        let plugin_id = upsert_scanned_plugin(&tx, &key, meta, &now, &mut result)?;
+                        replace_child_rows(&tx, &plugin_id, meta)?;
+                        ids.push(plugin_id);
+                    }
+                    record_file(&tx, &path, size, modified, &now, None)?;
+                    tx.execute("DELETE FROM plugin_file_plugins WHERE path = ?", [&path])?;
+                    for id in &ids {
+                        tx.execute(
+                            "INSERT OR IGNORE INTO plugin_file_plugins (path, plugin_id) VALUES (?, ?)",
+                            params![path, id],
+                        )?;
+                    }
+                }
+                // Gone between discovery and loading: nothing to remember.
+                Outcome::Error {
+                    error_type: ErrorType::FileNotFound,
+                    ..
+                } => {
+                    tx.execute("DELETE FROM plugin_files WHERE path = ?", [&path])?;
+                }
+                // Its links, if any, stay: they say which plugin this file was.
+                Outcome::Error { error_type, error } => {
+                    record_file(
+                        &tx,
+                        &path,
+                        size,
+                        modified,
+                        &now,
+                        Some((error_code(*error_type), error.as_str())),
+                    )?;
+                }
             }
         }
 
         if full_scan {
-            result.marked_missing = sweep_unseen(&tx, &seen, &now)?;
+            forget_vanished_files(&tx, files)?;
+            result.marked_missing = sweep_unseen(&tx, &now)?;
         } else {
             debug!("Partial scan: leaving plugins it did not reach untouched");
         }
@@ -343,38 +408,137 @@ fn replace_child_rows(
     Ok(())
 }
 
-/// Mark everything a full scan did not find as not installed.
+/// Mark every plugin no file on disk yields as not installed.
 ///
-/// Only valid after a scan that covered every configured search path: a narrowed or
-/// truncated scan has no grounds to call anything missing.
-fn sweep_unseen(
-    tx: &Transaction,
-    seen: &[String],
-    now: &SqlDateTime,
-) -> Result<usize, DatabaseError> {
-    // Build the exclusion list explicitly rather than with a temp table: a plugin
-    // library is hundreds of rows, not millions.
-    let placeholders = if seen.is_empty() {
-        "''".to_string()
-    } else {
-        std::iter::repeat_n("?", seen.len())
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-
-    let sql = format!(
+/// Only valid after a scan that covered every configured search path, once the files it
+/// did not find are forgotten: a narrowed or truncated scan has no grounds to call
+/// anything missing. A failing file's plugins count as yielded (ADR-0067).
+fn sweep_unseen(tx: &Transaction, now: &SqlDateTime) -> Result<usize, DatabaseError> {
+    Ok(tx.execute(
         "UPDATE plugins
          SET installed = 0, last_scanned_at = ?
-         WHERE uid NOT IN ({}) AND (installed IS NULL OR installed = 1)",
-        placeholders
-    );
+         WHERE id NOT IN (SELECT plugin_id FROM plugin_file_plugins)
+           AND (installed IS NULL OR installed = 1)",
+        [now],
+    )?)
+}
 
-    let mut values: Vec<&dyn rusqlite::ToSql> = vec![now];
-    for uid in seen {
-        values.push(uid);
+/// Record what loading one file gave: `error` is the failure's code and message.
+fn record_file(
+    tx: &Transaction,
+    path: &str,
+    size: i64,
+    modified: Option<i64>,
+    now: &SqlDateTime,
+    error: Option<(&str, &str)>,
+) -> Result<(), DatabaseError> {
+    tx.execute(
+        "INSERT INTO plugin_files (path, size_bytes, modified_at, scanned_at, error_type, error_message)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(path) DO UPDATE SET
+             size_bytes = ?2, modified_at = ?3, scanned_at = ?4, error_type = ?5, error_message = ?6",
+        params![path, size, modified, now, error.map(|e| e.0), error.map(|e| e.1)],
+    )?;
+    Ok(())
+}
+
+/// Forget the files a full scan no longer found, and with them the plugins they yielded.
+fn forget_vanished_files(tx: &Transaction, files: &[PluginFile]) -> Result<(), DatabaseError> {
+    let present: HashSet<String> = files.iter().map(|f| path_text(&f.path)).collect();
+    let known: Vec<String> = tx
+        .prepare("SELECT path FROM plugin_files")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+    for path in known.iter().filter(|p| !present.contains(*p)) {
+        tx.execute("DELETE FROM plugin_files WHERE path = ?", [path])?;
+    }
+    Ok(())
+}
+
+fn path_text(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+/// How a failure is stored and sent: the protocol's own serde names.
+fn error_code(error_type: ErrorType) -> &'static str {
+    match error_type {
+        ErrorType::FileNotFound => "file_not_found",
+        ErrorType::InvalidFormat => "invalid_format",
+        ErrorType::LoadFailed => "load_failed",
+        ErrorType::Timeout => "timeout",
+        ErrorType::Crashed => "crashed",
+    }
+}
+
+/// A plugin file that has never loaded (ADR-0067), so no plugin row stands for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailedPluginFile {
+    pub path: String,
+    /// `crashed`, `timeout` or `load_failed`. Files that are not plugins at all
+    /// (`invalid_format`) are not listed.
+    pub error_type: String,
+    pub error_message: Option<String>,
+    /// Epoch seconds.
+    pub scanned_at: i64,
+}
+
+impl ProjectDatabase {
+    /// Of `files`, the ones whose size and mtime match their last scan (ADR-0067). A
+    /// file with no mtime never matches.
+    pub fn unchanged_plugin_files(
+        &self,
+        files: &[PluginFile],
+    ) -> Result<HashSet<PathBuf>, DatabaseError> {
+        let recorded: HashMap<String, (i64, Option<i64>)> = self
+            .conn
+            .prepare("SELECT path, size_bytes, modified_at FROM plugin_files")?
+            .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?
+            .collect::<Result<_, _>>()?;
+        Ok(files
+            .iter()
+            .filter(|f| {
+                f.modified.is_some()
+                    && recorded.get(&path_text(&f.path)) == Some(&(f.size as i64, f.modified))
+            })
+            .map(|f| f.path.clone())
+            .collect())
     }
 
-    Ok(tx.execute(&sql, values.as_slice())?)
+    /// Plugins whose every file failed its last scan, by id, with how the first one
+    /// failed. They loaded once, so they are known, but no file of theirs loads now.
+    pub fn plugin_scan_errors(&self) -> Result<HashMap<String, String>, DatabaseError> {
+        Ok(self
+            .conn
+            .prepare(
+                "SELECT pfp.plugin_id, MIN(pf.error_type)
+                 FROM plugin_file_plugins pfp JOIN plugin_files pf ON pf.path = pfp.path
+                 GROUP BY pfp.plugin_id
+                 HAVING SUM(pf.error_type IS NULL) = 0",
+            )?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<_, _>>()?)
+    }
+
+    /// Plugin files that failed and have never loaded, by path.
+    pub fn failed_plugin_files(&self) -> Result<Vec<FailedPluginFile>, DatabaseError> {
+        Ok(self
+            .conn
+            .prepare(
+                "SELECT path, error_type, error_message, scanned_at FROM plugin_files pf
+                 WHERE error_type IS NOT NULL AND error_type != 'invalid_format'
+                   AND NOT EXISTS (SELECT 1 FROM plugin_file_plugins pfp WHERE pfp.path = pf.path)
+                 ORDER BY path",
+            )?
+            .query_map([], |row| {
+                Ok(FailedPluginFile {
+                    path: row.get(0)?,
+                    error_type: row.get(1)?,
+                    error_message: row.get(2)?,
+                    scanned_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<_, _>>()?)
+    }
 }
 
 /// Merge rows that a project reference created from a class ID into the bundle that

@@ -22,4 +22,5 @@ Bugs fixed before this list existed are written up there under Resolved. See ADR
 - [ ] 2026-10-07 `list-default-limit-1000` Most list routes answer 1000 rows when no `limit` is given (`limit.unwrap_or(1000)` across src/database/), while projects and search answer every row.
   Unclear whether 1000 was deliberate; asked 2026-10-07. The frontend no longer depends on
   it: it pages to the route's `total_count`.
-- [ ] 2026-10-07 `headers-rendering-over-sidebar` Headers render on top of sidebar at window widths lower than 1144px
+- [x] 2026-10-07 `headers-rendering-over-sidebar` Headers render on top of sidebar at window widths lower than 1144px
+  Fixed 58a9f95.

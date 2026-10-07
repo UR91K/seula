@@ -1,24 +1,13 @@
 // The projects view's toolbar row: filters and paging, or batch actions at >1 selected.
 
 import { Show } from "solid-js";
-import { PAGE_SIZE, plural } from "../../../shared/projects";
+import { plural } from "../../../shared/projects";
 import { Icon, TbBtn } from "../shell/parts";
 import { runScan, scan, setShell, shell } from "../shell/shell";
+import { Pager } from "../shell/toolbar";
 import { load, setQuery, setScope, table as t, ui } from "./state";
 
 
-function Pager() {
-  const from = () => (t.total() ? t.page() * PAGE_SIZE + 1 : 0);
-  const to = () => Math.min(t.total(), (t.page() + 1) * PAGE_SIZE);
-  return (
-    <span class="pager">
-      {from()}–{to()} of {t.total()}
-      <TbBtn icon="chevron_left" title="Previous page" disabled={t.page() === 0} onClick={() => t.goPage(-1)} />
-      <TbBtn icon="chevron_right" title="Next page" disabled={t.page() >= t.pageCount() - 1} onClick={() => t.goPage(1)} />
-      <span class="select"><span class="k">Show</span> {PAGE_SIZE} <Icon name="expand_more" /></span>
-    </span>
-  );
-}
 
 function Batch() {
   // Tag, collection and archive edits are not part of this comparison; the buttons are
@@ -66,7 +55,7 @@ export function Viewbar() {
           <TbBtn icon="refresh" label="Scan" title="Scan the project folders" disabled={!!scan()} onClick={() => runScan("projects", load)} />
           <TbBtn icon="speed" label="Simulate" title="A stand-in scan of 600 events at 40 a second" disabled={!!scan()} onClick={() => runScan("simulated", load)} />
           <span class="grow" />
-          <Pager />
+          <Pager page={t.page()} total={t.total()} pages={t.pageCount()} onPage={t.goPage} onSize={t.firstPage} />
         </>}>
         <Batch />
       </Show>

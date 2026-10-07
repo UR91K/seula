@@ -8,7 +8,7 @@ import { Icon, TbBtn } from "../shell/parts";
 import { scan } from "../shell/shell";
 import { FilterSelect, Pager } from "../shell/toolbar";
 import {
-  checkSamples, formats, goPage, loaded, pageCount, pageSize, samples, setFormat, setPresence, setQuery, sui, total,
+  checkSamples, firstPage, formats, goPage, loaded, pageCount, samples, setFormat, setPresence, setQuery, sui, total,
 } from "./state";
 
 export function CheckButton(): JSX.Element {
@@ -39,7 +39,7 @@ export function Viewbar() {
         <span class="sep" />
         <CheckButton />
         <span class="grow" />
-        <Pager page={sui.page} total={total()} size={pageSize} pages={pageCount()} onPage={goPage} />
+        <Pager page={sui.page} total={total()} pages={pageCount()} onPage={goPage} onSize={firstPage} />
       </Show>
     </>
   );

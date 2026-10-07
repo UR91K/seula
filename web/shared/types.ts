@@ -55,6 +55,15 @@ export interface PluginRow {
   id: string; dev_identifier: string; name: string; format: string;
   installed: boolean | null; vendor: string | null; version: string | null;
   project_count: number;
+  /** How its file failed the last scan, when every file of it did (ADR-0067). */
+  scan_error?: string | null;
+  /** Set on a row that stands for a file that never loaded, not for a plugin. */
+  file?: FailedPluginFile;
+}
+
+/** GET /plugins/failed-files: a plugin file that failed and has never loaded (ADR-0067). */
+export interface FailedPluginFile {
+  path: string; error_type: string; error_message: string | null; scanned_at: number;
 }
 
 /** GET /plugins/vendors and /plugins/formats: one rollup row per vendor or format. */

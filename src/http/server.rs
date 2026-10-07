@@ -213,6 +213,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/v1/plugins/scan", post(plugin_handlers::scan_plugins))
         .route(
+            "/api/v1/plugins/failed-files",
+            get(plugin_handlers::get_failed_plugin_files),
+        )
+        .route(
             "/api/v1/plugins/:plugin_id",
             get(plugin_handlers::get_plugin),
         )

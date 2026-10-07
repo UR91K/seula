@@ -4,10 +4,10 @@
 
 import { batch, createMemo, createResource, createSignal, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { PAGE_SIZE, lastPage, pageOf } from "../../../shared/projects";
+import { lastPage, pageOf } from "../../../shared/projects";
 import { DEFAULT_SAMPLE_SORT, nextSampleSort, sampleRows, sampleStats, type Presence } from "../../../shared/samples";
 import type { Project, SampleFile, SampleFormat, SampleRow, Sort } from "../../../shared/types";
-import { api, closePopups, loadChrome, runScan, setCounts, setNotice, showProjectsMatching } from "../shell/shell";
+import { api, closePopups, loadChrome, pageSize, runScan, setCounts, setNotice, showProjectsMatching } from "../shell/shell";
 
 export const [sui, setSui] = createStore({
   query: "",
@@ -48,9 +48,9 @@ const rows = createMemo(() => sampleRows(samples, { format: sui.format, presence
 export const total = () => rows().length;
 export const stats = createMemo(() => sampleStats(rows()));
 export const filtered = () => !!(sui.query || sui.format || sui.presence);
-export const pageRows = createMemo(() => pageOf(rows(), sui.page));
-export const pageCount = () => lastPage(total()) + 1;
-export const pageSize = PAGE_SIZE;
+export const pageRows = createMemo(() => pageOf(rows(), sui.page, pageSize()));
+export const pageCount = () => lastPage(total(), pageSize()) + 1;
+export const firstPage = () => setSui("page", 0);
 
 export const selectedSample = createMemo(() => samples.find((s) => s.id === sui.selected));
 

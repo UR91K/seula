@@ -298,8 +298,9 @@ impl ProjectDatabase {
     /// scan is picked up here without reparsing any project file (ADR-0009).
     pub fn record_plugin_refresh(
         &mut self,
-        report: &crate::scan::plugins::ScanReport,
+        scan: &crate::scan::plugins::PluginScan,
     ) -> Result<PluginRefreshResult, DatabaseError> {
+        let report = &scan.report;
         // Only a scan that covered every configured search path may declare anything
         // missing. A truncated one reports what it saw and leaves the rest alone.
         let full_scan = !report.budget_exhausted;
@@ -307,7 +308,7 @@ impl ProjectDatabase {
         let candidates_scanned = report.results.len() as i32;
         let scan_failures = report.failed() as i32;
 
-        let persisted = self.persist_plugin_scan(report, full_scan)?;
+        let persisted = self.persist_plugin_scan_of(report, &scan.files, full_scan)?;
 
         Ok(PluginRefreshResult {
             candidates_scanned,
@@ -315,6 +316,7 @@ impl ProjectDatabase {
             plugins_missing: persisted.marked_missing as i32,
             plugins_reconciled: persisted.reconciled as i32,
             scan_failures,
+            unchanged: scan.unchanged as i32,
         })
     }
 
@@ -812,6 +814,9 @@ pub struct PluginRefreshResult {
     pub plugins_reconciled: i32,
     /// Binaries that would not load — usually genuinely broken.
     pub scan_failures: i32,
+    /// Binaries skipped because they had not changed since they were last loaded
+    /// (ADR-0067). Their plugins, and their failures, are as last time.
+    pub unchanged: i32,
 }
 
 #[derive(serde::Serialize)]

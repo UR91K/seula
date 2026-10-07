@@ -41,6 +41,10 @@ pub struct PluginDto {
     pub vendor: Option<String>,
     pub version: Option<String>,
     pub project_count: i32,
+    /// How its file failed the last scan, when every file of this plugin did (ADR-0067):
+    /// `crashed`, `timeout`, `load_failed` or `invalid_format`. It loaded once, so it is
+    /// known; the plugins view shows it as Failed. The handler fills it in.
+    pub scan_error: Option<String>,
 }
 
 impl From<GrpcPlugin> for PluginDto {
@@ -54,6 +58,7 @@ impl From<GrpcPlugin> for PluginDto {
             vendor: grpc_plugin.plugin.vendor,
             version: grpc_plugin.plugin.version,
             project_count: grpc_plugin.project_count,
+            scan_error: None,
         }
     }
 }
@@ -70,6 +75,7 @@ impl PluginDto {
             vendor: plugin.vendor,
             version: plugin.version,
             project_count,
+            scan_error: None,
         }
     }
 }
@@ -181,6 +187,30 @@ pub struct PluginScanEventDto {
     #[serde(flatten)]
     pub progress: crate::http::dto::system::ScanProgressDto,
     pub result: Option<crate::database::plugins::PluginRefreshResult>,
+}
+
+/// `?mode=changes` (the default) loads only new and changed plugin files; `?mode=all`
+/// loads every one, retrying failures (ADR-0067).
+#[derive(Deserialize)]
+pub struct ScanModeQuery {
+    pub mode: Option<String>,
+}
+
+/// A plugin file that failed and has never loaded, so no plugin row stands for it
+/// (ADR-0067).
+#[derive(Serialize)]
+pub struct FailedPluginFileDto {
+    pub path: String,
+    /// `crashed`, `timeout` or `load_failed`.
+    pub error_type: String,
+    pub error_message: Option<String>,
+    /// Epoch seconds.
+    pub scanned_at: i64,
+}
+
+#[derive(Serialize)]
+pub struct FailedPluginFilesResponse {
+    pub files: Vec<FailedPluginFileDto>,
 }
 
 #[derive(Deserialize)]

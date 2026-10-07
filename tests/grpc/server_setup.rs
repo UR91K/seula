@@ -269,7 +269,11 @@ mod tests {
         let system = &server.system_handler.service;
         *system.scan_status_handle().lock().await = ScanStatus::ScanParsing;
 
-        assert!(!system.start_plugin_scan(|_, _| {}).await);
+        assert!(
+            !system
+                .start_plugin_scan(seula::scan::plugins::ScanMode::Changes, |_, _| {})
+                .await
+        );
         assert!(!system.start_sample_check(|_, _| {}).await);
         assert!(!system.start_scan(|_| {}).await);
         assert_eq!(
@@ -281,6 +285,10 @@ mod tests {
         assert!(!system.start_scan(|_| {}).await);
 
         *system.scan_status_handle().lock().await = ScanStatus::ScanCheckingSamples;
-        assert!(!system.start_plugin_scan(|_, _| {}).await);
+        assert!(
+            !system
+                .start_plugin_scan(seula::scan::plugins::ScanMode::Changes, |_, _| {})
+                .await
+        );
     }
 }

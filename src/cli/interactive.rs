@@ -759,7 +759,7 @@ impl InteractiveCli {
                         }
                     }
                     "stats" => PluginCommands::Stats,
-                    "refresh" => PluginCommands::Refresh,
+                    "refresh" => PluginCommands::Refresh { all: false },
                     "vendors" => PluginCommands::Vendors,
                     "formats" => PluginCommands::Formats,
                     _ => {

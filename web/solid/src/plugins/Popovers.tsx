@@ -2,13 +2,14 @@
 // dropdowns. Each is placed against the window once it is in the DOM (shared/place.ts).
 
 import { For, Show, onMount, type JSX } from "solid-js";
-import { INSTALL_STATES, type Group } from "../../../shared/plugins";
+import { INSTALL_STATES, type Group, type InstallState } from "../../../shared/plugins";
 import { place, type Placement } from "../../../shared/place";
 import { Cb, Icon } from "../shell/parts";
 import { api, setShell, showInExplorer } from "../shell/shell";
 import { StatusDot } from "./parts";
 import {
-  copyName, formats, plugins, pui, setFormat, setGroup, setPui, setVendor, showProjectsUsing, stats, toggleState, vendors,
+  copyName, formats, plugins, pui, scanPlugins, setFormat, setGroup, setPui, setVendor, showProjectsUsing, stats,
+  toggleState, vendors,
 } from "./state";
 
 /** Mount-time placement: find the window and put the popover where it belongs. */
@@ -45,19 +46,35 @@ export function ContextMenu(props: { menu: { id: string; x: number; y: number } 
   const explorer = async () => {
     const x = p();
     if (!x) return;
-    const path = (await api.pluginDetails(x.id)).path;
+    // A failed file's row has its path; a plugin's is in what the scan recorded.
+    const path = x.file?.path ?? (await api.pluginDetails(x.id)).path;
     if (path) showInExplorer(path);
   };
   return (
     <Show when={p()}>{(x) => (
       <div class="pop menu" ref={placed(() => ({ x: props.menu.x, y: props.menu.y }))}>
-        {item("folder_open", "Show in Explorer", { off: x().installed !== true, act: explorer })}
+        {item("folder_open", "Show in Explorer", { off: x().installed !== true && !x().file, act: explorer })}
         {item("audio_file", `Show the ${x().project_count} ${x().project_count === 1 ? "project" : "projects"} using it`,
           { off: !x().project_count, act: () => showProjectsUsing(x()) })}
         <div class="sep" />
         {item("content_copy", "Copy name", { act: () => copyName(x()) })}
       </div>
     )}</Show>
+  );
+}
+
+/** Under the scan button's caret: the two scans (ADR-0067). */
+export function ScanMenu() {
+  const item = (icon: string, label: string, title: string, mode: "changes" | "all") => (
+    <div class="mi" title={title} onClick={() => { setShell("popover", null); scanPlugins(mode); }}>
+      <Icon name={icon} /><span class="lbl">{label}</span>
+    </div>
+  );
+  return (
+    <div class="pop menu" ref={placed(anchorFor("scan"))}>
+      {item("radar", "Scan for changes", "Load only plugin files that are new or have changed. Files that failed are left as they are.", "changes")}
+      {item("refresh", "Rescan all", "Load every plugin file again, retrying the ones that failed. Takes minutes.", "all")}
+    </div>
   );
 }
 
@@ -113,23 +130,23 @@ export function VendorPicker() {
   );
 }
 
-/** Status ▾: any of the three states (ADR-0025), each with its library count. */
+/** Status ▾: any of the four states (ADR-0025, ADR-0067), each with its library count. */
 export function StatesMenu() {
-  const n = (id: string) => {
+  const n = (id: InstallState) => {
     const s = stats();
-    return id === "installed" ? s.installed : id === "absent" ? s.missing : s.unscanned;
+    return { installed: s.installed, absent: s.missing, failed: s.failed, unscanned: s.unscanned }[id];
   };
   return (
     <div class="pop picker pickmenu" ref={placed(anchorFor("states"))}>
       <div class="list" style={{ "padding-top": "var(--u)" }}>
         <For each={INSTALL_STATES}>{(s) => (
           <div class="it" onClick={() => toggleState(s.id)}>
-            <Cb state={pui.states.includes(s.id)} /><StatusDot installed={s.value} />
+            <Cb state={pui.states.includes(s.id)} /><StatusDot state={s.id} />
             <span class="grow">{s.label}</span><span class="n">{n(s.id)}</span>
           </div>
         )}</For>
       </div>
-      <div class="hint">None ticked shows all. Not scanned is not missing: no scan has looked yet.</div>
+      <div class="hint">None ticked shows all. Not scanned is not missing: no scan has looked yet. Failed is there but did not load.</div>
     </div>
   );
 }
