@@ -93,15 +93,16 @@ were found by the first CI run on a clean runner.
 `cargo test --workspace` no longer runs them; use
 `cargo test --workspace --tests -- --ignored` for the heavy pass. See CLAUDE.md.
 
+Accepted limitations and noise. Bugs, things that should be fixed, are in `docs/bugs.md`
+(ADR-0065).
+
 | Issue | Where | Severity |
 |---|---|---|
-| `test_process_projects_integration` fails on `._*.als` AppleDouble sidecars found in the configured project folders. They parse as `.als`, fail, and never reach the DB — while the test asserts every discovered `.als` is present. Environment-dependent. Fixing it means deciding whether the scanner should skip `._` files. | `tests/integration/scanning.rs` | Low, but it keeps the suite red |
-| `test_process_projects_with_progress` fails only when run alongside `test_process_projects_integration`. Both scan the real configured folders and write the same real database concurrently. Passes serially (`--test-threads=1`) and in isolation. Pre-existing test-isolation issue, not a product defect. Both are now `#[ignore]`d (2026-09-16, CLAUDE.md) so this only surfaces under `cargo test --tests -- --ignored`. | `tests/integration/scanning.rs` | Low |
 | `4-DUNE.als` (found 2026-10-04 in a test folder) starts `AB 1E 56 78`, not a gzip header, so the parser cannot read it. Live 12 opens it fine (maintainer), and it holds Live class names (`LiveDocument`, `ClipSlot`, `RemoteableSlot`) and UTF-16 strings, so it is a real Live set in a binary container, not a corrupt file. **Probably a pre-8.2 set.** The abletoolz source (`abletoolz/versioning.py`) states that Live sets before 8.2 use a different container with the `0xab1e` magic, and rejects them. Supporting evidence, all inference: the file embeds "Programmed By Rob Lee, www.basslinerecords.com" (looks like a downloaded template) and loads the `DUNE` plugin from `C:\Program Files\VstPlugins`. The maintainer now thinks it came from a DUNE preset pack on a sample CD, not from their own work (the file name looked like one of theirs, which is why they first assumed it was). That is a recollection too. Their first guess, a Live 11.0 save from February 2022 (they have only used Live 9.7.1 to 12.2), does not fit: Live 10 and 12 saves are gzipped XML, and the date is a recollection, not something in the file. The scan now reports `FileError::UnsupportedVersion` ("sets from before Live 8.2 are not supported") for that header, not "invalid gzip header", and skips the file. **Needs a closer look later:** neither dawtool nor abletoolz reads this format. abletoolz's `.asd` reader parses the same container (`AB 1E 56 78`, version byte, class-schema table), and on this file it reads the header and all 89 class definitions, then fails about 11% into the data. Version 3 differs from the `.asd` fixtures in two known ways: strings are `00 <kind> <len> <bytes>` and list elements carry an extra u32. Whether a reader is worth writing for one file is open; to use the project now, re-save it from Live 12. | `src/utils.rs`, `tests/utils/decompress.rs` | Low |
 | ~16 iZotope helper DLLs in the VST3 folder are scanned and correctly classified `invalid_format`. Noise, not a bug. Filtering by heuristic risks dropping real VST2 plugins. | `src/scan/plugins/discovery.rs` | Cosmetic |
 | Two `vst` crate deprecation warnings | `crates/vst-meta/src/scan.rs` | Upstream |
 
-Resolved:
+Resolved, before `docs/bugs.md` existed (2026-10-07); new bugs are logged and ticked there:
 
 - **The sample list took 8 to 14 seconds on a real library** (found 2026-10-07, fixed
   2026-10-07). `GET /api/v1/samples?limit=10000` took 14.0 s in debug and 8.1 s in
@@ -110,16 +111,6 @@ Resolved:
   probed each against all 500 ids of a chunk. A `CROSS JOIN` makes it start from the ids:
   0.40 s in debug, 0.19 s in release. ADR-0064. Regression test:
   `counts_start_from_the_ids_not_from_every_project` (`src/database/project_counts.rs`).
-- **Search, samples and every other list stopped at a fixed row count** (found 2026-10-07,
-  fixed 2026-10-07). The frontend asked for `limit=200` on search, which the projects
-  board's mockup snapshot had used, and `limit=10000` everywhere else, and showed what came
-  back as the whole list. On the maintainer's library a plugin's "show the projects using
-  it" stopped at 200 projects (FabFilter Pro-Q 3 is in 1,184), and the samples view at
-  10,000 of 18,243. Leaving the limit out does not help: most list queries default to 1000
-  rows (`limit.unwrap_or(1000)` in `src/database/`), while projects and search return
-  everything. The client now reads each list in pages until it has the route's
-  `total_count`, and throws if they do not match. Regression test: `web/shared/api.test.ts`
-  (`npm test` in `web/solid`, also run by CI).
 - **Search, samples and every other list stopped at a fixed row count** (found 2026-10-07,
   fixed 2026-10-07). The frontend asked for `limit=200` on search, which the projects
   board's mockup snapshot had used, and `limit=10000` everywhere else, and showed what came

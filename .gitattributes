@@ -1,0 +1,4 @@
+# The bug list is append-mostly, one line per bug: a union merge keeps both branches'
+# new lines instead of conflicting on them (ADR-0065). LF so `just bug` can append the
+# same bytes on every platform.
+docs/bugs.md merge=union eol=lf

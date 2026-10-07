@@ -149,3 +149,83 @@ fn every_adr_declares_a_status_and_confidence() {
         problems.join("\n")
     );
 }
+
+/// `docs/bugs.md` (ADR-0065): every entry reads `- [ ] YYYY-MM-DD `name` text`, names are
+/// unique (`merge=union` would happily keep two branches' entries under one name), and a
+/// ticked entry says how it closed.
+#[test]
+fn bug_list_entries_are_well_formed() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let text = fs::read_to_string(root.join("docs").join("bugs.md")).expect("docs/bugs.md");
+
+    let mut names = BTreeSet::new();
+    let mut problems = Vec::new();
+    let lines: Vec<&str> = text.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        let Some(rest) = line
+            .strip_prefix("- [ ] ")
+            .or_else(|| line.strip_prefix("- [x] "))
+        else {
+            continue;
+        };
+        let at = format!("  line {}", i + 1);
+        let (date, rest) = rest.split_at(rest.len().min(10));
+        let date_ok = date.len() == 10
+            && date.char_indices().all(|(j, c)| match j {
+                4 | 7 => c == '-',
+                _ => c.is_ascii_digit(),
+            });
+        if !date_ok {
+            problems.push(format!("{at}: no YYYY-MM-DD date"));
+            continue;
+        }
+        let Some(name) = rest
+            .strip_prefix(" `")
+            .and_then(|r| r.split_once('`'))
+            .map(|(name, _)| name)
+        else {
+            problems.push(format!("{at}: no `name` after the date"));
+            continue;
+        };
+        let kebab = !name.is_empty()
+            && !name.starts_with('-')
+            && !name.ends_with('-')
+            && !name.contains("--")
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if !kebab {
+            problems.push(format!("{at}: `{name}` is not short kebab-case"));
+        }
+        if !names.insert(name.to_string()) {
+            problems.push(format!("{at}: `{name}` is used twice"));
+        }
+        if line.starts_with("- [x]") {
+            // The entry and its indented continuation lines.
+            let block: Vec<&str> = std::iter::once(*line)
+                .chain(
+                    lines[i + 1..]
+                        .iter()
+                        .copied()
+                        .take_while(|l| l.starts_with("  ")),
+                )
+                .collect();
+            let block = block.join(" ");
+            if !["Fixed ", "Not a bug", "Won't fix"]
+                .iter()
+                .any(|close| block.contains(close))
+            {
+                problems.push(format!(
+                    "{at}: `{name}` is ticked but says neither `Fixed <commit>`, \
+                     `Not a bug` nor `Won't fix`"
+                ));
+            }
+        }
+    }
+
+    assert!(
+        problems.is_empty(),
+        "Malformed entries in docs/bugs.md:\n{}",
+        problems.join("\n")
+    );
+}

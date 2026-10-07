@@ -59,6 +59,44 @@ check: _npm
     cd web/solid; npm run build
     cd web/solid; npm run lint
 
+# Log a bug in docs/bugs.md: `just bug search-cap "Search stops at 200 rows"` (ADR-0065)
+[windows]
+[positional-arguments]
+[script("powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File")]
+[extension(".ps1")]
+bug name +description:
+    $ErrorActionPreference = 'Stop'
+    $name = $args[0]
+    $text = ($args[1..($args.Count - 1)] -join ' ').Trim()
+    $file = 'docs/bugs.md'
+    if ($name -cnotmatch '^[a-z0-9]+(-[a-z0-9]+)*$') { Write-Host "the name is short kebab-case, like search-cap, not '$name'"; exit 1 }
+    if (-not $text) { Write-Host 'a bug needs a description'; exit 1 }
+    if (Select-String -Path $file -SimpleMatch -Pattern "``$name``" -Quiet) { Write-Host "``$name`` is already in $file; pick another name"; exit 1 }
+    $line = "- [ ] $(Get-Date -Format 'yyyy-MM-dd') ``$name`` $text"
+    $bytes = [IO.File]::ReadAllBytes((Resolve-Path $file))
+    $lead = if ($bytes.Length -and $bytes[-1] -ne 10) { "`n" } else { '' }
+    [IO.File]::AppendAllText((Resolve-Path $file), "$lead$line`n", [Text.UTF8Encoding]::new($false))
+    Write-Host $line
+
+# Log a bug in docs/bugs.md: `just bug search-cap "Search stops at 200 rows"` (ADR-0065)
+[unix]
+[positional-arguments]
+[script("bash")]
+bug name +description:
+    set -euo pipefail
+    name=$1; shift; text="$*"; file=docs/bugs.md
+    [[ $name =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "the name is short kebab-case, like search-cap, not '$name'"; exit 1; }
+    [[ -n ${text// } ]] || { echo 'a bug needs a description'; exit 1; }
+    ! grep -qF "\`$name\`" "$file" || { echo "\`$name\` is already in $file; pick another name"; exit 1; }
+    line="- [ ] $(date +%F) \`$name\` $text"
+    [[ -z $(tail -c1 "$file") ]] || echo >> "$file"
+    echo "$line" >> "$file"
+    echo "$line"
+
+# The open bugs in docs/bugs.md
+bugs:
+    @git grep --no-index -h -e '^- \[ \]' -- docs/bugs.md; exit 0
+
 # Listed first so a mistyped `data` fails before anything is built.
 [private]
 _ready data: (_data data) _npm build

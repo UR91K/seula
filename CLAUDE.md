@@ -122,7 +122,7 @@ than the code. If something looks wrong-shaped, has no ADR, and the tests pass:
 | "Deliberate, because X" | new ADR, `Accepted (retrospective)` |
 | "I looked at changing it and decided not to" | new ADR, `Reaffirmed` |
 | "No idea, that's just what I wrote" | new ADR, `Incidental` — say what now depends on it |
-| "That's a bug" | fix it, add a regression test, note it in `docs/status.md` |
+| "That's a bug" | fix it, add a regression test, tick its line in `docs/bugs.md` (`just bug` adds one) |
 | Too small to be a decision | a `//` note at the site |
 
 Batch questions and ask at a natural pause, unless the answer changes what you do next.
@@ -143,7 +143,7 @@ maintainer's memory is the only source for them, and the only one that decays.
 
 - `test_process_projects_integration` fails on `._*.als` — macOS AppleDouble sidecar
   files in the configured project folders. Environment-dependent, pre-existing.
-  Tracked in `docs/status.md`.
+  Tracked in `docs/bugs.md` as `appledouble-sidecars-scanned`.
 - Two `vst` crate deprecation warnings in `crates/vst-meta` — upstream, unavoidable.
 
 ## Documentation
@@ -153,6 +153,7 @@ maintainer's memory is the only source for them, and the only one that decays.
 | Question | Where it is answered |
 |---|---|
 | What state is X in? | `docs/status.md` — the only place status lives |
+| What is broken? | `docs/bugs.md` — one line per bug; `just bug <name> <description>` |
 | Why is it built this way? | `docs/decisions/` — ADRs, append-only, never edited |
 | How do the pieces fit? | `docs/architecture/` |
 | How does this module work? | the `//!` header in the module itself |

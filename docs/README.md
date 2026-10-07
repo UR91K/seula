@@ -9,6 +9,7 @@ month.
 | Kind of information | Home | Mutable? |
 |---|---|---|
 | What state a subsystem is in | `status.md` | Yes — this is the only status source |
+| What is broken, and whether it is fixed | `bugs.md` | Yes — one line per bug (ADR-0065) |
 | Why a choice was made | `decisions/` (ADRs) | **No** — append-only |
 | How the pieces fit together | `architecture/` | Yes |
 | How one module works | the `//!` header in that file | Yes |
@@ -45,6 +46,14 @@ git*, or *inferred from code*. That word tells the reader how much weight the st
 rationale can bear, which is the thing retrospective ADRs most often get wrong. Do not
 invent a rationale you do not have — an `Incidental` record is more useful than a
 plausible fiction, because a fiction manufactures confidence in a choice nobody made.
+
+## Bugs
+
+`bugs.md` is a checklist, one line per bug, so a bug can be written down in the middle
+of a review without stopping: `just bug <name> <description>` appends one, and
+`just bugs` lists the open ones. A fixed bug is ticked with its commit; why it broke
+belongs in that commit's message. Accepted limitations that will not be fixed stay in
+`status.md` under Known issues. See ADR-0065.
 
 ## Writing paths
 
