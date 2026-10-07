@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint src",
+    "test": "vitest run",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "typescript": "~5.9.0",
     "typescript-eslint": "^8",
     "vite": "^7",
-    "vite-plugin-solid": "^2.11.0"
+    "vite-plugin-solid": "^2.11.0",
+    "vitest": "^5.0.3"
   }
 }

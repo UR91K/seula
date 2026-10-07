@@ -9,7 +9,10 @@ import type {
  *  50052; override with VITE_SEULA_URL. */
 export const DEFAULT_URL = "http://127.0.0.1:50152";
 
-const BIG = "limit=10000";
+/** Rows per request when reading a whole list. The list routes page, and most answer 1000
+ *  rows when no limit is given (`limit.unwrap_or(1000)` in src/database), so leaving the
+ *  limit out does not mean everything. */
+const PAGE = 5000;
 
 export class Api {
   constructor(readonly base: string = DEFAULT_URL) {}
@@ -20,23 +23,42 @@ export class Api {
     return res.json() as Promise<T>;
   }
 
+  /** Every row of a list route, read a page at a time. Throws when the rows read do not add
+   *  up to the route's own `total_count`: fixed limits (200, then 10000) once cut search and
+   *  samples short with nothing on screen to say so. */
+  private async all<T>(path: string, key: string): Promise<T[]> {
+    const sep = path.includes("?") ? "&" : "?";
+    const rows: T[] = [];
+    for (;;) {
+      const page = await this.json<{ total_count: number } & Record<string, unknown>>(
+        `${path}${sep}limit=${PAGE}&offset=${rows.length}`);
+      const got = page[key] as T[];
+      rows.push(...got);
+      if (got.length < PAGE || rows.length >= page.total_count) {
+        if (rows.length !== page.total_count) {
+          throw new Error(`GET ${path}: read ${rows.length} rows, the daemon counts ${page.total_count}`);
+        }
+        return rows;
+      }
+    }
+  }
+
   /** A write whose answer carries nothing the screen needs. */
   private async send(path: string, init: RequestInit): Promise<void> {
     const res = await fetch(this.base + path, init);
     if (!res.ok) throw new Error(`${init.method} ${path}: ${res.status} ${await res.text()}`);
   }
 
-  async projects(scope: Scope): Promise<Project[]> {
-    const q = scope === "archived" ? "scope=deleted&" : "";
-    return (await this.json<{ projects: Project[] }>(`/api/v1/projects?${q}${BIG}`)).projects;
+  projects(scope: Scope): Promise<Project[]> {
+    return this.all(scope === "archived" ? "/api/v1/projects?scope=deleted" : "/api/v1/projects", "projects");
   }
 
-  async search(query: string): Promise<Project[]> {
-    return (await this.json<{ projects: Project[] }>(`/api/v1/search?query=${encodeURIComponent(query)}&limit=200`)).projects;
+  search(query: string): Promise<Project[]> {
+    return this.all(`/api/v1/search?query=${encodeURIComponent(query)}`, "projects");
   }
 
-  async collections(): Promise<Collection[]> {
-    return (await this.json<{ collections: Collection[] }>(`/api/v1/collections?${BIG}`)).collections;
+  collections(): Promise<Collection[]> {
+    return this.all("/api/v1/collections", "collections");
   }
 
   systemInfo() { return this.json<SystemInfo>("/api/v1/system/info"); }
@@ -64,14 +86,12 @@ export class Api {
 
   /** The server sorts this list (unlike plugins and samples), counting in the active scope
    *  (ADR-0043). */
-  async collectionList(sortBy: CollectionSortKey, desc: boolean): Promise<CollectionRow[]> {
-    return (await this.json<{ collections: CollectionRow[] }>(
-      `/api/v1/collections?sort_by=${sortBy}&sort_desc=${desc}&${BIG}`)).collections;
+  collectionList(sortBy: CollectionSortKey, desc: boolean): Promise<CollectionRow[]> {
+    return this.all(`/api/v1/collections?sort_by=${sortBy}&sort_desc=${desc}`, "collections");
   }
 
-  async searchCollections(query: string): Promise<CollectionRow[]> {
-    return (await this.json<{ collections: CollectionRow[] }>(
-      `/api/v1/collections/search?query=${encodeURIComponent(query)}&${BIG}`)).collections;
+  searchCollections(query: string): Promise<CollectionRow[]> {
+    return this.all(`/api/v1/collections/search?query=${encodeURIComponent(query)}`, "collections");
   }
 
   collectionStats(id: string) { return this.json<CollectionStats>(`/api/v1/collections/${id}/statistics`); }
@@ -130,17 +150,16 @@ export class Api {
 
   // ---------------------------------------------------------------- plugins
 
-  async plugins(): Promise<PluginRow[]> {
-    return (await this.json<{ plugins: PluginRow[] }>(`/api/v1/plugins?${BIG}`)).plugins;
+  plugins(): Promise<PluginRow[]> {
+    return this.all("/api/v1/plugins", "plugins");
   }
 
-  async searchPlugins(query: string): Promise<PluginRow[]> {
-    return (await this.json<{ plugins: PluginRow[] }>(
-      `/api/v1/plugins/search?query=${encodeURIComponent(query)}&${BIG}`)).plugins;
+  searchPlugins(query: string): Promise<PluginRow[]> {
+    return this.all(`/api/v1/plugins/search?query=${encodeURIComponent(query)}`, "plugins");
   }
 
-  async vendors(): Promise<VendorRollup[]> {
-    return (await this.json<{ vendors: VendorRollup[] }>(`/api/v1/plugins/vendors?${BIG}`)).vendors;
+  vendors(): Promise<VendorRollup[]> {
+    return this.all("/api/v1/plugins/vendors", "vendors");
   }
 
   async formats(): Promise<FormatRollup[]> {
@@ -151,19 +170,18 @@ export class Api {
     return (await this.json<{ details: PluginDetails }>(`/api/v1/plugins/${id}`)).details;
   }
 
-  async pluginProjects(id: string): Promise<Project[]> {
-    return (await this.json<{ projects: Project[] }>(`/api/v1/plugins/${id}/projects?${BIG}`)).projects;
+  pluginProjects(id: string): Promise<Project[]> {
+    return this.all(`/api/v1/plugins/${id}/projects`, "projects");
   }
 
   // ---------------------------------------------------------------- samples
 
-  async samples(): Promise<SampleRow[]> {
-    return (await this.json<{ samples: SampleRow[] }>(`/api/v1/samples?${BIG}`)).samples;
+  samples(): Promise<SampleRow[]> {
+    return this.all("/api/v1/samples", "samples");
   }
 
-  async searchSamples(query: string): Promise<SampleRow[]> {
-    return (await this.json<{ samples: SampleRow[] }>(
-      `/api/v1/samples/search?query=${encodeURIComponent(query)}&${BIG}`)).samples;
+  searchSamples(query: string): Promise<SampleRow[]> {
+    return this.all(`/api/v1/samples/search?query=${encodeURIComponent(query)}`, "samples");
   }
 
   async sampleFormats(): Promise<SampleFormat[]> {
@@ -175,8 +193,8 @@ export class Api {
     return (await this.json<{ file: SampleFile | null }>(`/api/v1/samples/${id}`)).file;
   }
 
-  async sampleProjects(id: string): Promise<Project[]> {
-    return (await this.json<{ projects: Project[] }>(`/api/v1/samples/${id}/projects?${BIG}`)).projects;
+  sampleProjects(id: string): Promise<Project[]> {
+    return this.all(`/api/v1/samples/${id}/projects`, "projects");
   }
 
   // ---------------------------------------------------------------- scans

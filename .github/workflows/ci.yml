@@ -68,7 +68,7 @@ jobs:
 
   # The Solid frontend. Cheap, and independent of the Rust jobs.
   web:
-    name: Web (typecheck, lint, build)
+    name: Web (typecheck, lint, test, build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -83,6 +83,7 @@ jobs:
           cache-dependency-path: web/solid/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       # `build` is `tsc --noEmit && vite build`, so this is the typecheck too.
       - run: npm run build
 

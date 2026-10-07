@@ -10,7 +10,9 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // ../shared has no node_modules of its own; its tests import vitest from here.
+    "paths": { "vitest": ["./node_modules/vitest"] }
   },
   "include": ["src", "../shared"]
 }

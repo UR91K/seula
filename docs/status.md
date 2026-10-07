@@ -103,6 +103,16 @@ were found by the first CI run on a clean runner.
 
 Resolved:
 
+- **Search, samples and every other list stopped at a fixed row count** (found 2026-10-07,
+  fixed 2026-10-07). The frontend asked for `limit=200` on search, which the projects
+  board's mockup snapshot had used, and `limit=10000` everywhere else, and showed what came
+  back as the whole list. On the maintainer's library a plugin's "show the projects using
+  it" stopped at 200 projects (FabFilter Pro-Q 3 is in 1,184), and the samples view at
+  10,000 of 18,243. Leaving the limit out does not help: most list queries default to 1000
+  rows (`limit.unwrap_or(1000)` in `src/database/`), while projects and search return
+  everything. The client now reads each list in pages until it has the route's
+  `total_count`, and throws if they do not match. Regression test: `web/shared/api.test.ts`
+  (`npm test` in `web/solid`, also run by CI).
 - **A rescan of an edited project deleted everything attached to it** (found 2026-09-24,
   fixed 2026-09-24). Every parse mints a new project id, and the batch insert wrote it
   with `INSERT OR REPLACE`. `path` is unique, so the old row was deleted, and the cascade
