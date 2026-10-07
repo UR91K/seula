@@ -40,8 +40,132 @@ export interface SystemInfo { version: string; watch_paths: string[]; watcher_ac
 /** One event of a scan's SSE stream (ScanProgressDto). */
 export interface ScanProgress {
   completed: number; total: number; progress: number; message: string; status: string;
+  /** The plugin scan's final event carries its counts; the project scan sends none. */
+  result?: unknown;
+}
+
+/** Which scan a stream belongs to. Only one runs at a time, of any kind (ADR-0038). */
+export type ScanKind = "projects" | "plugins" | "samples" | "simulated";
+
+// ---------------------------------------------------------------- plugins
+
+/** A plugin as the list routes send it (PluginDto). `installed` is tri-state (ADR-0012):
+ *  null means no scan has looked, which is not the same as looked and absent. */
+export interface PluginRow {
+  id: string; dev_identifier: string; name: string; format: string;
+  installed: boolean | null; vendor: string | null; version: string | null;
+  project_count: number;
+}
+
+/** GET /plugins/vendors and /plugins/formats: one rollup row per vendor or format. */
+export interface Rollup {
+  plugin_count: number; installed_plugins: number; missing_plugins: number; unknown_plugins: number;
+  unique_projects_using: number;
+}
+export interface VendorRollup extends Rollup { vendor: string }
+export interface FormatRollup extends Rollup { format: string }
+
+export interface PluginClass { name: string; category: string }
+export interface PluginBus { name: string; direction: "input" | "output"; media: string; channel_count: number; bus_type: number }
+export interface PluginReference {
+  dev_identifier: string; ableton_name: string | null; ableton_format: string; resolved_via: string;
+}
+
+/** GET /plugins/:id `details`. Everything a scan records is null until one has looked. */
+export interface PluginDetails {
+  plugin_kind: "VST2" | "VST3"; uid: string; last_scanned_at: number | null; path: string | null;
+  category: string | null; is_instrument: boolean | null;
+  audio_in_channels: number | null; audio_out_channels: number | null;
+  audio_in_buses: number | null; audio_out_buses: number | null;
+  has_midi_input: boolean | null; has_midi_output: boolean | null;
+  presets: number | null; parameters: number | null; latency_samples: number | null;
+  has_gui: boolean | null; vendor_url: string | null;
+  fourcc: string | null; preset_chunks: boolean | null; f64_precision: boolean | null;
+  silent_when_stopped: boolean | null; midi_in_channels: number | null;
+  classes: PluginClass[]; buses: PluginBus[]; references: PluginReference[];
 }
 
 export type Scope = "active" | "archived";
 export type KeySpelling = "sharp" | "flat";
 export interface Sort { col: string; desc: boolean }
+
+// ---------------------------------------------------------------- samples
+
+/** A sample as the list routes send it (SampleDto). `size_bytes` is null until a check has
+ *  found the file, and a missing sample keeps the size it last had (ADR-0041). */
+export interface SampleRow {
+  id: string; name: string; path: string; is_present: boolean; project_count: number;
+  size_bytes: number | null;
+}
+
+/** GET /samples/:id `file`: what the last check found. */
+export interface SampleFile { size_bytes: number; modified_at: number | null; checked_at: number }
+
+/** GET /samples/formats: every known format, empty ones included (ADR-0039). */
+export interface SampleFormat {
+  format: string; name: string; extensions: string[]; count: number; present_count: number;
+  missing_count: number; total_size_bytes: number;
+}
+
+// ---------------------------------------------------------------- collections
+
+/** A collection as the list routes send it (CollectionDto). Counts and length are in the
+ *  project scope the request named (ADR-0043). */
+export interface CollectionRow {
+  id: string; name: string; description: string | null; notes: string | null;
+  created_at: number; modified_at: number; project_ids: string[];
+  cover_art_id: string | null; total_duration_seconds: number | null; project_count: number;
+}
+
+/** GET /collections/:id/statistics. */
+export interface CollectionStats {
+  project_count: number; total_duration_seconds: number | null; average_tempo: number | null;
+  total_plugins: number; total_samples: number; total_tags: number;
+  most_common_key: Key | null; most_common_time_signature: string | null;
+}
+
+/** A task in a collection's consolidated list: it names the project it belongs to. */
+export interface CollectionTask {
+  id: string; project_id: string; project_name: string; description: string;
+  completed: boolean; created_at: number;
+}
+
+/** What the server sorts the list by (`sort_by`). */
+export type CollectionSortKey = "name" | "project_count" | "total_duration" | "created_at" | "modified_at";
+
+// ---------------------------------------------------------------- stats
+
+/** The project scope the statistics count in (ADR-0045). */
+export type StatsScope = "active" | "all";
+
+/** GET /system/statistics: each count with its split (ADR-0045). Series come oldest first,
+ *  empty periods as zero. */
+export interface Statistics {
+  projects: { total: number; active: number; archived: number };
+  plugins: { total: number; installed: number; missing: number; not_scanned: number };
+  samples: { total: number; present: number; missing: number };
+  collections: { total: number; with_projects: number; empty: number };
+  tags: { total: number; in_use: number; unused: number };
+  tasks: { total: number; completed: number; pending: number; completion_rate: number };
+  top_plugins: { name: string; vendor: string; usage_count: number }[];
+  top_vendors: { vendor: string; plugin_count: number; usage_count: number }[];
+  tempo_distribution: { tempo: number; count: number }[];
+  key_distribution: { key: Key | null; count: number }[];
+  time_signature_distribution: (TimeSignature & { count: number })[];
+  projects_per_year: { year: number; count: number }[];
+  projects_per_month: { year: number; month: number; count: number }[];
+  average_monthly_projects: number;
+  average_project_duration_seconds: number;
+  projects_under_40_seconds: number;
+  longest_project: Project | null;
+  most_complex_projects: { project: Project; plugin_count: number; sample_count: number; complexity_score: number }[];
+  average_plugins_per_project: number;
+  average_samples_per_project: number;
+  top_samples: { name: string; path: string; usage_count: number }[];
+  top_tags: { name: string; usage_count: number }[];
+  recent_activity: { year: number; month: number; day: number; projects_created: number; projects_modified: number }[];
+  ableton_versions: { version: string; count: number }[];
+  average_projects_per_collection: number;
+  largest_collection: CollectionRow | null;
+  task_completion_trends: { year: number; month: number; completed_tasks: number; total_tasks: number; completion_rate: number }[];
+}

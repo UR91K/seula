@@ -1,63 +1,50 @@
-import { Show, createEffect, on, onMount } from "solid-js";
-import { Icon, TbBtn } from "./parts";
-import { Inspector } from "./Inspector";
-import { ColumnChooser, ContextMenu, HoverList } from "./Popovers";
-import { Sidebar, Statusbar, Topbar } from "./Shell";
-import { ProjectTable } from "./Table";
-import { Viewbar } from "./Viewbar";
-import { load, loadError, loadSidecars, setUi, total, ui, selectedProjects } from "./state";
+import { Show, onMount } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { collectionsView } from "./collections/view";
+import { pluginsView } from "./plugins/view";
+import { projectsView } from "./projects/view";
+import { samplesView } from "./samples/view";
+import { statsView } from "./stats/view";
+import { TbBtn } from "./shell/parts";
+import { Sidebar, Statusbar, Topbar } from "./shell/Frame";
+import { closePopups, loadChrome, route, setShell, shell, type RouteId } from "./shell/shell";
+import type { View } from "./shell/view";
+
+const VIEWS: Record<RouteId, View> = {
+  projects: projectsView, collections: collectionsView, plugins: pluginsView, samples: samplesView, stats: statsView,
+};
 
 export function App() {
-  onMount(() => { load(); loadSidecars(); });
-  // The list follows the scope and the search, nothing else.
-  createEffect(on(() => [ui.scope, ui.query], () => { load(); }, { defer: true }));
-
-  const shown = () => ui.inspectorOpen;
-
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "F2" && ui.renaming == null) {
-      const sel = selectedProjects();
-      if (sel.length === 1) { e.preventDefault(); setUi("renaming", sel[0].id); }
-    }
-    if (e.key === "Escape") setUi({ menu: null, popover: null });
-  };
+  onMount(loadChrome);
+  const view = () => VIEWS[route()];
+  const inspector = () => view().Inspector;
+  const shown = () => !!inspector() && shell.inspectorOpen;
 
   return (
-    <div class="win" classList={{ "sidebar-collapsed": ui.sidebarCollapsed, "no-inspector": !shown() }}
-      onKeyDown={onKey} tabIndex={-1}
+    <div class="win" classList={{ "sidebar-collapsed": shell.sidebarCollapsed, "no-inspector": !shown() }}
+      onKeyDown={(e) => { if (e.key === "Escape") closePopups(); view().onKey?.(e); }} tabIndex={-1}
       onClick={(e) => {
         // A click outside any popover closes the open ones.
-        if (!(e.target as HTMLElement).closest(".pop, [data-keep]")) setUi({ menu: null, popover: null });
+        if (!(e.target as HTMLElement).closest(".pop, [data-keep]")) closePopups();
       }}>
-      <Topbar />
+      <Topbar view={view()} />
       <div class="cols">
         <Sidebar />
         <section class="main">
           <div class="viewbar">
-            <Viewbar />
+            <Dynamic component={view().Viewbar} />
             <span class="grow" />
-            <TbBtn icon={shown() ? "right_panel_close" : "right_panel_open"} title="Inspector" on={shown()}
-              onClick={() => setUi("inspectorOpen", (o) => !o)} />
-          </div>
-          <div class="content">
-            <Show when={loadError()}><div class="error-banner">Cannot reach the daemon: {loadError()}</div></Show>
-            <Show when={total() > 0} fallback={
-              <Show when={!loadError()}>
-                <div class="empty">
-                  <Icon name={ui.query ? "search_off" : "inventory_2"} />
-                  <h2>{ui.query ? `No projects match “${ui.query}”` : ui.scope === "archived" ? "No archived projects" : "No projects yet"}</h2>
-                </div>
-              </Show>}>
-              <ProjectTable />
+            <Show when={inspector()}>
+              <TbBtn icon={shown() ? "right_panel_close" : "right_panel_open"} title="Inspector" on={shown()}
+                onClick={() => setShell("inspectorOpen", (o) => !o)} />
             </Show>
           </div>
+          <div class="content"><Dynamic component={view().Content} /></div>
         </section>
-        <Show when={shown()}><Inspector /></Show>
+        <Show when={shown()}><Dynamic component={inspector()!} /></Show>
       </div>
-      <Statusbar />
-      <Show when={ui.menu} keyed>{(m) => <ContextMenu menu={m} />}</Show>
-      <Show when={ui.hot} keyed>{(h) => <HoverList hot={h} />}</Show>
-      <Show when={ui.popover === "columns"}><ColumnChooser /></Show>
+      <Statusbar keys={view().keys}><Dynamic component={view().Status} /></Statusbar>
+      <Dynamic component={view().Popovers} />
     </div>
   );
 }

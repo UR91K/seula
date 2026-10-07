@@ -12,7 +12,7 @@
   "app": {
     "withGlobalTauri": true,
     "windows": [
-      { "title": "Seula (solid)", "width": 1280, "height": 800 }
+      { "title": "Seula (solid)", "width": 1280, "height": 800, "decorations": false }
     ],
     "security": { "csp": null }
   },

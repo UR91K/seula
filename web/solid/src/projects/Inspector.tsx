@@ -1,14 +1,15 @@
-// The inspector. One project selected, several, or none. The single-project view is a
+// The project inspector. One project selected, several, or none. The single-project view is a
 // non-keyed `Show`: moving the selection from one project to another changes what the
 // nodes read rather than rebuilding them, so the notes box keeps its focus and caret
 // while a scan streams in.
 
 import { For, Show, type JSX } from "solid-js";
-import { fmtDate, fmtKey, fmtLength, fmtTempo, fmtVersion } from "../../shared/format";
-import { common, commonCollections, missingPlugins, missingSamples } from "../../shared/projects";
-import type { Plugin, Project, Sample } from "../../shared/types";
-import { Icon, PathChip, TagChip } from "./parts";
-import { collectionById, collectionsFor, editNotes, selectedProjects, ui } from "./state";
+import { fmtDate, fmtKey, fmtLength, fmtTempo, fmtVersion } from "../../../shared/format";
+import { collectionsOf, common, commonCollections, missingPlugins, missingSamples } from "../../../shared/projects";
+import type { Plugin, Project, Sample } from "../../../shared/types";
+import { Icon, PathChip, TagChip } from "../shell/parts";
+import { collectionById, shell } from "../shell/shell";
+import type { TableState } from "./tablestate";
 
 const PluginDot = (p: { installed: boolean | null }) => (
   <span class="status-dot" classList={{ "is-ok": p.installed === true, "is-missing": p.installed === false, "is-unknown": p.installed == null }}>
@@ -35,17 +36,17 @@ function Listing<T>(props: { items: T[]; max?: number; render: (x: T) => JSX.Ele
   );
 }
 
-function Single(props: { p: Project }) {
+function Single(props: { t: TableState; p: Project }) {
   const p = () => props.p;
   const done = () => p().tasks.filter((t) => t.completed).length;
-  const cols = () => collectionsFor(p());
+  const cols = () => collectionsOf(p(), collectionById());
   return (
     <>
       <div class="insp-head"><div><h2>{p().name}</h2><PathChip path={p().path} /></div></div>
       <div class="insp-sec"><h3>Project</h3>
         <dl class="props">
           <dt>Tempo</dt><dd>{fmtTempo(p().tempo)} BPM</dd>
-          <dt>Key</dt><dd>{fmtKey(p().key_signature, ui.spelling) || <span class="faint">None detected</span>}</dd>
+          <dt>Key</dt><dd>{fmtKey(p().key_signature, shell.spelling) || <span class="faint">None detected</span>}</dd>
           <dt>Time</dt><dd>{p().time_signature.numerator}/{p().time_signature.denominator}</dd>
           <dt>Length</dt><dd>{fmtLength(p().duration_seconds) || <span class="faint">Unknown</span>}</dd>
           <dt>Live</dt><dd>{fmtVersion(p().ableton_version)}</dd>
@@ -56,7 +57,7 @@ function Single(props: { p: Project }) {
       <div class="insp-sec"><h3>Tags</h3><div class="tags"><For each={p().tags}>{(t) => <TagChip name={t.name} />}</For></div></div>
       <div class="insp-sec"><h3>Notes</h3>
         <textarea class="notes" placeholder="Add notes" value={p().notes}
-          onInput={(e) => editNotes(p().id, e.currentTarget.value)} />
+          onInput={(e) => props.t.editNotes(p().id, e.currentTarget.value)} />
       </div>
       <Section title="Tasks" count={p().tasks.length ? `${done()}/${p().tasks.length}` : ""}>
         <Show when={p().tasks.length}>
@@ -129,17 +130,17 @@ function Multi(props: { projects: Project[] }) {
   );
 }
 
-export function Inspector() {
-  const one = () => (selectedProjects().length === 1 ? selectedProjects()[0] : undefined);
-  const many = () => (selectedProjects().length > 1 ? selectedProjects() : undefined);
+/** The inspector's body for a table's selection, or `fallback` when nothing is selected.
+ *  The projects view and a collection's tracklist share it. */
+export function SelectionInspector(props: { t: TableState; fallback: JSX.Element }) {
+  const one = () => (props.t.selectedProjects().length === 1 ? props.t.selectedProjects()[0] : undefined);
+  const many = () => (props.t.selectedProjects().length > 1 ? props.t.selectedProjects() : undefined);
   return (
-    <aside class="inspector">
-      <Show when={one()} fallback={
-        <Show when={many()} fallback={<div class="empty"><Icon name="right_panel_open" /><p>Select a project to see its details here.</p></div>}>
-          {(ps) => <Multi projects={ps()} />}
-        </Show>}>
-        {(p) => <Single p={p()} />}
-      </Show>
-    </aside>
+    <Show when={one()} fallback={
+      <Show when={many()} fallback={props.fallback}>
+        {(ps) => <Multi projects={ps()} />}
+      </Show>}>
+      {(p) => <Single t={props.t} p={p()} />}
+    </Show>
   );
 }
