@@ -74,13 +74,9 @@ impl ProjectDatabase {
         ids: &[String],
         scope: ProjectScope,
     ) -> Result<HashMap<String, i32>, DatabaseError> {
-        let join = scope.join("j.project_id");
         let mut counts: HashMap<String, i32> = ids.iter().map(|id| (id.clone(), 0)).collect();
         for chunk in ids.chunks(CHUNK) {
-            let placeholders = vec!["?"; chunk.len()].join(", ");
-            let sql = format!(
-                "SELECT j.{column}, COUNT(*) FROM {table} j {join} WHERE j.{column} IN ({placeholders}) GROUP BY j.{column}"
-            );
+            let sql = counts_sql(table, column, chunk.len(), scope);
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map(rusqlite::params_from_iter(chunk), |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
@@ -91,5 +87,64 @@ impl ProjectDatabase {
             }
         }
         Ok(counts)
+    }
+}
+
+/// The count query for `n` ids. `CROSS JOIN` because SQLite keeps a cross join's order:
+/// it starts from the ids, through the junction's index on the item column, and looks up
+/// each row's project by its key. Given a plain `JOIN` it started from every active
+/// project and probed each one against every id, 344 ms a chunk on a real library
+/// instead of 5 ms (ADR-0064).
+fn counts_sql(table: &str, column: &str, n: usize, scope: ProjectScope) -> String {
+    let join = match scope.join("j.project_id") {
+        join if join.is_empty() => join,
+        join => format!("CROSS {join}"),
+    };
+    let placeholders = vec!["?"; n].join(", ");
+    format!(
+        "SELECT j.{column}, COUNT(*) FROM {table} j {join} WHERE j.{column} IN ({placeholders}) GROUP BY j.{column}"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The plan, not the timing: a test database is too small to be slow either way, but
+    /// the plan shows which side the query starts from (ADR-0064).
+    fn plan(table: &str, column: &str, scope: ProjectScope) -> String {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db = ProjectDatabase::new(dir.path().join("plan.db")).unwrap();
+        // A full chunk: SQLite weighs the length of the IN list, and with three ids it
+        // picks the right plan even without CROSS JOIN.
+        let sql = format!(
+            "EXPLAIN QUERY PLAN {}",
+            counts_sql(table, column, CHUNK, scope)
+        );
+        let mut stmt = db.conn.prepare(&sql).unwrap();
+        let ids: Vec<String> = (0..CHUNK).map(|i| i.to_string()).collect();
+        let details = stmt
+            .query_map(rusqlite::params_from_iter(ids), |row| {
+                row.get::<_, String>(3)
+            })
+            .unwrap();
+        details.map(Result::unwrap).collect::<Vec<_>>().join("\n")
+    }
+
+    #[test]
+    fn counts_start_from_the_ids_not_from_every_project() {
+        for (table, column, index) in [
+            ("project_samples", "sample_id", "idx_project_samples_sample"),
+            ("project_plugins", "plugin_id", "idx_project_plugins_plugin"),
+        ] {
+            for scope in [ProjectScope::Active, ProjectScope::All] {
+                let plan = plan(table, column, scope);
+                let first = plan.lines().next().unwrap();
+                assert!(
+                    first.contains("SEARCH j USING") && first.contains(index),
+                    "{table}, {scope:?}: should start from {index}, plan was:\n{plan}"
+                );
+            }
+        }
     }
 }

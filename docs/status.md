@@ -103,6 +103,23 @@ were found by the first CI run on a clean runner.
 
 Resolved:
 
+- **The sample list took 8 to 14 seconds on a real library** (found 2026-10-07, fixed
+  2026-10-07). `GET /api/v1/samples?limit=10000` took 14.0 s in debug and 8.1 s in
+  release on the maintainer's 18,243 samples. The list query took 47 ms; the per-page
+  project counts took the rest, because SQLite started from every active project and
+  probed each against all 500 ids of a chunk. A `CROSS JOIN` makes it start from the ids:
+  0.40 s in debug, 0.19 s in release. ADR-0064. Regression test:
+  `counts_start_from_the_ids_not_from_every_project` (`src/database/project_counts.rs`).
+- **Search, samples and every other list stopped at a fixed row count** (found 2026-10-07,
+  fixed 2026-10-07). The frontend asked for `limit=200` on search, which the projects
+  board's mockup snapshot had used, and `limit=10000` everywhere else, and showed what came
+  back as the whole list. On the maintainer's library a plugin's "show the projects using
+  it" stopped at 200 projects (FabFilter Pro-Q 3 is in 1,184), and the samples view at
+  10,000 of 18,243. Leaving the limit out does not help: most list queries default to 1000
+  rows (`limit.unwrap_or(1000)` in `src/database/`), while projects and search return
+  everything. The client now reads each list in pages until it has the route's
+  `total_count`, and throws if they do not match. Regression test: `web/shared/api.test.ts`
+  (`npm test` in `web/solid`, also run by CI).
 - **Search, samples and every other list stopped at a fixed row count** (found 2026-10-07,
   fixed 2026-10-07). The frontend asked for `limit=200` on search, which the projects
   board's mockup snapshot had used, and `limit=10000` everywhere else, and showed what came
