@@ -74,7 +74,42 @@ async fn set_collection_cover_art_refuses_a_missing_collection() {
         .set_collection_cover_art("nonexistent-collection", "some-media-id")
         .await;
 
-    assert!(result.is_err());
+    assert!(matches!(result, Err(MediaError::FileNotFound(_))));
+}
+
+/// `media-mutations-200-on-failure`: a mutation names rows by id, and one that is not
+/// there is `FileNotFound` (a 404), not a foreign-key failure from SQLite.
+#[tokio::test]
+async fn the_media_mutations_refuse_rows_that_are_not_there() {
+    let env = test_env();
+    let collection_id = collection(&env).await;
+    let project_id = create_test_project_in_db(&env.db).await;
+    let media = &env.services.media;
+
+    for result in [
+        media
+            .set_collection_cover_art(&collection_id, "no-such-media")
+            .await,
+        media
+            .remove_collection_cover_art("no-such-collection")
+            .await,
+        media
+            .set_project_audio_file(&project_id, "no-such-media")
+            .await,
+        media
+            .set_project_audio_file("no-such-project", "no-such-media")
+            .await,
+        media.remove_project_audio_file("no-such-project").await,
+    ] {
+        assert!(matches!(result, Err(MediaError::FileNotFound(_))));
+    }
+    // Nothing was attached along the way.
+    let db = env.db.lock().await;
+    assert!(db
+        .get_collection_cover_art(&collection_id)
+        .unwrap()
+        .is_none());
+    assert!(db.get_project_audio_file(&project_id).unwrap().is_none());
 }
 
 #[tokio::test]

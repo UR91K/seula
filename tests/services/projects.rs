@@ -299,6 +299,43 @@ async fn a_project_goes_through_the_whole_deletion_cycle() {
         .is_empty());
 }
 
+/// The unfiltered list pages in memory, with the same refusal as search
+/// (`search-negative-offset`).
+#[tokio::test]
+async fn list_projects_refuses_a_negative_offset_or_limit() {
+    let env = test_env();
+    create_test_project_in_db(&env.db).await;
+
+    for (limit, offset) in [(None, Some(-1)), (Some(-1), None)] {
+        let result = env
+            .services
+            .projects
+            .list_projects(
+                DeletionScope::ActiveOnly,
+                limit,
+                offset,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await;
+        assert!(matches!(result, Err(DatabaseError::InvalidOperation(_))));
+    }
+}
+
 // Filtering and statistics.
 
 #[tokio::test]

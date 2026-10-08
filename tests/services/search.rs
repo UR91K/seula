@@ -165,17 +165,29 @@ async fn search_zero_limit_returns_an_empty_page_and_the_full_total() {
     assert!(total > 0);
 }
 
-/// The old gRPC test expected a negative offset to be "likely treated as 0" but only
-/// checked the total. It is not: `offset as usize` wraps, so the page comes back empty
-/// (the `search-negative-offset` bug in `docs/bugs.md`). This pins the total, as the old
-/// test did, and not the page.
+/// `search-negative-offset`: a negative offset was cast to `usize`, which wraps, so the
+/// page came back empty with a total that said otherwise. A negative limit wrapped the
+/// other way and took everything. Both are refused now.
 #[tokio::test]
-async fn search_negative_offset_keeps_the_total() {
-    let env = with_projects(1).await;
+async fn search_refuses_a_negative_offset_or_limit() {
+    let env = with_projects(2).await;
 
-    let (_, total) = search_page(&env, "Test Project", None, Some(-5)).await;
-
-    assert_eq!(total, 1);
+    for (limit, offset, what) in [(None, Some(-5), "offset"), (Some(-1), None, "limit")] {
+        let result = env
+            .services
+            .search
+            .search("Test Project", limit, offset)
+            .await;
+        match result {
+            Err(seula::error::DatabaseError::InvalidOperation(msg)) => {
+                assert!(msg.contains(what), "{msg}")
+            }
+            other => panic!(
+                "expected InvalidOperation for {what}, got {:?}",
+                other.map(|r| r.1)
+            ),
+        }
+    }
 }
 
 #[tokio::test]

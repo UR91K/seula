@@ -53,14 +53,6 @@ pub struct UploadAudioFileQuery {
 #[derive(Serialize)]
 pub struct UploadResponse {
     pub media_file_id: String,
-    pub success: bool,
-    pub error_message: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct MutationResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -113,6 +105,4 @@ pub struct CleanupResponse {
     pub files_cleaned: i32,
     pub bytes_freed: i64,
     pub deleted_file_ids: Vec<String>,
-    pub success: bool,
-    pub error_message: Option<String>,
 }

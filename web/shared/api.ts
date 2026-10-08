@@ -129,21 +129,16 @@ export class Api {
   }
 
   /** Send an image's bytes and make it the collection's cover (ADR-0061). The daemon keeps
-   *  its own copy. The media routes report a failure as a 200 with `success: false`. */
+   *  its own copy. A failure is an HTTP error, so `json` and `send` throw it. */
   async setCollectionCover(id: string, file: File): Promise<void> {
-    const up = await this.json<{ media_file_id: string; success: boolean; error_message: string | null }>(
+    const up = await this.json<{ media_file_id: string }>(
       `/api/v1/media/cover-art?collection_id=${id}&filename=${encodeURIComponent(file.name)}`,
       { method: "POST", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
-    if (!up.success) throw new Error(up.error_message ?? "The cover was not stored");
-    const set = await this.json<{ success: boolean; error_message: string | null }>(
-      `/api/v1/collections/${id}/cover-art`, put({ media_file_id: up.media_file_id }));
-    if (!set.success) throw new Error(set.error_message ?? "The cover was not set");
+    await this.send(`/api/v1/collections/${id}/cover-art`, put({ media_file_id: up.media_file_id }));
   }
 
   async removeCollectionCover(id: string): Promise<void> {
-    const res = await this.json<{ success: boolean; error_message: string | null }>(
-      `/api/v1/collections/${id}/cover-art`, { method: "DELETE" });
-    if (!res.success) throw new Error(res.error_message ?? "The cover was not removed");
+    await this.send(`/api/v1/collections/${id}/cover-art`, { method: "DELETE" });
   }
 
   /** A cover's URL: media is served over HTTP (ADR-0033). */

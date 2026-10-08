@@ -1,14 +1,12 @@
-//! Media domain HTTP handlers (ADR-0024). Thin over `MediaService`, with two error
-//! conventions: an empty upload or a missing required field is a real rejection (400),
-//! but a storage/database failure during store/delete/set is a normal 200 with
-//! `success: false` (the `media-mutations-200-on-failure` bug in `docs/bugs.md`).
+//! Media domain HTTP handlers (ADR-0024). Thin over `MediaService`. A failure is an
+//! HTTP error (404 for a row that is not there, 400 for a file that is refused, 500 for
+//! storage); a mutation with nothing to return answers 204.
 //!
-//! The project audio-list routes (ADR-0037) use ordinary HTTP errors (404, 400) and
-//! return the resulting list on success.
+//! The project audio-list routes (ADR-0037) return the resulting list on success.
 
 use axum::body::{boxed, Body, Bytes};
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderValue, Request};
+use axum::http::{header, HeaderValue, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use tower::ServiceExt;
@@ -16,8 +14,8 @@ use tower_http::services::ServeFile;
 
 use crate::http::dto::media::{
     CleanupQuery, CleanupResponse, MediaByTypeQuery, MediaFileDto, MediaFileListResponse,
-    MediaStatisticsResponse, MutationResponse, PaginationQuery, SetAudioFileRequest,
-    SetCoverArtRequest, UploadAudioFileQuery, UploadCoverArtQuery, UploadResponse,
+    MediaStatisticsResponse, PaginationQuery, SetAudioFileRequest, SetCoverArtRequest,
+    UploadAudioFileQuery, UploadCoverArtQuery, UploadResponse,
 };
 use crate::http::dto::projects::{AudioFileDto, AudioFileListResponse};
 use crate::http::error::ApiError;
@@ -34,25 +32,15 @@ pub async fn upload_cover_art(
         ));
     }
 
-    let response = match state
+    let media_file = state
         .services
         .media
         .store_cover_art(&body, &query.filename, &query.collection_id)
-        .await
-    {
-        Ok(media_file) => UploadResponse {
-            media_file_id: media_file.id,
-            success: true,
-            error_message: None,
-        },
-        Err(e) => UploadResponse {
-            media_file_id: String::new(),
-            success: false,
-            error_message: Some(e.to_string()),
-        },
-    };
+        .await?;
 
-    Ok(Json(response))
+    Ok(Json(UploadResponse {
+        media_file_id: media_file.id,
+    }))
 }
 
 pub async fn upload_audio_file(
@@ -66,25 +54,15 @@ pub async fn upload_audio_file(
         ));
     }
 
-    let response = match state
+    let media_file = state
         .services
         .media
         .store_audio_file(&body, &query.filename, &query.project_id)
-        .await
-    {
-        Ok(media_file) => UploadResponse {
-            media_file_id: media_file.id,
-            success: true,
-            error_message: None,
-        },
-        Err(e) => UploadResponse {
-            media_file_id: String::new(),
-            success: false,
-            error_message: Some(e.to_string()),
-        },
-    };
+        .await?;
 
-    Ok(Json(response))
+    Ok(Json(UploadResponse {
+        media_file_id: media_file.id,
+    }))
 }
 
 /// Streams the stored file with `Range` support, so an `<audio>` element can seek in
@@ -161,103 +139,59 @@ fn content_disposition(filename: &str) -> HeaderValue {
 pub async fn delete_media(
     State(state): State<AppState>,
     Path(media_file_id): Path<String>,
-) -> Json<MutationResponse> {
-    match state.services.media.delete_media(&media_file_id).await {
-        Ok(()) => Json(MutationResponse {
-            success: true,
-            error_message: None,
-        }),
-        Err(e) => Json(MutationResponse {
-            success: false,
-            error_message: Some(e.to_string()),
-        }),
-    }
+) -> Result<StatusCode, ApiError> {
+    state.services.media.delete_media(&media_file_id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn set_collection_cover_art(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
     Json(req): Json<SetCoverArtRequest>,
-) -> Json<MutationResponse> {
-    match state
+) -> Result<StatusCode, ApiError> {
+    state
         .services
         .media
         .set_collection_cover_art(&collection_id, &req.media_file_id)
-        .await
-    {
-        Ok(()) => Json(MutationResponse {
-            success: true,
-            error_message: None,
-        }),
-        Err(e) => Json(MutationResponse {
-            success: false,
-            error_message: Some(format!("Database error: {}", e)),
-        }),
-    }
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn remove_collection_cover_art(
     State(state): State<AppState>,
     Path(collection_id): Path<String>,
-) -> Json<MutationResponse> {
-    match state
+) -> Result<StatusCode, ApiError> {
+    state
         .services
         .media
         .remove_collection_cover_art(&collection_id)
-        .await
-    {
-        Ok(()) => Json(MutationResponse {
-            success: true,
-            error_message: None,
-        }),
-        Err(e) => Json(MutationResponse {
-            success: false,
-            error_message: Some(format!("Database error: {}", e)),
-        }),
-    }
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn set_project_audio_file(
     State(state): State<AppState>,
     Path(project_id): Path<String>,
     Json(req): Json<SetAudioFileRequest>,
-) -> Json<MutationResponse> {
-    match state
+) -> Result<StatusCode, ApiError> {
+    state
         .services
         .media
         .set_project_audio_file(&project_id, &req.media_file_id)
-        .await
-    {
-        Ok(()) => Json(MutationResponse {
-            success: true,
-            error_message: None,
-        }),
-        Err(e) => Json(MutationResponse {
-            success: false,
-            error_message: Some(format!("Database error: {}", e)),
-        }),
-    }
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn remove_project_audio_file(
     State(state): State<AppState>,
     Path(project_id): Path<String>,
-) -> Json<MutationResponse> {
-    match state
+) -> Result<StatusCode, ApiError> {
+    state
         .services
         .media
         .remove_project_audio_file(&project_id)
-        .await
-    {
-        Ok(()) => Json(MutationResponse {
-            success: true,
-            error_message: None,
-        }),
-        Err(e) => Json(MutationResponse {
-            success: false,
-            error_message: Some(format!("Database error: {}", e)),
-        }),
-    }
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn list_media_files(
@@ -340,8 +274,6 @@ pub async fn cleanup_orphaned_media(
         files_cleaned: deleted_file_ids.len() as i32,
         bytes_freed,
         deleted_file_ids,
-        success: true,
-        error_message: None,
     }))
 }
 

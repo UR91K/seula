@@ -1,7 +1,6 @@
-//! Config domain HTTP handlers (ADR-0024). Thin over `ConfigService`, with two
-//! different error conventions: a config that fails to *load* is a 500
-//! (`ApiError::Internal`), but a mutation that fails (bad path, invalid setting) is a
-//! normal 200 with `success: false`.
+//! Config domain HTTP handlers (ADR-0024). Thin over `ConfigService`. A config that
+//! fails to load is a 500; a mutation that fails is a 400 when the path or setting
+//! cannot be used and a 500 when the file cannot be written.
 
 use axum::extract::State;
 use axum::response::IntoResponse;
@@ -41,106 +40,57 @@ pub async fn get_config_status(
 pub async fn update_paths(
     State(state): State<AppState>,
     Json(req): Json<UpdatePathsRequest>,
-) -> Json<PathMutationResponse> {
-    match state.services.config.update_paths(req.paths) {
-        Ok((_, warnings)) => Json(PathMutationResponse {
-            success: true,
-            error_message: None,
-            validation_warnings: warnings,
-        }),
-        Err(e) => Json(PathMutationResponse {
-            success: false,
-            error_message: Some(e.to_string()),
-            validation_warnings: vec![],
-        }),
-    }
+) -> Result<Json<PathMutationResponse>, ApiError> {
+    let (_, warnings) = state.services.config.update_paths(req.paths)?;
+    Ok(Json(PathMutationResponse {
+        validation_warnings: warnings,
+    }))
 }
 
 pub async fn add_path(
     State(state): State<AppState>,
     Json(req): Json<AddPathRequest>,
-) -> Json<PathMutationResponse> {
-    match state.services.config.add_path(req.path) {
-        Ok((_, warnings)) => Json(PathMutationResponse {
-            success: true,
-            error_message: None,
-            validation_warnings: warnings,
-        }),
-        Err(e) => Json(PathMutationResponse {
-            success: false,
-            error_message: Some(e.to_string()),
-            validation_warnings: vec![],
-        }),
-    }
+) -> Result<Json<PathMutationResponse>, ApiError> {
+    let (_, warnings) = state.services.config.add_path(req.path)?;
+    Ok(Json(PathMutationResponse {
+        validation_warnings: warnings,
+    }))
 }
 
 pub async fn remove_path(
     State(state): State<AppState>,
     Json(req): Json<RemovePathRequest>,
-) -> Json<RemovePathResponse> {
-    match state.services.config.remove_path(&req.path) {
-        Ok(config) => Json(RemovePathResponse {
-            success: true,
-            error_message: None,
-            remaining_paths_count: config.paths.len() as i32,
-        }),
-        Err(e) => {
-            // Report the (unchanged) current path
-            // count even on failure, rather than leaving the field unset.
-            let remaining = state
-                .services
-                .config
-                .get()
-                .map(|c| c.paths.len() as i32)
-                .unwrap_or(0);
-            Json(RemovePathResponse {
-                success: false,
-                error_message: Some(e.to_string()),
-                remaining_paths_count: remaining,
-            })
-        }
-    }
+) -> Result<Json<RemovePathResponse>, ApiError> {
+    let config = state.services.config.remove_path(&req.path)?;
+    Ok(Json(RemovePathResponse {
+        remaining_paths_count: config.paths.len() as i32,
+    }))
 }
 
 pub async fn update_settings(
     State(state): State<AppState>,
     Json(req): Json<UpdateSettingsRequest>,
-) -> Json<PathMutationResponse> {
-    match state.services.config.update_settings(
+) -> Result<Json<PathMutationResponse>, ApiError> {
+    let (_, warnings) = state.services.config.update_settings(
         req.database_path,
         req.log_level,
         req.media_storage_dir,
         req.max_cover_art_size_mb,
         req.max_audio_file_size_mb,
-    ) {
-        Ok((_, warnings)) => Json(PathMutationResponse {
-            success: true,
-            error_message: None,
-            validation_warnings: warnings,
-        }),
-        Err(e) => Json(PathMutationResponse {
-            success: false,
-            error_message: Some(e.to_string()),
-            validation_warnings: vec![],
-        }),
-    }
+    )?;
+    Ok(Json(PathMutationResponse {
+        validation_warnings: warnings,
+    }))
 }
 
-pub async fn reload_config(State(state): State<AppState>) -> Json<ReloadConfigResponse> {
-    match state.services.config.reload() {
-        Ok((new_config, warnings)) => Json(ReloadConfigResponse {
-            success: true,
-            error_message: None,
-            validation_warnings: warnings,
-            config: Some(ConfigDto::from(&new_config)),
-        }),
-        Err(e) => Json(ReloadConfigResponse {
-            success: false,
-            error_message: Some(e.to_string()),
-            validation_warnings: vec![],
-            config: None,
-        }),
-    }
+pub async fn reload_config(
+    State(state): State<AppState>,
+) -> Result<Json<ReloadConfigResponse>, ApiError> {
+    let (new_config, warnings) = state.services.config.reload()?;
+    Ok(Json(ReloadConfigResponse {
+        validation_warnings: warnings,
+        config: ConfigDto::from(&new_config),
+    }))
 }
 
 pub async fn validate_config(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {

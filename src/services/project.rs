@@ -109,16 +109,9 @@ impl ProjectsService {
                 has_audio_file,
             )
         } else {
-            let mut projects = db.get_all_projects_with_status(scope.to_is_active())?;
+            let projects = db.get_all_projects_with_status(scope.to_is_active())?;
             let total_count = projects.len() as i32;
-            let offset = offset.unwrap_or(0) as usize;
-            let drained = projects.drain(..).skip(offset);
-            let page = if let Some(limit) = limit {
-                drained.take(limit as usize).collect()
-            } else {
-                drained.collect()
-            };
-            Ok((page, total_count))
+            Ok((super::paginate(projects, limit, offset)?, total_count))
         }
     }
 

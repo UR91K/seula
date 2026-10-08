@@ -120,6 +120,7 @@ pub async fn get_projects_by_tag(
 ) -> Result<impl IntoResponse, ApiError> {
     let projects = state.services.tags.get_projects_by_tag(&tag_id).await?;
     let total_count = projects.len() as i32;
+    let projects = crate::services::paginate(projects, query.limit, query.offset)?;
 
     let db_arc = state.services.tags.db_handle();
     let mut db = db_arc.lock().await;
@@ -128,17 +129,6 @@ pub async fn get_projects_by_tag(
         .map(|p| project_to_dto(p, &mut db))
         .collect::<Result<Vec<_>, _>>()?;
     drop(db);
-
-    let offset = query.offset.unwrap_or(0) as usize;
-    let projects = if let Some(limit) = query.limit {
-        projects
-            .into_iter()
-            .skip(offset)
-            .take(limit as usize)
-            .collect()
-    } else {
-        projects.into_iter().skip(offset).collect()
-    };
 
     Ok(Json(ProjectListResponse {
         projects,

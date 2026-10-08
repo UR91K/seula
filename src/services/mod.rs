@@ -19,6 +19,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::database::ProjectDatabase;
+use crate::error::DatabaseError;
 use crate::media::MediaStorageManager;
 
 pub use collections::{CollectionDetail, CollectionsService};
@@ -33,6 +34,35 @@ pub use statistics::Statistics;
 pub use system::SystemService;
 pub use tags::TagsService;
 pub use tasks::TasksService;
+
+/// One page of `items`, for the lists that are paged in memory rather than in SQL.
+///
+/// A negative `offset` or `limit` is a malformed request, so it is refused. It used to
+/// be cast to `usize`, which wraps: a negative offset skipped everything and a negative
+/// limit took everything.
+pub fn paginate<T>(
+    items: Vec<T>,
+    limit: Option<i32>,
+    offset: Option<i32>,
+) -> Result<Vec<T>, DatabaseError> {
+    let offset = match offset {
+        Some(n) if n < 0 => {
+            return Err(DatabaseError::InvalidOperation(
+                "offset must not be negative".to_string(),
+            ))
+        }
+        Some(n) => n as usize,
+        None => 0,
+    };
+    let rest = items.into_iter().skip(offset);
+    match limit {
+        Some(n) if n < 0 => Err(DatabaseError::InvalidOperation(
+            "limit must not be negative".to_string(),
+        )),
+        Some(n) => Ok(rest.take(n as usize).collect()),
+        None => Ok(rest.collect()),
+    }
+}
 
 #[derive(Clone)]
 pub struct Services {

@@ -1,10 +1,8 @@
 //! HTTP wire types for the config domain (ADR-0024).
 //!
-//! Mutations here do not use the `ApiError`/`?` pattern the other domains use: a
-//! failed update is a normal 200 response with `success: false` and an
-//! `error_message`, not a 4xx/5xx. It was chosen so an earlier frontend could show the
-//! message more easily, which the maintainer no longer remembers for certain. It is
-//! logged as the `media-mutations-200-on-failure` bug in `docs/bugs.md`.
+//! A mutation that fails is an HTTP error (400 for a path or setting that cannot be
+//! used, 500 for a config file that cannot be written); one that succeeds answers with
+//! any validation warnings.
 
 use serde::{Deserialize, Serialize};
 
@@ -67,15 +65,11 @@ pub struct RemovePathRequest {
 
 #[derive(Serialize)]
 pub struct PathMutationResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub validation_warnings: Vec<String>,
 }
 
 #[derive(Serialize)]
 pub struct RemovePathResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub remaining_paths_count: i32,
 }
 
@@ -90,10 +84,8 @@ pub struct UpdateSettingsRequest {
 
 #[derive(Serialize)]
 pub struct ReloadConfigResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub validation_warnings: Vec<String>,
-    pub config: Option<ConfigDto>,
+    pub config: ConfigDto,
 }
 
 #[derive(Serialize)]

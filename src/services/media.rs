@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::database::ProjectDatabase;
+use crate::database::{ProjectDatabase, ProjectScope};
 use crate::media::{MediaError, MediaFile, MediaStorageManager, MediaType};
 
 #[derive(Clone)]
@@ -18,6 +18,27 @@ impl MediaService {
 
     pub fn storage(&self) -> &Arc<MediaStorageManager> {
         &self.storage
+    }
+
+    // A mutation names rows by id; one that is not there is a 404, not a foreign-key
+    // failure from deep in SQLite.
+
+    fn require_media_file(db: &ProjectDatabase, id: &str) -> Result<(), MediaError> {
+        db.get_media_file(id)?
+            .map(|_| ())
+            .ok_or_else(|| MediaError::FileNotFound(format!("Media file {} not found", id)))
+    }
+
+    fn require_collection(db: &mut ProjectDatabase, id: &str) -> Result<(), MediaError> {
+        db.get_collection_by_id(id, ProjectScope::All)?
+            .map(|_| ())
+            .ok_or_else(|| MediaError::FileNotFound(format!("Collection {} not found", id)))
+    }
+
+    fn require_project(db: &mut ProjectDatabase, id: &str) -> Result<(), MediaError> {
+        db.get_project_by_id_any_status(id)?
+            .map(|_| ())
+            .ok_or_else(|| MediaError::FileNotFound(format!("Project {} not found", id)))
     }
 
     /// Stores a file and records its metadata, optionally attaching it as a
@@ -133,11 +154,14 @@ impl MediaService {
         media_file_id: &str,
     ) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
+        Self::require_collection(&mut db, collection_id)?;
+        Self::require_media_file(&db, media_file_id)?;
         Ok(db.update_collection_cover_art(collection_id, Some(media_file_id))?)
     }
 
     pub async fn remove_collection_cover_art(&self, collection_id: &str) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
+        Self::require_collection(&mut db, collection_id)?;
         Ok(db.update_collection_cover_art(collection_id, None)?)
     }
 
@@ -147,11 +171,14 @@ impl MediaService {
         media_file_id: &str,
     ) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
+        Self::require_project(&mut db, project_id)?;
+        Self::require_media_file(&db, media_file_id)?;
         Ok(db.update_project_audio_file(project_id, Some(media_file_id))?)
     }
 
     pub async fn remove_project_audio_file(&self, project_id: &str) -> Result<(), MediaError> {
         let mut db = self.db.lock().await;
+        Self::require_project(&mut db, project_id)?;
         Ok(db.update_project_audio_file(project_id, None)?)
     }
 

@@ -334,34 +334,122 @@ async fn an_unknown_media_file_is_a_404_to_download() {
     assert_eq!(download.status, StatusCode::NOT_FOUND);
 }
 
-/// The media mutations report failure in a 200 body (`success: false` and a message),
-/// as the gRPC calls did, where every other route answers with a status code. Pinned as
-/// it is (the `media-mutations-200-on-failure` bug in `docs/bugs.md`).
+/// `media-mutations-200-on-failure`: these used to answer 200 with `success: false` and
+/// a message. A row that is not there is a 404 now, like everywhere else.
 #[tokio::test]
-async fn media_mutations_report_failure_in_the_body() {
-    let (app, _env) = app();
+async fn media_mutations_fail_with_a_status_code() {
+    let (app, env) = app();
+    let collection = env
+        .services
+        .collections
+        .create_collection("Covers", None, None)
+        .await
+        .unwrap();
 
     let delete = send(&app, Method::DELETE, "/api/v1/media/nonexistent-media-id").await;
-    assert_eq!(delete.status, StatusCode::OK);
-    let body = delete.json();
-    assert_eq!(body["success"], false);
-    assert!(body["error_message"]
-        .as_str()
-        .unwrap()
-        .contains("not found"));
+    assert_eq!(delete.status, StatusCode::NOT_FOUND);
 
-    let set_cover = send_json(
+    let missing_collection = send_json(
         &app,
         Method::PUT,
         "/api/v1/collections/nonexistent-collection/cover-art",
         json!({ "media_file_id": "some-media-id" }),
     )
     .await;
-    assert_eq!(set_cover.status, StatusCode::OK);
-    let body = set_cover.json();
-    assert_eq!(body["success"], false);
-    assert!(body["error_message"].is_string());
+    assert_eq!(missing_collection.status, StatusCode::NOT_FOUND);
+
+    let missing_media = send_json(
+        &app,
+        Method::PUT,
+        &format!("/api/v1/collections/{}/cover-art", collection.id),
+        json!({ "media_file_id": "no-such-media" }),
+    )
+    .await;
+    assert_eq!(missing_media.status, StatusCode::NOT_FOUND);
+
+    let remove = send(
+        &app,
+        Method::DELETE,
+        "/api/v1/collections/nonexistent-collection/cover-art",
+    )
+    .await;
+    assert_eq!(remove.status, StatusCode::NOT_FOUND);
+
+    let missing_project = send(
+        &app,
+        Method::DELETE,
+        "/api/v1/projects/nonexistent-project/audio-file",
+    )
+    .await;
+    assert_eq!(missing_project.status, StatusCode::NOT_FOUND);
+
+    let empty_upload = send(
+        &app,
+        Method::POST,
+        "/api/v1/media/cover-art?collection_id=x&filename=cover.jpg",
+    )
+    .await;
+    assert_eq!(empty_upload.status, StatusCode::BAD_REQUEST);
 }
+
+/// The success side: a mutation with nothing to return is a 204, an upload returns the
+/// new file's id, and the attached cover can be taken off again.
+#[tokio::test]
+async fn media_mutations_succeed_with_204() {
+    use seula::media::MediaType;
+
+    let (app, env) = app();
+    let collection = env
+        .services
+        .collections
+        .create_collection("Covers", None, None)
+        .await
+        .unwrap();
+    let stored = env
+        .media_storage
+        .store_file(b"cover bytes", "cover.jpg", MediaType::CoverArt)
+        .unwrap();
+    env.db.lock().await.insert_media_file(&stored).unwrap();
+
+    let set = send_json(
+        &app,
+        Method::PUT,
+        &format!("/api/v1/collections/{}/cover-art", collection.id),
+        json!({ "media_file_id": stored.id }),
+    )
+    .await;
+    assert_eq!(set.status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        env.db
+            .lock()
+            .await
+            .get_collection_cover_art(&collection.id)
+            .unwrap()
+            .map(|m| m.id),
+        Some(stored.id.clone())
+    );
+
+    let remove = send(
+        &app,
+        Method::DELETE,
+        &format!("/api/v1/collections/{}/cover-art", collection.id),
+    )
+    .await;
+    assert_eq!(remove.status, StatusCode::NO_CONTENT);
+
+    let delete = send(
+        &app,
+        Method::DELETE,
+        &format!("/api/v1/media/{}", stored.id),
+    )
+    .await;
+    assert_eq!(delete.status, StatusCode::NO_CONTENT);
+}
+
+// There is deliberately no router test for the config mutations: `ConfigService` edits
+// the global `CONFIG` and saves it to the real `config.toml`, so a test that sends one
+// writes the developer's own configuration. Their status mapping is tested on the error
+// type instead (`src/http/error.rs`).
 
 // System: the routes whose answers are built from the scan state and the statistics.
 
@@ -459,4 +547,33 @@ async fn statistics_export_as_csv() {
         "{csv}"
     );
     assert!(csv.contains("Top Plugins\n"));
+}
+
+/// `search-negative-offset`: a malformed page is the client's mistake, not an empty
+/// result.
+#[tokio::test]
+async fn a_negative_offset_or_limit_is_a_400_on_every_paged_route() {
+    let (app, env) = app();
+    create_test_project_in_db(&env.db).await;
+    let (tag_id, _, _) = env.services.tags.create_tag("Electronic").await.unwrap();
+
+    for uri in [
+        "/api/v1/search?query=Test&offset=-5".to_string(),
+        "/api/v1/search?query=Test&limit=-1".to_string(),
+        "/api/v1/projects?offset=-1".to_string(),
+        "/api/v1/projects?limit=-1".to_string(),
+        format!("/api/v1/tags/{tag_id}/projects?offset=-1"),
+        format!("/api/v1/tags/{tag_id}/projects?limit=-1"),
+    ] {
+        let reply = send(&app, Method::GET, &uri).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{uri}");
+    }
+
+    let fine = send(
+        &app,
+        Method::GET,
+        "/api/v1/search?query=Test&offset=0&limit=5",
+    )
+    .await;
+    assert_eq!(fine.status, StatusCode::OK);
 }
