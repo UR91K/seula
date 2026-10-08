@@ -17,7 +17,7 @@ fn test_batch_insert() {
     let mut live_set_db = ProjectDatabase::new(db_path.clone()).expect("Failed to create database");
 
     // Get connection for batch insert
-    let mut conn = &mut live_set_db.conn;
+    let conn = &mut live_set_db.conn;
 
     // Generate test data
     let test_sets = generate_test_live_sets_arc(3);
