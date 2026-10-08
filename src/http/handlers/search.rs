@@ -1,8 +1,6 @@
-//! Search domain HTTP handlers (ADR-0024). Thin over `SearchService`, mirroring
-//! `src/grpc/handlers/search.rs` -- including that handler's gap: `SearchResult`
-//! carries a relevance `rank` and `match_reason`, and neither the gRPC surface
-//! nor this one surfaces them. Not fixed here; porting is not the place to
-//! change behavior nobody asked to change.
+//! Search domain HTTP handlers (ADR-0024). Thin over `SearchService`. A gap: `SearchResult`
+//! carries a relevance `rank` and `match_reason`, and this surface does not return
+//! them.
 
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;

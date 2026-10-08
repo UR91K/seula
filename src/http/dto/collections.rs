@@ -131,7 +131,7 @@ pub struct ReorderCollectionRequest {
 
 /// A task in a collection's consolidated list. It carries its project's id, so the
 /// UI can reach the project, and its name, so it can say which project it is without
-/// a lookup. (The gRPC surface put the name in `project_id` instead.)
+/// a lookup. (An earlier surface put the name in `project_id` instead.)
 #[derive(Serialize)]
 pub struct TaskDto {
     pub id: String,

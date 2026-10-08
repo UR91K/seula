@@ -3,17 +3,15 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
+use super::scan::{ScanProgress, ScanStatus, WatcherEvent, WatcherEventType};
+use super::statistics::*;
+use super::CollectionDetail;
 use crate::config::CONFIG;
 use crate::database::batch::BatchInsertManager;
 use crate::database::plugins::PluginRefreshResult;
 use crate::database::samples::SampleRefreshResult;
 use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::{DatabaseError, LiveSetError};
-use crate::grpc::common::{ScanStatus, WatcherEventType};
-use crate::grpc::handlers::utils::convert_live_set_to_proto;
-use crate::grpc::scanning::ScanProgressResponse;
-use crate::grpc::system::GetStatisticsResponse;
-use crate::grpc::watcher::WatcherEventResponse;
 use crate::process_projects_into;
 use crate::project::Project;
 use crate::scan::sample_check::{check_sample_files, default_threads};
@@ -29,9 +27,8 @@ type ProgressCallback = Box<dyn FnMut(u32, u32, f32, String, &str) + Send>;
 /// Call it only from a scan's progress callback. `start_scan`, `start_plugin_scan` and
 /// `start_sample_check` run those on a blocking thread, where waiting is allowed; in a
 /// task it would panic.
-pub fn send_scan_update<T>(tx: &tokio::sync::mpsc::Sender<T>, status: i32, update: T) {
-    let last = status == ScanStatus::ScanCompleted as i32 || status == ScanStatus::ScanError as i32;
-    if last {
+pub fn send_scan_update<T>(tx: &tokio::sync::mpsc::Sender<T>, status: ScanStatus, update: T) {
+    if status.is_final() {
         let _ = tx.blocking_send(update);
     } else {
         let _ = tx.try_send(update);
@@ -40,15 +37,11 @@ pub fn send_scan_update<T>(tx: &tokio::sync::mpsc::Sender<T>, status: i32, updat
 
 /// Owns the state shared across the scanning/watcher/statistics RPCs: scan
 /// status/progress, the active file watcher (if any), and process start time.
-/// Reuses the gRPC-generated `ScanStatus`/`ScanProgressResponse`/`WatcherEventResponse`
-/// types directly rather than introducing domain equivalents -- CLI has no
-/// consumer of this state today (`system watch`/`scan-status` are stubs), so
-/// there's nothing yet motivating that split; revisit if axum needs one.
 #[derive(Clone)]
 pub struct SystemService {
     db: Arc<Mutex<ProjectDatabase>>,
     scan_status: Arc<Mutex<ScanStatus>>,
-    scan_progress: Arc<Mutex<Option<ScanProgressResponse>>>,
+    scan_progress: Arc<Mutex<Option<ScanProgress>>>,
     watcher: Arc<Mutex<Option<FileWatcher>>>,
     watcher_events: Arc<Mutex<Option<std::sync::mpsc::Receiver<FileEvent>>>>,
     start_time: Instant,
@@ -59,7 +52,7 @@ impl SystemService {
     pub fn new(
         db: Arc<Mutex<ProjectDatabase>>,
         scan_status: Arc<Mutex<ScanStatus>>,
-        scan_progress: Arc<Mutex<Option<ScanProgressResponse>>>,
+        scan_progress: Arc<Mutex<Option<ScanProgress>>>,
         watcher: Arc<Mutex<Option<FileWatcher>>>,
         watcher_events: Arc<Mutex<Option<std::sync::mpsc::Receiver<FileEvent>>>>,
         start_time: Instant,
@@ -84,7 +77,7 @@ impl SystemService {
         Arc::clone(&self.scan_status)
     }
 
-    pub fn scan_progress_handle(&self) -> Arc<Mutex<Option<ScanProgressResponse>>> {
+    pub fn scan_progress_handle(&self) -> Arc<Mutex<Option<ScanProgress>>> {
         Arc::clone(&self.scan_progress)
     }
 
@@ -103,7 +96,7 @@ impl SystemService {
         ))
     }
 
-    pub async fn get_scan_status(&self) -> (ScanStatus, Option<ScanProgressResponse>) {
+    pub async fn get_scan_status(&self) -> (ScanStatus, Option<ScanProgress>) {
         let status = *self.scan_status.lock().await;
         let progress = self.scan_progress.lock().await.clone();
         (status, progress)
@@ -114,16 +107,7 @@ impl SystemService {
     /// runs at a time (ADR-0038, ADR-0041).
     async fn begin_scan(&self, status: ScanStatus) -> bool {
         let mut current = self.scan_status.lock().await;
-        let running = matches!(
-            *current,
-            ScanStatus::ScanStarting
-                | ScanStatus::ScanScanningPlugins
-                | ScanStatus::ScanCheckingSamples
-                | ScanStatus::ScanDiscovering
-                | ScanStatus::ScanParsing
-                | ScanStatus::ScanInserting
-        );
-        if running {
+        if current.is_running() {
             return false;
         }
         *current = status;
@@ -137,7 +121,7 @@ impl SystemService {
     /// Returns false, and starts nothing, when a scan is already running.
     pub async fn start_scan<F>(&self, on_progress: F) -> bool
     where
-        F: Fn(ScanProgressResponse) + Send + Sync + 'static,
+        F: Fn(ScanProgress) + Send + Sync + 'static,
     {
         let db = Arc::clone(&self.db);
         self.start_scan_with(on_progress, move |callback| {
@@ -153,10 +137,10 @@ impl SystemService {
     /// handling without a configured project folder.
     async fn start_scan_with<F, S>(&self, on_progress: F, scan: S) -> bool
     where
-        F: Fn(ScanProgressResponse) + Send + Sync + 'static,
+        F: Fn(ScanProgress) + Send + Sync + 'static,
         S: FnOnce(ProgressCallback) -> Result<(), LiveSetError> + Send + 'static,
     {
-        if !self.begin_scan(ScanStatus::ScanStarting).await {
+        if !self.begin_scan(ScanStatus::Starting).await {
             return false;
         }
 
@@ -168,7 +152,7 @@ impl SystemService {
         // one. Written from spawned tasks, one could, and it left the scan "running".
         tokio::task::spawn_blocking(move || {
             // blocking_lock is right here: this is a blocking thread, not a task.
-            let report = Arc::new(move |response: ScanProgressResponse, status: ScanStatus| {
+            let report = Arc::new(move |response: ScanProgress, status: ScanStatus| {
                 *scan_status.blocking_lock() = status;
                 *scan_progress.blocking_lock() = Some(response.clone());
                 on_progress(response);
@@ -178,45 +162,45 @@ impl SystemService {
             let progress_callback =
                 move |completed: u32, total: u32, progress: f32, message: String, phase: &str| {
                     let status = match phase {
-                        "starting" => ScanStatus::ScanStarting,
-                        "scanning_plugins" => ScanStatus::ScanScanningPlugins,
-                        "discovering" => ScanStatus::ScanDiscovering,
-                        "preprocessing" | "parsing" => ScanStatus::ScanParsing,
-                        "inserting" => ScanStatus::ScanInserting,
-                        "completed" => ScanStatus::ScanCompleted,
-                        _ => ScanStatus::ScanStarting,
+                        "starting" => ScanStatus::Starting,
+                        "scanning_plugins" => ScanStatus::ScanningPlugins,
+                        "discovering" => ScanStatus::Discovering,
+                        "preprocessing" | "parsing" => ScanStatus::Parsing,
+                        "inserting" => ScanStatus::Inserting,
+                        "completed" => ScanStatus::Completed,
+                        _ => ScanStatus::Starting,
                     };
 
-                    let response = ScanProgressResponse {
+                    let response = ScanProgress {
                         completed,
                         total,
                         progress,
                         message,
-                        status: status as i32,
+                        status,
                     };
                     report_for_callback(response, status);
                 };
 
             match scan(Box::new(progress_callback)) {
                 Ok(()) => {
-                    let final_status = ScanStatus::ScanCompleted;
-                    let final_progress = ScanProgressResponse {
+                    let final_status = ScanStatus::Completed;
+                    let final_progress = ScanProgress {
                         completed: 100,
                         total: 100,
                         progress: 1.0,
                         message: "Scan completed successfully".to_string(),
-                        status: final_status as i32,
+                        status: final_status,
                     };
                     report(final_progress, final_status);
                 }
                 Err(e) => {
-                    let error_status = ScanStatus::ScanError;
-                    let error_progress = ScanProgressResponse {
+                    let error_status = ScanStatus::Error;
+                    let error_progress = ScanProgress {
                         completed: 0,
                         total: 1,
                         progress: 0.0,
                         message: format!("Scan failed: {}", e),
-                        status: error_status as i32,
+                        status: error_status,
                     };
                     report(error_progress, error_status);
                 }
@@ -239,9 +223,9 @@ impl SystemService {
         on_progress: F,
     ) -> bool
     where
-        F: Fn(ScanProgressResponse, Option<PluginRefreshResult>) + Send + Sync + 'static,
+        F: Fn(ScanProgress, Option<PluginRefreshResult>) + Send + Sync + 'static,
     {
-        if !self.begin_scan(ScanStatus::ScanScanningPlugins).await {
+        if !self.begin_scan(ScanStatus::ScanningPlugins).await {
             return false;
         }
 
@@ -252,7 +236,7 @@ impl SystemService {
         tokio::task::spawn_blocking(move || {
             // blocking_lock is right here: this is a blocking thread, not a task.
             let report = |completed: u32, total: u32, message: String, status: ScanStatus| {
-                let response = ScanProgressResponse {
+                let response = ScanProgress {
                     completed,
                     total,
                     progress: if total == 0 {
@@ -261,7 +245,7 @@ impl SystemService {
                         completed as f32 / total as f32
                     },
                     message,
-                    status: status as i32,
+                    status,
                 };
                 *scan_status.blocking_lock() = status;
                 *scan_progress.blocking_lock() = Some(response.clone());
@@ -273,7 +257,7 @@ impl SystemService {
                     0,
                     0,
                     "Finding plugins...".to_string(),
-                    ScanStatus::ScanScanningPlugins,
+                    ScanStatus::ScanningPlugins,
                 ),
                 None,
             );
@@ -290,7 +274,7 @@ impl SystemService {
                         // Counted like the project scan's messages; this one is
                         // being loaded, not yet done.
                         format!("Scanning {} ({}/{})", name, index + 1, total),
-                        ScanStatus::ScanScanningPlugins,
+                        ScanStatus::ScanningPlugins,
                     ),
                     None,
                 );
@@ -317,13 +301,13 @@ impl SystemService {
                     }
                     let total = result.candidates_scanned.max(0) as u32;
                     on_progress(
-                        report(total, total, message, ScanStatus::ScanCompleted),
+                        report(total, total, message, ScanStatus::Completed),
                         Some(result),
                     );
                 }
                 Err(e) => {
                     let message = format!("Plugin scan failed: {}", e);
-                    on_progress(report(0, 1, message, ScanStatus::ScanError), None);
+                    on_progress(report(0, 1, message, ScanStatus::Error), None);
                 }
             }
         });
@@ -338,9 +322,9 @@ impl SystemService {
     /// false, and starts nothing, when a scan is already running.
     pub async fn start_sample_check<F>(&self, on_progress: F) -> bool
     where
-        F: Fn(ScanProgressResponse, Option<SampleRefreshResult>) + Send + Sync + 'static,
+        F: Fn(ScanProgress, Option<SampleRefreshResult>) + Send + Sync + 'static,
     {
-        if !self.begin_scan(ScanStatus::ScanCheckingSamples).await {
+        if !self.begin_scan(ScanStatus::CheckingSamples).await {
             return false;
         }
 
@@ -351,7 +335,7 @@ impl SystemService {
         tokio::task::spawn_blocking(move || {
             // blocking_lock is right here: this is a blocking thread, not a task.
             let report = |completed: u32, total: u32, message: String, status: ScanStatus| {
-                let response = ScanProgressResponse {
+                let response = ScanProgress {
                     completed,
                     total,
                     progress: if total == 0 {
@@ -360,7 +344,7 @@ impl SystemService {
                         completed as f32 / total as f32
                     },
                     message,
-                    status: status as i32,
+                    status,
                 };
                 *scan_status.blocking_lock() = status;
                 *scan_progress.blocking_lock() = Some(response.clone());
@@ -377,7 +361,7 @@ impl SystemService {
                         0,
                         0,
                         format!("Checking {} samples...", paths.len()),
-                        ScanStatus::ScanCheckingSamples,
+                        ScanStatus::CheckingSamples,
                     ),
                     None,
                 );
@@ -396,7 +380,7 @@ impl SystemService {
                             done as u32,
                             total as u32,
                             format!("Checked {} ({}/{})", name, done, total),
-                            ScanStatus::ScanCheckingSamples,
+                            ScanStatus::CheckingSamples,
                         ),
                         None,
                     );
@@ -415,13 +399,13 @@ impl SystemService {
                     );
                     let total = result.total_samples_checked.max(0) as u32;
                     on_progress(
-                        report(total, total, message, ScanStatus::ScanCompleted),
+                        report(total, total, message, ScanStatus::Completed),
                         Some(result),
                     );
                 }
                 Err(e) => {
                     let message = format!("Sample check failed: {}", e);
-                    on_progress(report(0, 1, message, ScanStatus::ScanError), None);
+                    on_progress(report(0, 1, message, ScanStatus::Error), None);
                 }
             }
         });
@@ -430,7 +414,7 @@ impl SystemService {
 
     /// Validates, parses, and inserts a single project via BatchInsertManager,
     /// returning the freshly-inserted domain Project. Error strings match the
-    /// exact wording the gRPC response contract already commits to.
+    /// exact wording the API already commits to.
     pub async fn add_single_project(&self, file_path: &Path) -> Result<Project, String> {
         if !file_path.exists() {
             return Err("File does not exist".to_string());
@@ -575,7 +559,7 @@ impl SystemService {
     /// no watcher is active -- there is nothing to stream.
     pub async fn start_watcher_event_stream<F>(&self, on_event: F) -> bool
     where
-        F: Fn(WatcherEventResponse) + Send + Sync + 'static,
+        F: Fn(WatcherEvent) + Send + Sync + 'static,
     {
         let mut events_guard = self.watcher_events.lock().await;
         let Some(event_receiver) = events_guard.take() else {
@@ -604,26 +588,26 @@ impl SystemService {
                 }
 
                 let watcher_event = match file_event {
-                    FileEvent::Created(path) => WatcherEventResponse {
-                        event_type: WatcherEventType::WatcherCreated as i32,
+                    FileEvent::Created(path) => WatcherEvent {
+                        event_type: WatcherEventType::Created,
                         path: path.to_string_lossy().to_string(),
                         new_path: None,
                         timestamp: chrono::Utc::now().timestamp(),
                     },
-                    FileEvent::Modified(path) => WatcherEventResponse {
-                        event_type: WatcherEventType::WatcherModified as i32,
+                    FileEvent::Modified(path) => WatcherEvent {
+                        event_type: WatcherEventType::Modified,
                         path: path.to_string_lossy().to_string(),
                         new_path: None,
                         timestamp: chrono::Utc::now().timestamp(),
                     },
-                    FileEvent::Deleted(path) => WatcherEventResponse {
-                        event_type: WatcherEventType::WatcherDeleted as i32,
+                    FileEvent::Deleted(path) => WatcherEvent {
+                        event_type: WatcherEventType::Deleted,
                         path: path.to_string_lossy().to_string(),
                         new_path: None,
                         timestamp: chrono::Utc::now().timestamp(),
                     },
-                    FileEvent::Renamed { from, to } => WatcherEventResponse {
-                        event_type: WatcherEventType::WatcherRenamed as i32,
+                    FileEvent::Renamed { from, to } => WatcherEvent {
+                        event_type: WatcherEventType::Renamed,
                         path: from.to_string_lossy().to_string(),
                         new_path: Some(to.to_string_lossy().to_string()),
                         timestamp: chrono::Utc::now().timestamp(),
@@ -637,17 +621,10 @@ impl SystemService {
         true
     }
 
-    /// Gathers every statistic and returns the assembled proto response
-    /// directly -- this data is proto-shaped by nature (it exists to answer
-    /// `GetStatistics`), and the HTTP adapter mirrors it field by field.
+    /// Gathers every statistic.
     ///
     /// Every figure counts the projects in `scope` and what they use (ADR-0045).
-    pub async fn get_statistics(
-        &self,
-        scope: ProjectScope,
-    ) -> Result<GetStatisticsResponse, DatabaseError> {
-        use crate::grpc::system::*;
-
+    pub async fn get_statistics(&self, scope: ProjectScope) -> Result<Statistics, DatabaseError> {
         let today = chrono::Utc::now().date_naive();
         let mut db = self.db.lock().await;
 
@@ -661,21 +638,6 @@ impl SystemService {
         let total_collections = c.collections_with_projects + c.collections_empty;
         let total_tags = c.tags_in_use + c.tags_unused;
         let total_tasks = c.tasks_completed + c.tasks_pending;
-        let counts = LibraryCounts {
-            projects_active: c.projects_active,
-            projects_archived: c.projects_archived,
-            plugins_installed: c.plugins_installed,
-            plugins_missing: c.plugins_missing,
-            plugins_not_scanned: c.plugins_not_scanned,
-            samples_present: c.samples_present,
-            samples_missing: c.samples_missing,
-            collections_with_projects: c.collections_with_projects,
-            collections_empty: c.collections_empty,
-            tags_in_use: c.tags_in_use,
-            tags_unused: c.tags_unused,
-            tasks_completed: c.tasks_completed,
-            tasks_pending: c.tasks_pending,
-        };
 
         let top_plugins = db
             .get_top_plugins(10, scope)?
@@ -745,13 +707,9 @@ impl SystemService {
         let (average_project_duration_seconds, projects_under_40_seconds, longest_project_id) =
             db.get_duration_analytics(scope)?;
 
-        let longest_project = if let Some(project_id) = longest_project_id {
-            match db.get_project_by_id_any_status(&project_id) {
-                Ok(Some(project)) => convert_live_set_to_proto(project, &mut db).ok(),
-                _ => None,
-            }
-        } else {
-            None
+        let longest_project = match longest_project_id {
+            Some(project_id) => db.get_project_by_id_any_status(&project_id).ok().flatten(),
+            None => None,
         };
 
         let (average_plugins_per_project, average_samples_per_project) =
@@ -762,14 +720,12 @@ impl SystemService {
         for (project_id, plugin_count, sample_count, complexity_score) in most_complex_projects_raw
         {
             if let Ok(Some(project)) = db.get_project_by_id_any_status(&project_id) {
-                if let Ok(proto_project) = convert_live_set_to_proto(project, &mut db) {
-                    most_complex_projects.push(ProjectComplexityStatistic {
-                        project: Some(proto_project),
-                        plugin_count,
-                        sample_count,
-                        complexity_score,
-                    });
-                }
+                most_complex_projects.push(ProjectComplexity {
+                    project,
+                    plugin_count,
+                    sample_count,
+                    complexity_score,
+                });
             }
         }
 
@@ -796,7 +752,7 @@ impl SystemService {
             .get_recent_activity(30, today, scope)?
             .into_iter()
             .map(
-                |(year, month, day, projects_created, projects_modified)| ActivityTrendStatistic {
+                |(year, month, day, projects_created, projects_modified)| ActivityTrend {
                     year,
                     month,
                     day,
@@ -830,7 +786,7 @@ impl SystemService {
                     let (total_duration_seconds, project_count) = db
                         .get_collection_statistics(&id, scope)
                         .unwrap_or((None, 0));
-                    Some(crate::grpc::common::Collection {
+                    Some(CollectionDetail {
                         id,
                         name,
                         description,
@@ -854,7 +810,7 @@ impl SystemService {
             .into_iter()
             .map(
                 |(year, month, completed_tasks, total_tasks, completion_rate)| {
-                    TaskCompletionTrendStatistic {
+                    TaskCompletionTrend {
                         year,
                         month,
                         completed_tasks,
@@ -865,7 +821,7 @@ impl SystemService {
             )
             .collect();
 
-        Ok(GetStatisticsResponse {
+        Ok(Statistics {
             total_projects,
             total_plugins,
             total_samples,
@@ -896,7 +852,7 @@ impl SystemService {
             average_projects_per_collection,
             largest_collection,
             task_completion_trends,
-            counts: Some(counts),
+            counts: c,
         })
     }
 }
@@ -909,7 +865,7 @@ mod tests {
         let db = ProjectDatabase::new(PathBuf::from(":memory:")).unwrap();
         SystemService::new(
             Arc::new(Mutex::new(db)),
-            Arc::new(Mutex::new(ScanStatus::ScanUnknown)),
+            Arc::new(Mutex::new(ScanStatus::Unknown)),
             Arc::new(Mutex::new(None)),
             Arc::new(Mutex::new(None)),
             Arc::new(Mutex::new(None)),
@@ -947,7 +903,7 @@ mod tests {
             tokio::task::yield_now().await;
         }
 
-        assert_eq!(*system.scan_status.lock().await, ScanStatus::ScanCompleted);
+        assert_eq!(*system.scan_status.lock().await, ScanStatus::Completed);
         assert!(
             system.start_scan_with(|_| {}, |_| Ok(())).await,
             "a new scan can start"
@@ -963,7 +919,7 @@ mod tests {
         let db = ProjectDatabase::new(PathBuf::from(":memory:")).unwrap();
         let system = SystemService::new(
             Arc::new(Mutex::new(db)),
-            Arc::new(Mutex::new(ScanStatus::ScanUnknown)),
+            Arc::new(Mutex::new(ScanStatus::Unknown)),
             Arc::new(Mutex::new(None)),
             Arc::new(Mutex::new(None)),
             Arc::new(Mutex::new(Some(event_rx))),

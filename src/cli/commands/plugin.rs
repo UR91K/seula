@@ -174,17 +174,17 @@ impl PluginCommands {
 
         let displayed = plugins
             .into_iter()
-            .map(|grpc_plugin| PluginRow {
-                id: grpc_plugin.plugin.id.to_string(),
-                name: grpc_plugin.plugin.name,
-                vendor: grpc_plugin
+            .map(|plugin_with_usage| PluginRow {
+                id: plugin_with_usage.plugin.id.to_string(),
+                name: plugin_with_usage.plugin.name,
+                vendor: plugin_with_usage
                     .plugin
                     .vendor
                     .unwrap_or_else(|| "Unknown".to_string()),
-                format: grpc_plugin.plugin.plugin_format.to_string(),
-                installed: grpc_plugin.plugin.installed,
-                usage_count: grpc_plugin.usage_count,
-                project_count: grpc_plugin.project_count,
+                format: plugin_with_usage.plugin.plugin_format.to_string(),
+                installed: plugin_with_usage.plugin.installed,
+                usage_count: plugin_with_usage.usage_count,
+                project_count: plugin_with_usage.project_count,
             })
             .collect();
 
@@ -246,10 +246,10 @@ impl PluginCommands {
             .await?;
 
         match plugin {
-            Some(grpc_plugin) => Ok(PluginDetails {
-                plugin: grpc_plugin.plugin,
-                usage_count: grpc_plugin.usage_count,
-                project_count: grpc_plugin.project_count,
+            Some(plugin_with_usage) => Ok(PluginDetails {
+                plugin: plugin_with_usage.plugin,
+                usage_count: plugin_with_usage.usage_count,
+                project_count: plugin_with_usage.project_count,
             }),
             None => Err(format!("Plugin with ID {} not found", plugin_id).into()),
         }

@@ -10,7 +10,7 @@ use crate::database::plugins::{
 };
 use crate::database::{ProjectDatabase, ProjectScope};
 use crate::error::DatabaseError;
-use crate::models::GrpcPlugin;
+use crate::models::PluginWithUsage;
 use crate::project::Project;
 use crate::scan::plugins::{scan_files, PluginScan, ScanMode};
 
@@ -49,7 +49,7 @@ impl PluginsService {
         install_states: &[InstallState],
         min_usage_count: Option<i32>,
         scope: ProjectScope,
-    ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
+    ) -> Result<(Vec<PluginWithUsage>, i32), DatabaseError> {
         let db = self.db.lock().await;
         db.get_all_plugins(
             limit,
@@ -146,7 +146,7 @@ impl PluginsService {
         &self,
         plugin_id: &str,
         scope: ProjectScope,
-    ) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    ) -> Result<Option<PluginWithUsage>, DatabaseError> {
         let db = self.db.lock().await;
         db.get_plugin_by_id(plugin_id, scope)
     }

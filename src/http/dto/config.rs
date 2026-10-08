@@ -1,11 +1,10 @@
 //! HTTP wire types for the config domain (ADR-0024).
 //!
-//! Mutations here follow `src/grpc/handlers/config.rs`'s convention, not the
-//! `ApiError`/`?` pattern the other domains use: a failed update is a normal
-//! 200 response with `success: false` and an `error_message`, not a 4xx/5xx.
-//! That's a deliberate existing choice (config errors are user-facing
-//! validation feedback, not exceptional failures) and preserved as-is rather
-//! than folded into the generic error mapping as part of this port.
+//! Mutations here do not use the `ApiError`/`?` pattern the other domains use: a
+//! failed update is a normal 200 response with `success: false` and an
+//! `error_message`, not a 4xx/5xx. It was chosen so an earlier frontend could show the
+//! message more easily, which the maintainer no longer remembers for certain. It is
+//! logged as the `media-mutations-200-on-failure` bug in `docs/bugs.md`.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +14,6 @@ use crate::config::Config;
 pub struct ConfigDto {
     pub paths: Vec<String>,
     pub database_path: Option<String>,
-    pub grpc_port: u32,
     pub log_level: String,
     pub media_storage_dir: String,
     pub max_cover_art_size_mb: Option<u32>,
@@ -29,7 +27,6 @@ impl From<&Config> for ConfigDto {
         Self {
             paths: config.paths.clone(),
             database_path: config.database_path.clone(),
-            grpc_port: config.grpc_port as u32,
             log_level: config.log_level.clone(),
             media_storage_dir: config.media_storage_dir.clone(),
             max_cover_art_size_mb: config.max_cover_art_size_mb,
@@ -85,7 +82,6 @@ pub struct RemovePathResponse {
 #[derive(Deserialize)]
 pub struct UpdateSettingsRequest {
     pub database_path: Option<String>,
-    pub grpc_port: Option<u16>,
     pub log_level: Option<String>,
     pub media_storage_dir: Option<String>,
     pub max_cover_art_size_mb: Option<Option<u32>>,

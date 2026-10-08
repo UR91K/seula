@@ -1,11 +1,10 @@
-//! Media domain HTTP handlers (ADR-0024). Thin over `MediaService`, mirroring
-//! `src/grpc/handlers/media.rs` -- including its two error conventions: an
-//! empty upload or a missing required field is a real rejection (400), but a
-//! storage/database failure during store/delete/set is a normal 200 with
-//! `success: false`, matching the gRPC handler exactly.
+//! Media domain HTTP handlers (ADR-0024). Thin over `MediaService`, with two error
+//! conventions: an empty upload or a missing required field is a real rejection (400),
+//! but a storage/database failure during store/delete/set is a normal 200 with
+//! `success: false` (the `media-mutations-200-on-failure` bug in `docs/bugs.md`).
 //!
-//! The project audio-list routes (ADR-0037) have no gRPC counterpart to mirror, so they
-//! use ordinary HTTP errors (404, 400) and return the resulting list on success.
+//! The project audio-list routes (ADR-0037) use ordinary HTTP errors (404, 400) and
+//! return the resulting list on success.
 
 use axum::body::{boxed, Body, Bytes};
 use axum::extract::{Path, Query, State};

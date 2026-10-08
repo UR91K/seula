@@ -10,7 +10,7 @@
 //! - **Parallel parsing**: Multi-threaded parsing of `.als` files for maximum performance
 //! - **Comprehensive metadata extraction**: Tempo, plugins, samples, key signatures, and more
 //! - **SQLite database**: Persistent storage with full-text search capabilities
-//! - **gRPC API**: Remote access and integration capabilities
+//! - **HTTP API**: Remote access and integration capabilities
 //! - **Media management**: Handle cover art and audio files
 //! - **Real-time watching**: Monitor file system changes
 //!
@@ -28,7 +28,6 @@
 //! The library is organized into several key modules:
 //! - [`scan`]: Project discovery and parallel parsing
 //! - [`database`]: SQLite storage and full-text search
-//! - [`grpc`]: gRPC server and API handlers
 //! - [`models`]: Core data structures and types
 //! - [`media`]: Media file storage and management
 //! - [`watcher`]: File system monitoring
@@ -41,7 +40,6 @@ pub mod cli;
 pub mod config;
 pub mod database;
 pub mod error;
-pub mod grpc;
 pub mod http;
 pub mod media;
 pub mod models;
@@ -57,7 +55,7 @@ pub mod watcher;
 /// Global configuration instance loaded from `config.toml`.
 ///
 /// This provides access to all configuration settings including project paths,
-/// database location, gRPC port, and other runtime options.
+/// database location, HTTP port, and other runtime options.
 ///
 /// # Examples
 ///
@@ -65,7 +63,6 @@ pub mod watcher;
 /// use seula::CONFIG;
 ///
 /// let config = CONFIG.as_ref().expect("Config should be loaded");
-/// println!("gRPC port: {}", config.grpc_port);
 /// ```
 pub use config::CONFIG;
 
@@ -256,7 +253,7 @@ where
 }
 
 /// The same scan, reading and writing through `db`: the tray daemon's one connection,
-/// shared with the HTTP and gRPC adapters. A second connection would hold SQLite's
+/// shared with the HTTP adapter. A second connection would hold SQLite's
 /// write lock through the batch insert, and a write from an adapter would wait out the
 /// busy timeout and fail. On the shared handle it waits on the mutex instead.
 ///
@@ -743,7 +740,7 @@ mod tests {
     use std::io::Write;
 
     /// The daemon's scan once opened a connection of its own and wrote the whole batch
-    /// through it, so a write from the HTTP or gRPC adapter during the insert waited out
+    /// through it, so a write from the HTTP adapter during the insert waited out
     /// SQLite's busy timeout and failed. It has to write through the handle it is given;
     /// an in-memory database makes that checkable, since no other connection can reach
     /// it.

@@ -10,7 +10,7 @@ The most intricate area in the codebase, and the one mid-migration. Read
 | `PluginInfo` | `src/models.rs` | Raw — exactly what an `.als` yields |
 | `PluginKey` | `src/models.rs` | The join key: `(format, uid)` as an enum (ADR-0005) |
 | `Plugin` | `src/models.rs:587` | The merged record, stored in Seula's database |
-| `GrpcPlugin` | `src/models.rs:617` | `Plugin` + usage counts, for API responses |
+| `PluginWithUsage` | `src/models.rs` | `Plugin` + usage counts, for API responses |
 | `PluginMeta` | `crates/vst-meta/src/meta.rs` | What the scanner extracts from a binary |
 
 ## What the project file actually contains

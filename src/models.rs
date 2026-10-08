@@ -937,8 +937,8 @@ pub struct Plugin {
     pub installed: Option<bool>,
 }
 
-/// Plugin data with usage statistics for gRPC responses
-pub struct GrpcPlugin {
+/// A plugin with how much it is used
+pub struct PluginWithUsage {
     /// The base plugin data
     pub plugin: Plugin,
     /// Number of times this plugin is used across all projects

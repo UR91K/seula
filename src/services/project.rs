@@ -9,7 +9,7 @@ use crate::error::DatabaseError;
 use crate::project::Project;
 
 /// Which projects to include by deletion status. Defaults to `ActiveOnly` — the
-/// unfiltered gRPC `GetProjects` used to return active + deleted with no way to
+/// unfiltered list used to return active + deleted with no way to
 /// opt out, while the CLI defaulted to active-only; this is the single default
 /// both surfaces now share. See the service-layer audit / ADR discussion.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -41,7 +41,7 @@ impl ProjectsService {
     }
 
     /// Escape hatch for callers that need a raw `&mut ProjectDatabase` lock, e.g.
-    /// gRPC's LiveSet-to-proto conversion helper. Prefer the typed methods below.
+    /// the adapters' project-to-response conversion helpers. Prefer the typed methods below.
     pub fn db_handle(&self) -> Arc<Mutex<ProjectDatabase>> {
         Arc::clone(&self.db)
     }

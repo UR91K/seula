@@ -1,5 +1,4 @@
-//! Tasks domain HTTP handlers (ADR-0024). Thin over `TasksService`, mirroring
-//! `src/grpc/handlers/tasks.rs`.
+//! Tasks domain HTTP handlers (ADR-0024). Thin over `TasksService`.
 
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;

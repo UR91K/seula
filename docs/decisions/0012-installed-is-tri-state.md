@@ -5,7 +5,7 @@
 - **Recorded:** 2026-09-15
 - **Confidence:** decided now
 - **Evidence:** `plugins.installed` in `src/database/core.rs`; `Plugin::installed` in
-  `src/models.rs`; `optional bool installed = 7` in `proto/common.proto`
+  `src/models.rs`; `optional bool installed = 7` in `a841a58^:proto/common.proto`
 
 ## Context
 

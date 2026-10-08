@@ -1,8 +1,7 @@
-//! Config domain HTTP handlers (ADR-0024). Thin over `ConfigService`, mirroring
-//! `src/grpc/handlers/config.rs` -- including its two different error
-//! conventions: a config that fails to *load* is a 500 (`ApiError::Internal`,
-//! matching the gRPC handler's `Status::Internal`), but a mutation that fails
-//! (bad path, invalid setting) is a normal 200 with `success: false`.
+//! Config domain HTTP handlers (ADR-0024). Thin over `ConfigService`, with two
+//! different error conventions: a config that fails to *load* is a 500
+//! (`ApiError::Internal`), but a mutation that fails (bad path, invalid setting) is a
+//! normal 200 with `success: false`.
 
 use axum::extract::State;
 use axum::response::IntoResponse;
@@ -86,7 +85,7 @@ pub async fn remove_path(
             remaining_paths_count: config.paths.len() as i32,
         }),
         Err(e) => {
-            // Match prior (gRPC) behavior: report the (unchanged) current path
+            // Report the (unchanged) current path
             // count even on failure, rather than leaving the field unset.
             let remaining = state
                 .services
@@ -109,7 +108,6 @@ pub async fn update_settings(
 ) -> Json<PathMutationResponse> {
     match state.services.config.update_settings(
         req.database_path,
-        req.grpc_port,
         req.log_level,
         req.media_storage_dir,
         req.max_cover_art_size_mb,

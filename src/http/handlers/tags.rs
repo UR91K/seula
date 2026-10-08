@@ -111,10 +111,8 @@ pub async fn get_all_tags_with_usage(
     }))
 }
 
-/// Mirrors `src/grpc/handlers/tags.rs::get_projects_by_tag`: the service
-/// returns every tagged project, and pagination is applied here rather than in
-/// SQL, matching the existing (gRPC) behavior rather than changing it as part
-/// of this port.
+/// The service returns every tagged project, and pagination is applied here rather
+/// than in SQL.
 pub async fn get_projects_by_tag(
     State(state): State<AppState>,
     Path(tag_id): Path<String>,

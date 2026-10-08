@@ -14,11 +14,6 @@ impl Config {
             );
         }
 
-        // Validate gRPC port range (u16 is already limited to 0-65535, so just check for 0)
-        if self.grpc_port == 0 {
-            return Err(ConfigError::PortOutOfRange(0));
-        }
-
         // Validate HTTP port range (u16 is already limited to 0-65535, so just check for 0)
         if self.http_port == 0 {
             return Err(ConfigError::PortOutOfRange(0));

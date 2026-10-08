@@ -24,3 +24,9 @@ Bugs fixed before this list existed are written up there under Resolved. See ADR
   it: it pages to the route's `total_count`.
 - [x] 2026-10-07 `headers-rendering-over-sidebar` Headers render on top of sidebar at window widths lower than 1144px
   Fixed 58a9f95.
+- [ ] 2026-10-08 `search-negative-offset` A negative offset wraps in `as usize`, so the search page comes back empty; clamp or reject it, and check the other offset casts (project listing too). src/services/search.rs
+- [ ] 2026-10-08 `media-mutations-200-on-failure` The media routes report failure as 200 with success:false instead of a status code, unlike every other route; web/shared/api.ts works around it. src/http/handlers/media.rs
+  The config mutation routes (`src/http/handlers/config.rs`) do the same. The maintainer
+  thinks it was chosen because an earlier frontend read better with it, but does not
+  remember for certain (2026-10-08). Both need a status code and a matching change in
+  `web/shared/api.ts`.

@@ -2,22 +2,11 @@ use clap::Parser;
 use seula::cli::{Cli, Commands};
 use seula::config::CONFIG;
 use seula::database::ProjectDatabase;
-use seula::grpc::collections::collection_service_server;
-use seula::grpc::common::ScanStatus;
-use seula::grpc::media::media_service_server;
-use seula::grpc::plugins::plugin_service_server;
-use seula::grpc::projects::project_service_server;
-use seula::grpc::samples::sample_service_server;
-use seula::grpc::scanning::scanning_service_server;
-use seula::grpc::search::search_service_server;
-use seula::grpc::system::system_service_server;
-use seula::grpc::tags::tag_service_server;
-use seula::grpc::tasks::task_service_server;
-use seula::grpc::watcher::watcher_service_server;
 use seula::http;
 use seula::media::{MediaConfig, MediaStorageManager};
+use seula::services::ScanStatus;
 use seula::services::{Services, SystemService};
-use seula::{grpc, tray};
+use seula::tray;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -61,12 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-/// The state every adapter (gRPC, HTTP) runs on top of, built once so all of them share
-/// the same database connection and the same in-memory `SystemService` state (scan
-/// status, watcher handle) rather than each opening their own -- see ADR-0024.
+/// The state the HTTP router runs on, built once so everything shares the same database
+/// connection and the same in-memory `SystemService` state (scan status, watcher handle)
+/// rather than opening its own -- see ADR-0024.
 struct SharedState {
-    db: Arc<Mutex<ProjectDatabase>>,
-    media_storage: Arc<MediaStorageManager>,
     services: Services,
     system_service: SystemService,
 }
@@ -91,7 +78,7 @@ fn build_shared_state() -> Result<SharedState, Box<dyn std::error::Error>> {
         media_config,
     )?);
 
-    let scan_status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
+    let scan_status = Arc::new(Mutex::new(ScanStatus::Unknown));
     let scan_progress = Arc::new(Mutex::new(None));
     let watcher = Arc::new(Mutex::new(None));
     let watcher_events = Arc::new(Mutex::new(None));
@@ -107,56 +94,27 @@ fn build_shared_state() -> Result<SharedState, Box<dyn std::error::Error>> {
     );
 
     Ok(SharedState {
-        db,
-        media_storage,
         services,
         system_service,
     })
 }
 
-#[allow(unused)] //TODO: Remove this once it is used.
-async fn run_cli_mode() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting Seula gRPC Server (CLI mode)");
-    let state = build_shared_state()?;
-    start_grpc_server(state).await
-}
-
 async fn run_server_mode() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting Seula gRPC Server (server-only mode)");
+    info!("Starting Seula (server-only mode)");
 
     let state = build_shared_state()?;
-    let http_services = state.services.clone();
-    let http_system_service = state.system_service.clone();
-    let http_handle = tokio::spawn(async move {
-        if let Err(e) = start_http_server(http_services, http_system_service).await {
-            eprintln!("HTTP server error: {}", e);
-        }
-    });
-
-    let grpc_result = start_grpc_server(state).await;
-    http_handle.abort();
-    grpc_result
+    start_http_server(state.services, state.system_service).await
 }
 
 async fn run_tray_mode() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting Seula gRPC Server (tray mode)");
+    info!("Starting Seula (tray mode)");
 
     let state = build_shared_state()?;
 
-    // Start the HTTP server in a background task first, since starting the gRPC
-    // server below consumes `state`.
-    let http_services = state.services.clone();
-    let http_system_service = state.system_service.clone();
+    // The HTTP server runs in a background task while the tray owns this thread.
     let http_handle = tokio::spawn(async move {
-        if let Err(e) = start_http_server(http_services, http_system_service).await {
+        if let Err(e) = start_http_server(state.services, state.system_service).await {
             eprintln!("HTTP server error: {}", e);
-        }
-    });
-
-    // Start the gRPC server in a background task
-    let server_handle = tokio::spawn(async {
-        if let Err(e) = start_grpc_server(state).await {
-            eprintln!("gRPC server error: {}", e);
         }
     });
 
@@ -179,60 +137,8 @@ async fn run_tray_mode() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // If we get here, the user quit the tray, so abort the servers
-    server_handle.abort();
+    // If we get here, the user quit the tray, so stop the server
     http_handle.abort();
-
-    Ok(())
-}
-
-async fn start_grpc_server(state: SharedState) -> Result<(), Box<dyn std::error::Error>> {
-    let config = CONFIG.as_ref().inspect_err(|&e| {
-        eprintln!("Failed to load configuration: {}", e);
-    })?;
-
-    let server = grpc::server::SeulaServer::from_shared(
-        state.db,
-        state.media_storage,
-        state.services,
-        state.system_service,
-    );
-
-    // Set up the gRPC service
-    let addr = format!("127.0.0.1:{}", config.grpc_port).parse()?;
-    info!("gRPC server listening on {}", addr);
-
-    // Start the server with all services
-    tonic::transport::Server::builder()
-        .add_service(project_service_server::ProjectServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(search_service_server::SearchServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(collection_service_server::CollectionServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(tag_service_server::TagServiceServer::new(server.clone()))
-        .add_service(task_service_server::TaskServiceServer::new(server.clone()))
-        .add_service(media_service_server::MediaServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(system_service_server::SystemServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(plugin_service_server::PluginServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(sample_service_server::SampleServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(scanning_service_server::ScanningServiceServer::new(
-            server.clone(),
-        ))
-        .add_service(watcher_service_server::WatcherServiceServer::new(server))
-        .serve(addr)
-        .await?;
 
     Ok(())
 }

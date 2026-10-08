@@ -56,7 +56,7 @@ impl ConfigCommands {
             database_path: config
                 .database_path()
                 .unwrap_or_else(|| "Default".to_string()),
-            grpc_port: config.grpc_port(),
+            http_port: config.http_port(),
             log_level: config.log_level(),
             media_storage_dir: config.media_storage_dir.clone(),
             max_cover_art_size_mb: config.max_cover_art_size_mb,
@@ -149,7 +149,7 @@ impl ConfigCommands {
 pub struct ConfigDisplay {
     pub paths: Vec<String>,
     pub database_path: String,
-    pub grpc_port: u16,
+    pub http_port: u16,
     pub log_level: String,
     pub media_storage_dir: String,
     pub max_cover_art_size_mb: Option<u32>,
@@ -172,7 +172,7 @@ impl TableDisplay for ConfigDisplay {
         simple_table_row!(table, "Status Message", self.status_message);
 
         // Basic settings
-        simple_table_row!(table, "gRPC Port", self.grpc_port);
+        simple_table_row!(table, "HTTP Port", self.http_port);
         simple_table_row!(table, "Log Level", self.log_level);
 
         // Paths
@@ -244,7 +244,7 @@ impl TableDisplay for ConfigDisplay {
             .write_record(["status_message", &self.status_message])
             .map_err(|e| -> CliError { e.into() })?;
         writer
-            .write_record(["grpc_port", &self.grpc_port.to_string()])
+            .write_record(["http_port", &self.http_port.to_string()])
             .map_err(|e| -> CliError { e.into() })?;
         writer
             .write_record(["log_level", &self.log_level])

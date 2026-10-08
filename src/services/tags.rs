@@ -19,7 +19,7 @@ impl TagsService {
     }
 
     /// Escape hatch for callers that need a raw `&mut ProjectDatabase` lock, e.g.
-    /// gRPC's LiveSet-to-proto conversion helper. Prefer the typed methods above.
+    /// the adapters' project-to-response conversion helpers. Prefer the typed methods above.
     pub fn db_handle(&self) -> Arc<Mutex<ProjectDatabase>> {
         Arc::clone(&self.db)
     }

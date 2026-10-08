@@ -1,7 +1,6 @@
-//! HTTP error mapping (ADR-0024). Mirrors `src/grpc/error.rs`'s
-//! `From<DatabaseError> for tonic::Status`, but to HTTP status codes instead of
-//! gRPC codes, with the same classification: `NotFound` -> 404,
-//! `InvalidOperation` -> 400 (a validation-style failure), everything else -> 500.
+//! HTTP error mapping (ADR-0024). Classifies a `DatabaseError` as
+//! an HTTP status: `NotFound` -> 404, `InvalidOperation` -> 400 (a validation-style
+//! failure), everything else -> 500.
 //!
 //! Exists so handlers can use `?` on a `Result<_, DatabaseError>` and no call site
 //! hand-builds an error response.

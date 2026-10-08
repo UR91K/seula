@@ -6,12 +6,13 @@ use crate::error::DatabaseError;
 use crate::models::CollectionStatistics;
 use crate::project::Project;
 
-/// A collection plus the detail gRPC/CLI both need to display it: derived
+/// A collection plus the detail the adapters need to display it: derived
 /// project-count/duration stats, bundled here so callers don't repeat the
-/// get-then-stat two-step that used to live in the gRPC handler.
+/// get-then-stat two-step each adapter used to repeat.
 ///
 /// `project_ids`, `project_count` and `total_duration_seconds` all count the same
 /// projects: those in the scope the detail was loaded with (ADR-0043).
+#[derive(Debug)]
 pub struct CollectionDetail {
     pub id: String,
     pub name: String,

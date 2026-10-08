@@ -1,5 +1,4 @@
-//! Samples domain HTTP handlers (ADR-0024). Thin over `SamplesService`,
-//! mirroring `src/grpc/handlers/samples.rs`.
+//! Samples domain HTTP handlers (ADR-0024). Thin over `SamplesService`.
 
 use std::convert::Infallible;
 
@@ -287,8 +286,8 @@ pub async fn get_sample_formats(
 mod tests {
     use super::*;
     use crate::database::ProjectDatabase;
-    use crate::grpc::common::ScanStatus;
     use crate::media::{MediaConfig, MediaStorageManager};
+    use crate::services::ScanStatus;
     use crate::services::{Services, SystemService};
     use axum::body::HttpBody;
     use std::sync::Arc;
@@ -318,7 +317,7 @@ mod tests {
             MediaStorageManager::new(media_dir.path().to_path_buf(), MediaConfig::default())
                 .unwrap(),
         );
-        let status = Arc::new(Mutex::new(ScanStatus::ScanUnknown));
+        let status = Arc::new(Mutex::new(ScanStatus::Unknown));
         let system = SystemService::new(
             Arc::clone(&db),
             Arc::clone(&status),
@@ -338,7 +337,7 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(30);
         while !matches!(
             *status.lock().await,
-            ScanStatus::ScanCompleted | ScanStatus::ScanError
+            ScanStatus::Completed | ScanStatus::Error
         ) {
             assert!(Instant::now() < deadline, "the check never finished");
             tokio::time::sleep(Duration::from_millis(10)).await;

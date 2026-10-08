@@ -1,130 +1,15 @@
 //! HTTP wire types for the system domain (ADR-0024).
 //!
-//! `SystemService::get_statistics` returns the generated proto
-//! `GetStatisticsResponse` directly (see that method's own doc comment: the
-//! data is proto-shaped by nature and had no other consumer). ADR-0024's
-//! rejected alternatives rule out deriving serde on generated types and
-//! reusing them as the HTTP wire format, so everything below is a hand-written
-//! mirror of that message and its nested types, built by converting the proto
-//! response field by field -- including the two embedded `common::Project`s
-//! and the embedded `common::Collection`, converted from their already-proto
-//! form rather than from the domain type (the service has already done that
-//! conversion once by the time HTTP sees it).
+//! `StatisticsDto` mirrors `services::Statistics` field by field. The projects it
+//! embeds are converted by `project_to_dto`, like any other project in a response.
 
 use serde::{Deserialize, Serialize};
 
-use crate::grpc::common::Project as ProtoProject;
-use crate::grpc::system as proto;
+use crate::database::ProjectDatabase;
+use crate::error::DatabaseError;
 use crate::http::dto::collections::CollectionDto;
-use crate::http::dto::projects::{
-    AbletonVersionDto, KeySignatureDto, PluginDto, ProjectDto, SampleDto, TaskDto, TimeSignatureDto,
-};
-use crate::http::dto::tags::TagDto;
-
-fn proto_project_to_dto(p: ProtoProject) -> ProjectDto {
-    ProjectDto {
-        id: p.id,
-        // False for an archived project, which the statistics include under
-        // `scope=all` (ADR-0045).
-        is_active: p.is_active,
-        name: p.name,
-        path: p.path,
-        hash: p.hash,
-        notes: p.notes,
-        created_at: p.created_at,
-        modified_at: p.modified_at,
-        last_parsed_at: p.last_parsed_at,
-        tempo: p.tempo,
-        time_signature: p
-            .time_signature
-            .map(|ts| TimeSignatureDto {
-                numerator: ts.numerator,
-                denominator: ts.denominator,
-            })
-            .unwrap_or(TimeSignatureDto {
-                numerator: 0,
-                denominator: 0,
-            }),
-        key_signature: p
-            .key_signature
-            .and_then(|ks| KeySignatureDto::from_names(&ks.tonic, &ks.scale)),
-        duration_seconds: p.duration_seconds,
-        furthest_bar: p.furthest_bar,
-        ableton_version: p
-            .ableton_version
-            .map(|v| AbletonVersionDto {
-                major: v.major,
-                minor: v.minor,
-                patch: v.patch,
-                beta: v.beta,
-            })
-            .unwrap_or(AbletonVersionDto {
-                major: 0,
-                minor: 0,
-                patch: 0,
-                beta: false,
-            }),
-        plugins: p
-            .plugins
-            .into_iter()
-            .map(|pl| PluginDto {
-                id: pl.id,
-                dev_identifier: pl.dev_identifier,
-                name: pl.name,
-                format: pl.format,
-                installed: pl.installed,
-                vendor: pl.vendor,
-                version: pl.version,
-            })
-            .collect(),
-        samples: p
-            .samples
-            .into_iter()
-            .map(|s| SampleDto {
-                id: s.id,
-                name: s.name,
-                path: s.path,
-                is_present: s.is_present,
-            })
-            .collect(),
-        tags: p
-            .tags
-            .into_iter()
-            .map(|t| TagDto::from((t.id, t.name, t.created_at)))
-            .collect(),
-        tasks: p
-            .tasks
-            .into_iter()
-            .map(|t| TaskDto {
-                id: t.id,
-                project_id: t.project_id,
-                description: t.description,
-                completed: t.completed,
-                created_at: t.created_at,
-            })
-            .collect(),
-        collection_ids: p.collection_ids,
-        audio_file_id: p.audio_file_id,
-        // The proto Project carries only the primary (gRPC is not extended, ADR-0028/0037),
-        // so the system statistics' embedded projects have no audio list.
-        audio_files: Vec::new(),
-    }
-}
-
-fn proto_collection_to_dto(c: crate::grpc::common::Collection) -> CollectionDto {
-    CollectionDto {
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        notes: c.notes,
-        created_at: c.created_at,
-        modified_at: c.modified_at,
-        project_ids: c.project_ids,
-        cover_art_id: c.cover_art_id,
-        total_duration_seconds: c.total_duration_seconds,
-        project_count: c.project_count,
-    }
-}
+use crate::http::dto::projects::{project_to_dto, KeySignatureDto, ProjectDto};
+use crate::services::{ScanProgress, Statistics};
 
 #[derive(Serialize)]
 pub struct SystemInfoResponse {
@@ -149,32 +34,14 @@ pub struct ScanProgressDto {
     pub status: String,
 }
 
-pub fn scan_status_name(status: crate::grpc::common::ScanStatus) -> String {
-    use crate::grpc::common::ScanStatus::*;
-    match status {
-        ScanUnknown => "unknown",
-        ScanStarting => "starting",
-        ScanScanningPlugins => "scanning_plugins",
-        ScanCheckingSamples => "checking_samples",
-        ScanDiscovering => "discovering",
-        ScanParsing => "parsing",
-        ScanInserting => "inserting",
-        ScanCompleted => "completed",
-        ScanError => "error",
-    }
-    .to_string()
-}
-
-impl From<crate::grpc::scanning::ScanProgressResponse> for ScanProgressDto {
-    fn from(p: crate::grpc::scanning::ScanProgressResponse) -> Self {
-        let status = crate::grpc::common::ScanStatus::try_from(p.status)
-            .unwrap_or(crate::grpc::common::ScanStatus::ScanUnknown);
+impl From<ScanProgress> for ScanProgressDto {
+    fn from(p: ScanProgress) -> Self {
         Self {
             completed: p.completed,
             total: p.total,
             progress: p.progress,
             message: p.message,
-            status: scan_status_name(status),
+            status: p.status.name().to_string(),
         }
     }
 }
@@ -392,10 +259,11 @@ pub struct StatisticsDto {
     pub task_completion_trends: Vec<TaskCompletionTrendStatisticDto>,
 }
 
-impl From<proto::GetStatisticsResponse> for StatisticsDto {
-    fn from(s: proto::GetStatisticsResponse) -> Self {
-        let c = s.counts.unwrap_or_default();
-        Self {
+impl StatisticsDto {
+    /// `db` is for the embedded projects, which are converted like any other.
+    pub fn build(s: Statistics, db: &mut ProjectDatabase) -> Result<Self, DatabaseError> {
+        let c = s.counts;
+        Ok(Self {
             projects: ProjectCountsDto {
                 total: c.projects_active + c.projects_archived,
                 active: c.projects_active,
@@ -491,17 +359,22 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
             average_monthly_projects: s.average_monthly_projects,
             average_project_duration_seconds: s.average_project_duration_seconds,
             projects_under_40_seconds: s.projects_under_40_seconds,
-            longest_project: s.longest_project.map(proto_project_to_dto),
+            longest_project: s
+                .longest_project
+                .map(|p| project_to_dto(p, db))
+                .transpose()?,
             most_complex_projects: s
                 .most_complex_projects
                 .into_iter()
-                .map(|c| ProjectComplexityStatisticDto {
-                    project: c.project.map(proto_project_to_dto),
-                    plugin_count: c.plugin_count,
-                    sample_count: c.sample_count,
-                    complexity_score: c.complexity_score,
+                .map(|c| {
+                    Ok(ProjectComplexityStatisticDto {
+                        project: Some(project_to_dto(c.project, db)?),
+                        plugin_count: c.plugin_count,
+                        sample_count: c.sample_count,
+                        complexity_score: c.complexity_score,
+                    })
                 })
-                .collect(),
+                .collect::<Result<_, DatabaseError>>()?,
             average_plugins_per_project: s.average_plugins_per_project,
             average_samples_per_project: s.average_samples_per_project,
             top_samples: s
@@ -541,7 +414,7 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
                 })
                 .collect(),
             average_projects_per_collection: s.average_projects_per_collection,
-            largest_collection: s.largest_collection.map(proto_collection_to_dto),
+            largest_collection: s.largest_collection.map(CollectionDto::from),
             task_completion_trends: s
                 .task_completion_trends
                 .into_iter()
@@ -553,7 +426,7 @@ impl From<proto::GetStatisticsResponse> for StatisticsDto {
                     completion_rate: t.completion_rate,
                 })
                 .collect(),
-        }
+        })
     }
 }
 

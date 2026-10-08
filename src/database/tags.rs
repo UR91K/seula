@@ -99,7 +99,7 @@ impl ProjectDatabase {
         Ok(tags)
     }
 
-    /// Get tag IDs for a project (for gRPC responses)
+    /// Get tag IDs for a project (for API responses)
     pub fn get_project_tag_ids(&mut self, project_id: &str) -> Result<Vec<String>, DatabaseError> {
         debug!("Getting tag IDs for project: {}", project_id);
         let mut stmt = self.conn.prepare(
@@ -124,7 +124,7 @@ impl ProjectDatabase {
         Ok(tag_ids)
     }
 
-    /// Get tag data with creation timestamps for a project (for gRPC responses)
+    /// Get tag data with creation timestamps for a project (for API responses)
     pub fn get_project_tag_data(
         &mut self,
         project_id: &str,

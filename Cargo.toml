@@ -41,11 +41,7 @@ notify = "8.0.0"              # File system events
 tokio = { version = "1.0", features = ["full"] }  # Async runtime
 sha2 = "0.10"              # File hashing
 chrono = { version = "0.4.39", features = ["serde"] }
-tonic = "0.10"
-prost = "0.12"
-# HTTP router (ADR-0024). Pinned to 0.6 because axum v0.6.20 / hyper v0.14 / tower v0.4
-# are already transitively present in this tree via tonic 0.10; axum 0.7+ pulls hyper 1.0
-# alongside it, doubling the hyper/tower generations in the build.
+# HTTP router (ADR-0024). Still on 0.6 / hyper 0.14, which tonic used to hold it to.
 axum = "0.6"
 tower-http = { version = "0.4", features = ["cors", "fs"] }
 # Both already in the tree via axum; direct only for ServeFile in the media handler.
@@ -76,6 +72,3 @@ vst-meta = { path = "crates/vst-meta", default-features = false }
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging"] }
 winreg = "0.52"
-
-[build-dependencies]
-tonic-build = "0.10"

@@ -162,11 +162,9 @@ pub struct AudioFileListResponse {
     pub audio_files: Vec<AudioFileDto>,
 }
 
-/// Mirrors `src/grpc/handlers/utils.rs::convert_live_set_to_proto`, but builds
-/// the HTTP DTO directly instead of the proto type. Needs a database lock for
-/// the same reason that function does: notes, audio file, collections, tags and
-/// tasks are not fields of `Project` itself -- they're stored, and loaded,
-/// separately.
+/// Builds the HTTP DTO for a project. Needs the database because notes, audio file,
+/// collections, tags and tasks are not fields of `Project` itself -- they're stored,
+/// and loaded, separately.
 pub fn project_to_dto(
     live_set: DomainProject,
     db: &mut crate::database::ProjectDatabase,

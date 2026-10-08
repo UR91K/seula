@@ -1,11 +1,7 @@
-//! Projects domain HTTP handlers (ADR-0024). Thin over `ProjectsService`,
-//! mirroring `src/grpc/handlers/projects.rs`.
+//! Projects domain HTTP handlers (ADR-0024). Thin over `ProjectsService`.
 //!
-//! `GetProjectsByDeletionStatus` (the gRPC handlers' name) is deliberately not
-//! given its own route: it is a strict subset of `list_projects` (deletion
-//! status with no other filters), and ADR-0024 says the HTTP surface is not
-//! required to mirror the gRPC method names. `GET /api/v1/projects?scope=deleted`
-//! covers it.
+//! There is no route for listing by deletion status alone: it is a strict subset of
+//! `list_projects`. `GET /api/v1/projects?scope=deleted` covers it.
 
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;

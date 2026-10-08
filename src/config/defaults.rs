@@ -1,11 +1,7 @@
 use crate::error::ConfigError;
 use dirs;
 
-/// Default gRPC port
-pub const DEFAULT_GRPC_PORT: u16 = 50051;
-
-/// Default HTTP port (ADR-0024). Distinct from `DEFAULT_GRPC_PORT` so the two
-/// servers can run side by side without a config change.
+/// Default HTTP port (ADR-0024).
 pub const DEFAULT_HTTP_PORT: u16 = 50052;
 
 /// Default log level
@@ -42,9 +38,6 @@ paths = [
 # If database_path is not specified or empty, it will default to the user's data directory
 # database_path = ''
 
-# gRPC server configuration
-grpc_port = {}
-
 # HTTP server configuration (can be overridden by SEULA_HTTP_PORT env var)
 http_port = {}
 
@@ -66,7 +59,6 @@ vst_search_paths = []
 # Seconds a single plugin may take to load before the scanner gives up on it.
 # vst_scan_timeout_secs = 30
 "#,
-        DEFAULT_GRPC_PORT,
         DEFAULT_HTTP_PORT,
         DEFAULT_LOG_LEVEL,
         media_storage_path.display()
@@ -132,10 +124,6 @@ pub fn default_max_cover_art_size() -> Option<u32> {
 
 pub fn default_max_audio_file_size() -> Option<u32> {
     None // Use media module default
-}
-
-pub fn default_grpc_port() -> u16 {
-    DEFAULT_GRPC_PORT
 }
 
 pub fn default_http_port() -> u16 {

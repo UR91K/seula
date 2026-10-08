@@ -67,8 +67,8 @@ impl SystemCommands {
         ]);
 
         table.add_row(vec![
-            "gRPC Port".to_string(),
-            ctx.config.grpc_port.to_string(),
+            "HTTP Port".to_string(),
+            ctx.config.http_port().to_string(),
         ]);
 
         table.add_row(vec!["Log Level".to_string(), ctx.config.log_level.clone()]);

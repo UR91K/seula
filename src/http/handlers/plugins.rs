@@ -1,5 +1,4 @@
-//! Plugins domain HTTP handlers (ADR-0024). Thin over `PluginsService`,
-//! mirroring `src/grpc/handlers/plugins.rs`.
+//! Plugins domain HTTP handlers (ADR-0024). Thin over `PluginsService`.
 
 use std::convert::Infallible;
 
@@ -233,7 +232,7 @@ pub async fn get_plugin(
 ) -> Result<impl IntoResponse, ApiError> {
     let scope = parse_project_scope(query.scope.as_deref())?;
     let not_found = || ApiError::NotFound(format!("Plugin with ID {} not found", plugin_id));
-    let grpc_plugin = state
+    let plugin = state
         .services
         .plugins
         .get_plugin(&plugin_id, scope)
@@ -246,7 +245,7 @@ pub async fn get_plugin(
         .await?
         .ok_or_else(not_found)?;
 
-    let plugin = with_scan_errors(&state, vec![PluginDto::from(grpc_plugin)])
+    let plugin = with_scan_errors(&state, vec![PluginDto::from(plugin)])
         .await?
         .remove(0);
     Ok(Json(GetPluginResponse { plugin, details }))

@@ -4,7 +4,7 @@
 - **Decided:** 2026-09-16
 - **Recorded:** 2026-09-16
 - **Confidence:** decided now
-- **Evidence:** `proto/services/projects.proto` (`DeletionScope` enum,
+- **Evidence:** `a841a58^:proto/services/projects.proto` (`DeletionScope` enum,
   `GetProjectsRequest.deletion_scope`); `src/services/project.rs`
   (`DeletionScope`, `ProjectsService::list_projects`); `src/database/projects.rs`
   (`get_projects_with_filters` gained an `is_active` parameter); ADR-0018 (the

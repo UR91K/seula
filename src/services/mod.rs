@@ -1,5 +1,5 @@
-//! Domain services shared by the gRPC handlers and the CLI/TUI (ADR-0018). Each
-//! service owns validation and orchestration for one entity domain; gRPC handlers
+//! Domain services shared by the HTTP handlers and the CLI (ADR-0018). Each
+//! service owns validation and orchestration for one entity domain; the HTTP handlers
 //! and CLI commands both call into these instead of the database directly.
 
 pub mod collections;
@@ -8,7 +8,9 @@ pub mod media;
 pub mod plugins;
 pub mod project;
 pub mod samples;
+pub mod scan;
 pub mod search;
+pub mod statistics;
 pub mod system;
 pub mod tags;
 pub mod tasks;
@@ -25,7 +27,9 @@ pub use media::MediaService;
 pub use plugins::PluginsService;
 pub use project::{DeletionScope, ProjectsService};
 pub use samples::SamplesService;
+pub use scan::{ScanProgress, ScanStatus, WatcherEvent, WatcherEventType};
 pub use search::SearchService;
+pub use statistics::Statistics;
 pub use system::SystemService;
 pub use tags::TagsService;
 pub use tasks::TasksService;

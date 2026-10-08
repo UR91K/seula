@@ -17,7 +17,7 @@ fn test_config_validation() {
                 !config.paths.is_empty(),
                 "At least one path should be configured"
             );
-            assert!(config.grpc_port > 0, "gRPC port should be greater than 0");
+            assert!(config.http_port > 0, "HTTP port should be greater than 0");
 
             // Note: Size limits are now optional and handled by media module
             // 0 means no limit, None means use media module default
@@ -63,7 +63,7 @@ fn test_config_validation() {
 fn test_config_constants() {
     setup("error");
     // Test that constants are properly defined
-    assert_eq!(seula::config::DEFAULT_GRPC_PORT, 50051);
+    assert_eq!(seula::config::DEFAULT_HTTP_PORT, 50052);
     assert_eq!(seula::config::DEFAULT_LOG_LEVEL, "error");
 
     // Test media module constants
@@ -114,7 +114,7 @@ fn test_config_clone() {
     // Test that Config can be cloned
     if let Ok(config) = &*CONFIG {
         let cloned = config.clone();
-        assert_eq!(config.grpc_port, cloned.grpc_port);
+        assert_eq!(config.http_port, cloned.http_port);
         assert_eq!(config.paths, cloned.paths);
         assert_eq!(config.database_path, cloned.database_path);
     }
@@ -233,4 +233,24 @@ fn test_windows_path_length_detection() {
     let info = windows_paths::get_path_length_info();
     assert!(!info.is_empty());
     assert!(info.contains("characters"));
+}
+
+/// The gRPC server is gone (ADR-0046), but config files written while it existed still
+/// carry `grpc_port`. They must keep loading, and keep their other settings.
+#[test]
+fn test_config_with_the_retired_grpc_port_still_loads() {
+    setup("error");
+    let config: seula::config::Config = toml::from_str(
+        r#"
+paths = []
+grpc_port = 50051
+http_port = 50999
+log_level = "info"
+media_storage_dir = "media"
+"#,
+    )
+    .expect("an old config with grpc_port should still parse");
+
+    assert_eq!(config.http_port, 50999);
+    assert_eq!(config.log_level, "info");
 }
