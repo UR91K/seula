@@ -157,9 +157,8 @@ async fn start_http_server(
     let addr = format!("127.0.0.1:{}", config.http_port()).parse::<std::net::SocketAddr>()?;
     info!("HTTP server listening on {}", addr);
 
-    axum::Server::bind(&addr)
-        .serve(router.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, router).await?;
 
     Ok(())
 }

@@ -53,8 +53,8 @@ pub async fn get_scan_status(State(state): State<AppState>) -> impl IntoResponse
 /// 409 when a scan, of projects or plugins, is already running (ADR-0038).
 pub async fn scan_directories(
     State(state): State<AppState>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+) -> Result<impl IntoResponse, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system
@@ -160,8 +160,8 @@ pub async fn stop_watcher(State(state): State<AppState>) -> Json<WatcherActionRe
 
 pub async fn get_watcher_events(
     State(state): State<AppState>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+) -> Result<impl IntoResponse, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system

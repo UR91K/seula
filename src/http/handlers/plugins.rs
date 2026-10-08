@@ -287,9 +287,9 @@ pub async fn get_projects_by_plugin(
 pub async fn scan_plugins(
     State(state): State<AppState>,
     Query(query): Query<ScanModeQuery>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     let mode = parse_scan_mode(query.mode.as_deref())?;
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system

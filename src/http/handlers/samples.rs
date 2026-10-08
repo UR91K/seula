@@ -165,10 +165,8 @@ pub async fn get_sample_stats(
 /// Check every sample file in the background, streaming progress as Server-Sent Events
 /// like the other scans (ADR-0041). The progress also shows at
 /// `GET /api/v1/system/scan-status`. 409 when a scan is already running.
-pub async fn check_samples(
-    State(state): State<AppState>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+pub async fn check_samples(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system
@@ -289,7 +287,6 @@ mod tests {
     use crate::media::{MediaConfig, MediaStorageManager};
     use crate::services::ScanStatus;
     use crate::services::{Services, SystemService};
-    use axum::body::HttpBody;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
     use tokio::sync::Mutex;
@@ -328,7 +325,7 @@ mod tests {
         );
         let state = AppState::new(Services::new(db, media), system);
 
-        let mut body = check_samples(State(state))
+        let body = check_samples(State(state))
             .await
             .unwrap()
             .into_response()
@@ -345,10 +342,8 @@ mod tests {
         // The status is written just before the final update is sent.
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        let mut text = String::new();
-        while let Some(chunk) = body.data().await {
-            text.push_str(&String::from_utf8_lossy(&chunk.unwrap()));
-        }
+        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+        let text = String::from_utf8_lossy(&bytes).into_owned();
         let last = text
             .lines()
             .filter_map(|l| l.strip_prefix("data:"))

@@ -4,7 +4,7 @@
 //!
 //! The project audio-list routes (ADR-0037) return the resulting list on success.
 
-use axum::body::{boxed, Body, Bytes};
+use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderValue, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -103,7 +103,7 @@ pub async fn download_media(
         content_disposition(&media_file.original_filename),
     );
 
-    Ok(response.map(boxed))
+    Ok(response.map(Body::new))
 }
 
 /// `attachment` with the original file name, RFC 6266 style: an ASCII fallback plus a

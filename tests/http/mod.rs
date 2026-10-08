@@ -2,7 +2,7 @@
 
 pub mod adapters;
 
-use axum::body::{Body, HttpBody};
+use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use axum::Router;
 use seula::http::server::build_router;
@@ -64,11 +64,10 @@ async fn reply(app: &Router, request: Request<Body>) -> Reply {
 
     let status = response.status();
     let headers = response.headers().clone();
-    let mut body = response.into_body();
-    let mut bytes = Vec::new();
-    while let Some(chunk) = body.data().await {
-        bytes.extend_from_slice(&chunk.unwrap());
-    }
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
     Reply {
         status,
         headers,

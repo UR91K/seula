@@ -17,7 +17,7 @@ Last reviewed: 2026-10-04.
 | CLI | **Done, to be replaced** | 33+ commands, table/JSON/CSV via `src/cli/output.rs`. Opens the database directly. To be replaced by a CLI client that talks to the daemon over HTTP (ADR-0050, which reverses this part of ADR-0046); `--config` and `--server` stay |
 | CLI client over HTTP | **Not started, decided** | ADR-0050. A separate small program on the `PATH`, no interactive mode. Lands before the old subcommands are deleted, which serve as its reference. A client that finds no daemon starts it; the daemon needs a single-instance guard first (none exists). Starting the daemon from the CLI is disabled if it trips antivirus before the executables are signed. Executables: `seula` is the CLI and the daemon is renamed `seula-service` (not done yet). Tray menu: Open, Rescan, Start with Windows (also in the GUI's settings), Quit |
 | gRPC API | **Removed** | ADR-0046. `src/grpc/`, `proto/`, `build.rs`, tonic and prost, and the `grpc_port` setting are gone. A config file that still has `grpc_port` loads fine; the key is ignored |
-| HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
+| HTTP API | **Done** | `src/http/`, axum 0.8, all 9 `Services` domains plus `system`. ADR-0024 |
 | Tray mode | **Done** | `src/tray.rs`; default when run with no subcommand |
 | File watcher | **Done** | `src/watcher/`, streams over SSE |
 | Tags / collections / tasks / notes | **Done** | |

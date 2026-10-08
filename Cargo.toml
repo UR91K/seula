@@ -41,11 +41,11 @@ notify = "8.0.0"              # File system events
 tokio = { version = "1.0", features = ["full"] }  # Async runtime
 sha2 = "0.10"              # File hashing
 chrono = { version = "0.4.39", features = ["serde"] }
-# HTTP router (ADR-0024). Still on 0.6 / hyper 0.14, which tonic used to hold it to.
-axum = "0.6"
-tower-http = { version = "0.4", features = ["cors", "fs"] }
-# Both already in the tree via axum; direct only for ServeFile in the media handler.
-tower = { version = "0.4", features = ["util"] }
+# HTTP router (ADR-0024).
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+# Already in the tree via axum; direct only for ServeFile in the media handler.
+tower = { version = "0.5", features = ["util"] }
 mime = "0.3"
 tokio-stream = "0.1"
 async-trait = "0.1"
