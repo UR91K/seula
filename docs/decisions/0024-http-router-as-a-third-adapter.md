@@ -8,8 +8,8 @@
 - **Confidence:** decided now
 - **Evidence:** ADR-0018 (the service layer and its provision for this router);
   `src/services/mod.rs` (the `Services` aggregator this consumes);
-  `src/grpc/handlers/tags.rs` (the adapter shape being copied);
-  `src/grpc/error.rs` (the error-conversion precedent); `src/grpc/server.rs`
+  `a841a58^:src/grpc/handlers/tags.rs` (the adapter shape being copied);
+  `a841a58^:src/grpc/error.rs` (the error-conversion precedent); `a841a58^:src/grpc/server.rs`
   (where `SystemService` is constructed outside `Services`); ADR-0023 (which lands first)
 
 ## Context
@@ -39,7 +39,7 @@ database access.
 
 **State.** An `AppState` bundling `Services` with `SystemService`. The second is needed
 because `SystemService` is not a field of the `Services` aggregator — it is constructed
-separately in `src/grpc/server.rs` and reached only through `SystemHandler`. `Services`
+separately in `a841a58^:src/grpc/server.rs` and reached only through `SystemHandler`. `Services`
 is already `Clone` over `Arc`-backed fields, so per-request cloning costs what the gRPC
 server's own `clone()` per call already costs.
 
@@ -48,7 +48,7 @@ independent of the generated proto types.
 
 **Errors.** An `ApiError` with `From<DatabaseError>` and `IntoResponse`, mapping
 `NotFound` to 404, validation failures to 400 and everything else to 500. This is the
-same move as `impl From<DatabaseError> for tonic::Status` in `src/grpc/error.rs`: it
+same move as `impl From<DatabaseError> for tonic::Status` in `a841a58^:src/grpc/error.rs`: it
 exists so handlers use `?` and no call site hand-builds an error response.
 
 **Routing.** Resource-oriented under `/api/v1`, with POST sub-resources for the

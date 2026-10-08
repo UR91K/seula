@@ -7,10 +7,10 @@
 - **Recorded:** 2026-09-16
 - **Confidence:** decided now
 - **Evidence:** `src/database/plugins.rs` (`get_plugins_by_installed_status`,
-  `search_plugins`, `get_all_plugins`); `proto/services/plugins.proto`
+  `search_plugins`, `get_all_plugins`); `a841a58^:proto/services/plugins.proto`
   (`GetPluginByInstalledStatusRequest.installed`, `installed_only` on the list and search
   requests, and `GetPluginStatsResponse` which is already tri-state);
-  `src/services/plugins.rs`; `src/grpc/handlers/plugins.rs`;
+  `src/services/plugins.rs`; `a841a58^:src/grpc/handlers/plugins.rs`;
   `src/cli/commands/plugin.rs` (`installed_cell`, `installed_label` — already tri-state
   for display); ADR-0012 (which made `installed` tri-state in the first place)
 

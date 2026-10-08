@@ -53,9 +53,7 @@ SCAN_DB = HERE / "seula-scan.db"
 SCAN_CONFIG = HERE / "mock-scan-config.toml"
 
 # Off the defaults (50051/50052) so a running real daemon does not collide.
-GRPC_PORT = 50151
 HTTP_PORT = 50152
-SCAN_GRPC_PORT = 50153
 SCAN_HTTP_PORT = 50154
 
 rng = random.Random(20260923)
@@ -519,7 +517,7 @@ def q(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
-def write_config(path: Path, db: Path, grpc_port: int, http_port: int, vst_paths: list) -> None:
+def write_config(path: Path, db: Path, http_port: int, vst_paths: list) -> None:
     toml_path = lambda p: str(p).replace("\\", "/")
     path.write_text(
         "paths = []\n"
@@ -561,7 +559,7 @@ def scan_streams() -> dict:
     for name, _, kind, _, _ in PLUGINS[:14]:
         (FAKE_PLUGINS / f"{name}.{'vst3' if kind == 'VST3' else 'dll'}").write_bytes(b"")
     shutil.copyfile(DB, SCAN_DB)
-    write_config(SCAN_CONFIG, SCAN_DB, SCAN_GRPC_PORT, SCAN_HTTP_PORT, [FAKE_PLUGINS])
+    write_config(SCAN_CONFIG, SCAN_DB, SCAN_HTTP_PORT, [FAKE_PLUGINS])
     server = start_server(SCAN_CONFIG, SCAN_HTTP_PORT)
     streams = {}
     try:
@@ -615,7 +613,7 @@ def snapshot() -> None:
     if not DB.exists():
         sys.exit("no database; run `seed` first")
     MEDIA_DIR.mkdir(exist_ok=True)
-    write_config(CONFIG, DB, GRPC_PORT, HTTP_PORT, [])
+    write_config(CONFIG, DB, HTTP_PORT, [])
     subprocess.run(["cargo", "build", "--quiet"], cwd=REPO, check=True)
     server = start_server(CONFIG, HTTP_PORT)
     try:
@@ -703,7 +701,7 @@ if __name__ == "__main__":
     if step == "config":
         # Only the config the frontend's dev daemon runs from; `snapshot` writes it too.
         MEDIA_DIR.mkdir(exist_ok=True)
-        write_config(CONFIG, DB, GRPC_PORT, HTTP_PORT, [])
+        write_config(CONFIG, DB, HTTP_PORT, [])
     if step in ("seed", "all"):
         seed()
     if step in ("snapshot", "all"):

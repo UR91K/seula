@@ -14,27 +14,31 @@ use vst_meta::protocol::{ErrorType, Outcome};
 
 /// Locate the stub worker that `cargo test` builds alongside these tests.
 fn stub_worker() -> PathBuf {
-    // The test binary lives in target/<profile>/deps/; examples land one level up in
-    // target/<profile>/examples/.
-    let mut dir = std::env::current_exe().expect("test executable path");
-    dir.pop(); // deps/
-    dir.pop(); // <profile>/
-
     let name = if cfg!(windows) {
         "stub_vst_worker.exe"
     } else {
         "stub_vst_worker"
     };
-    let path = dir.join("examples").join(name);
+
+    // Examples land in target/<profile>/examples/. Where the test binary sits relative to
+    // that depends on the cargo version: target/<profile>/deps/ for a long time, then
+    // target/<profile>/build/<package>/<hash>/out/ with the newer build-dir layout. So
+    // look in `examples/` beside each ancestor of the test binary, nearest first.
+    let exe = std::env::current_exe().expect("test executable path");
+    let found = exe
+        .ancestors()
+        .skip(1)
+        .map(|dir| dir.join("examples").join(name))
+        .find(|path| path.is_file());
 
     // `cargo test` builds examples; `cargo test --test plugin_scanner_tests` does not.
-    assert!(
-        path.is_file(),
-        "stub worker not found at {}.\nRun `cargo build --example stub_vst_worker` first, \
-         or use plain `cargo test`, which builds examples.",
-        path.display()
-    );
-    path
+    found.unwrap_or_else(|| {
+        panic!(
+            "stub worker not found in an `examples/` directory above {}.\nRun `cargo build \
+             --example stub_vst_worker` first, or use plain `cargo test`, which builds examples.",
+            exe.display()
+        )
+    })
 }
 
 fn spawner(timeout_secs: u64) -> Spawner {

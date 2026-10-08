@@ -2,8 +2,8 @@ use crate::config::{Config, CONFIG};
 use crate::error::ConfigError;
 
 /// Config mutation is on the static `CONFIG` lazy, not `ProjectDatabase` -- this
-/// service holds no state of its own. It exists so gRPC and the future axum router
-/// share one place for this logic; the CLI's `config` command reads `CONFIG`
+/// service holds no state of its own. It exists so the HTTP router has one place for this
+/// logic; the CLI's `config` command reads `CONFIG`
 /// directly today and has no mutation subcommands to route through this yet.
 #[derive(Clone, Default)]
 pub struct ConfigService;
@@ -39,7 +39,6 @@ impl ConfigService {
     pub fn update_settings(
         &self,
         database_path: Option<String>,
-        grpc_port: Option<u16>,
         log_level: Option<String>,
         media_storage_dir: Option<String>,
         max_cover_art_size_mb: Option<Option<u32>>,
@@ -48,7 +47,6 @@ impl ConfigService {
         let mut config = self.get()?.clone();
         let warnings = config.update_settings(
             database_path,
-            grpc_port,
             log_level,
             media_storage_dir,
             max_cover_art_size_mb,

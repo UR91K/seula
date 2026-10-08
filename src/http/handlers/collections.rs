@@ -1,11 +1,7 @@
-//! Collections domain HTTP handlers (ADR-0024). Thin over `CollectionsService`,
-//! mirroring `src/grpc/handlers/collections.rs`.
+//! Collections domain HTTP handlers (ADR-0024). Thin over `CollectionsService`.
 //!
-//! `get_collection_projects` (returning full `Project` values) is exposed here
-//! even though the gRPC surface never did -- only the CLI used it. It's
-//! possible now because the projects domain's `ProjectDto`/`project_to_dto`
-//! already exist; the tags domain's equivalent (`GetProjectsByTag`) had to
-//! wait for exactly this, and now it can be revisited too.
+//! `get_collection_projects` returns full `Project` values, converted with the projects
+//! domain's `project_to_dto`.
 //!
 //! Every route that counts or lists a collection's projects takes `scope`
 //! (ADR-0043): `active` by default, leaving archived projects out, or `all`.

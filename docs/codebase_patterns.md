@@ -59,262 +59,99 @@ fn test_scenario_2_impl() {
 
 ---
 
-## gRPC Service Patterns
+## Adding an Endpoint
 
-### Adding New gRPC Endpoints
-
-**Overview**: The codebase follows a structured approach for adding gRPC services with clear separation of concerns between protocol definitions, handlers, and server implementation.
+Behaviour lives in a service; the HTTP router is a thin adapter over it (ADR-0018,
+ADR-0024). An endpoint is a database method, a service method, a wire type, a handler
+and a route, plus tests at the layer where the behaviour is.
 
 ### Step-by-Step Process
 
-#### 1. Define Protocol Buffer Service
-**File**: `proto/services/{service_name}.proto`
-
-```protobuf
-syntax = "proto3";
-
-package seula.{service_name};
-
-import "common.proto";
-
-service {ServiceName}Service {
-  rpc GetItem(GetItemRequest) returns (GetItemResponse);
-  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
-  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
-  rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
-}
-
-message GetItemRequest {
-  string item_id = 1;
-}
-
-message GetItemResponse {
-  optional seula.common.Item item = 1;
-}
-
-// ... other message definitions
-```
-
-#### 2. Add Service to Build System
-**File**: `build.rs`
+#### 1. Database method
+**File**: `src/database/{domain}.rs`
 
 ```rust
-let services = [
-    "projects",
-    "collections", 
-    "tasks",
-    // ... existing services
-    "{service_name}",  // Add your new service here
-];
-```
-
-#### 3. Create Database Methods
-**File**: `src/database/{service_name}.rs`
-
-```rust
-use crate::database::ProjectDatabase;
-use crate::error::DatabaseError;
-
 impl ProjectDatabase {
     pub fn get_item(&mut self, item_id: &str) -> Result<Option<ItemData>, DatabaseError> {
-        // Database implementation
-    }
-
-    pub fn create_item(&mut self, item: &ItemData) -> Result<String, DatabaseError> {
-        // Database implementation
-    }
-
-    // ... other database methods
-}
-
-// Database-specific structs
-pub struct ItemData {
-    pub id: String,
-    pub name: String,
-    // ... other fields
-}
-```
-
-#### 4. Create gRPC Handler
-**File**: `src/grpc/handlers/{service_name}.rs`
-
-```rust
-use log::{debug, error};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tonic::{Code, Request, Response, Status};
-
-use crate::database::ProjectDatabase;
-use super::super::{service_name}::*;
-use super::super::common::*;
-
-#[derive(Clone)]
-pub struct {ServiceName}Handler {
-    pub db: Arc<Mutex<ProjectDatabase>>,
-}
-
-impl {ServiceName}Handler {
-    pub fn new(db: Arc<Mutex<ProjectDatabase>>) -> Self {
-        Self { db }
-    }
-
-    pub async fn get_item(
-        &self,
-        request: Request<GetItemRequest>,
-    ) -> Result<Response<GetItemResponse>, Status> {
-        debug!("GetItem request: {:?}", request);
-
-        let req = request.into_inner();
-        let mut db = self.db.lock().await;
-
-        match db.get_item(&req.item_id) {
-            Ok(Some(item_data)) => {
-                let item = Item {
-                    id: item_data.id,
-                    name: item_data.name,
-                    // ... convert database struct to proto
-                };
-
-                let response = GetItemResponse { item: Some(item) };
-                Ok(Response::new(response))
-            }
-            Ok(None) => {
-                debug!("Item not found: {}", req.item_id);
-                let response = GetItemResponse { item: None };
-                Ok(Response::new(response))
-            }
-            Err(e) => {
-                error!("Failed to get item {}: {:?}", req.item_id, e);
-                Err(Status::new(
-                    Code::Internal,
-                    format!("Database error: {}", e),
-                ))
-            }
-        }
-    }
-
-    // ... other handler methods
-}
-```
-
-#### 5. Register Handler in Module
-**File**: `src/grpc/handlers/mod.rs`
-
-```rust
-pub mod collections;
-pub mod config;
-// ... existing handlers
-pub mod {service_name};  // Add your handler module
-
-pub use collections::CollectionsHandler;
-pub use config::ConfigHandler;
-// ... existing exports
-pub use {service_name}::{ServiceName}Handler;  // Export your handler
-```
-
-#### 6. Add Service to gRPC Module
-**File**: `src/grpc/mod.rs`
-
-```rust
-pub mod {service_name} {
-    tonic::include_proto!("seula.{service_name}");
-}
-```
-
-#### 7. Integrate with Main Server
-**File**: `src/grpc/server.rs`
-
-```rust
-// Add import
-use super::{service_name}::*;
-
-// Add handler to server struct
-#[derive(Clone)]
-pub struct SeulaServer {
-    // ... existing handlers
-    pub {service_name}_handler: {ServiceName}Handler,
-}
-
-// Initialize handler in new() method
-impl SeulaServer {
-    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // ... existing initialization
-        Ok(Self {
-            // ... existing handlers
-            {service_name}_handler: {ServiceName}Handler::new(Arc::clone(&db)),
-        })
+        // SQL
     }
 }
+```
 
-// Implement the service trait
-#[tonic::async_trait]
-impl {service_name}_service_server::{ServiceName}Service for SeulaServer {
-    async fn get_item(
-        &self,
-        request: Request<GetItemRequest>,
-    ) -> Result<Response<GetItemResponse>, Status> {
-        self.{service_name}_handler.get_item(request).await
-    }
+#### 2. Service method
+**File**: `src/services/{domain}.rs`
 
-    // ... implement other service methods
+The service owns validation and orchestration: checking that what a mutation names
+exists, composing several database calls, deciding what an absent row means. Take the
+lock once, inside the method.
+
+```rust
+pub async fn get_item(&self, item_id: &str) -> Result<Option<ItemRow>, DatabaseError> {
+    let mut db = self.db.lock().await;
+    db.get_item(item_id)
 }
 ```
 
-#### 8. Add Tests
-**File**: `tests/grpc/{service_name}.rs`
+Return a `DatabaseError` for failures. `NotFound` becomes a 404 and `InvalidOperation` a
+400 at the router; anything else is a 500.
+
+#### 3. Wire types
+**File**: `src/http/dto/{domain}.rs`
+
+Hand-written `Serialize` and `Deserialize` structs, not derives on domain types, so the
+wire format changes on purpose (ADR-0024). `web/shared/types.ts` mirrors them.
+
+#### 4. Handler
+**File**: `src/http/handlers/{domain}.rs`
+
+Parse the request, call one service method, convert the result. No business logic and no
+database access. `?` turns a `DatabaseError` into the right status.
 
 ```rust
-use crate::grpc::*;
-use crate::grpc::server_setup::{setup_test_server, create_test_project};
-use seula::grpc::{service_name}::*;
-use seula::grpc::{service_name}::{service_name}_service_server::{ServiceName}Service;
-
-#[tokio::test]
-async fn test_get_item() {
-    let (server, _db) = setup_test_server().await;
-
-    let request = Request::new(GetItemRequest {
-        item_id: "test-id".to_string(),
-    });
-
-    let response = server.get_item(request).await.unwrap();
-    let item = response.into_inner().item;
-    
-    // Add assertions
+pub async fn get_item(
+    State(state): State<AppState>,
+    Path(item_id): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let item = state
+        .services
+        .items
+        .get_item(&item_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Item {} not found", item_id)))?;
+    Ok(Json(ItemDto::from(item)))
 }
 ```
 
-**Don't forget to add the module to** `tests/grpc/mod.rs`:
-```rust
-pub mod {service_name};
-```
+#### 5. Route
+**File**: `src/http/server.rs`, in `build_router`. A new domain also needs its handler
+module declared in `src/http/handlers/mod.rs` and its service added to `Services` in
+`src/services/mod.rs`.
+
+#### 6. Tests
+
+- **Behaviour** goes in `tests/services/{domain}.rs`, against the service:
+  `let env = test_env();` gives a fresh in-memory library and the services over it.
+  Test the happy path, the missing row and the refusal.
+- **What only the handler does**, such as status codes, response shape and anything
+  built beyond the service's rows, goes in `tests/http/adapters.rs`, through the real
+  router: `let (app, env) = app();` then `send(&app, Method::GET, "/api/v1/...")`.
+
+Add a new service test module to `tests/services/mod.rs`.
 
 ### Key Patterns & Conventions
 
-#### Error Handling
-- Always use `debug!()` for request logging
-- Use `error!()` for database/internal errors  
-- Convert database errors to gRPC `Status::internal()`
-- Return appropriate gRPC status codes
-
-#### Database Integration
-- Always acquire database lock: `let mut db = self.db.lock().await;`
-- Handle `Ok(Some())`, `Ok(None)`, and `Err()` cases explicitly
-- Use meaningful error messages in Status responses
-
-#### Proto Conversion
-- Convert database structs to proto structs in handlers
-- Use `Some()` for optional fields when data exists
-- Use `None` for optional fields when data doesn't exist
-
-#### Testing
-- Use `setup_test_server()` helper for consistent test setup
-- Test happy path, not found, and error cases
-- Use descriptive test names: `test_{method_name}_{scenario}`
+- **A service returns rows, not responses.** Counting successes in a batch, naming a scan
+  status, embedding a project's tags: the adapter does those.
+- **"Not found" is `None` or `NotFound`.** Which one is the service's call; the handler
+  maps `None` to a 404 itself.
+- **Pagination is the service's.** `limit` and `offset` arrive as `Option<i32>`.
+- **Tests that share the database take the lock once.** Hold it across an `.await` on a
+  service call and you deadlock.
 
 ### Examples in Codebase
-- **Tags Service**: `proto/services/tags.proto`, `src/grpc/handlers/tags.rs`
-- **Config Service**: `proto/services/config.proto`, `src/grpc/handlers/config.rs`
-- **Samples Service**: `proto/services/samples.proto`, `src/grpc/handlers/samples.rs`
+- **Tags**: `src/services/tags.rs`, `src/http/handlers/tags.rs`, `src/http/dto/tags.rs`,
+  `tests/services/tags.rs`
+- **Samples**: `src/services/samples.rs`, `src/http/handlers/samples.rs`
+- **Config**: `src/services/config.rs`, `src/http/handlers/config.rs`
 
 ---

@@ -7,7 +7,7 @@
 - **Evidence:** `src/services/tags.rs` (`TagsService::tag_project`/`untag_project`,
   `require_tag`/`require_project`); `src/services/collections.rs`
   (`CollectionsService::add_project_to_collection`/`remove_project_from_collection`,
-  `require_collection`/`require_project`); `tests/grpc/collections.rs`
+  `require_collection`/`require_project`); `a841a58^:tests/grpc/collections.rs`
   (`test_add_project_to_nonexistent_collection`,
   `test_remove_project_from_nonexistent_collection`, updated to expect `NotFound`
   instead of `Internal`); ADR-0018 (the service-layer audit this was found during)

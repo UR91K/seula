@@ -50,7 +50,7 @@ reseed:
     {{python}} mockup/data/generate.py seed
     {{python}} mockup/data/generate.py config
 
-# Build the daemon (needs protoc on PATH, or PROTOC set)
+# Build the daemon
 build:
     cargo build --bin seula
 

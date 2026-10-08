@@ -14,6 +14,7 @@ use seula::project::Project;
 use seula::scan::parser::ParseResult;
 
 pub mod builders;
+pub mod fixtures;
 pub mod helpers;
 
 // Global INIT for all tests - ensures logger is initialized only once across all tests

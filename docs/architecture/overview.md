@@ -8,7 +8,7 @@ Seula is one binary with two modes, plus a sidecar.
 
 | | |
 |---|---|
-| **Tray daemon** (default) | `src/tray.rs` + the gRPC server and the HTTP router. Background indexing, file watching, gRPC on `grpc_port`, HTTP on `http_port` (ADR-0024). |
+| **Tray daemon** (default) | `src/tray.rs` + the HTTP router. Background indexing, file watching, HTTP on `http_port` (ADR-0024). `--server` runs it without the tray icon. |
 | **CLI** | `src/cli/`. Any subcommand switches to CLI mode. `seula` with no args is interactive (rustyline). |
 | **`vst-meta`** | `crates/vst-meta`. Sidecar binary, spawned per scan batch, never long-lived. ADR-0004 |
 
@@ -87,19 +87,18 @@ powers search with operators (`plugin:`, `bpm:`, `key:`, `missing:`).
 
 ## API
 
-Three adapters over one service layer. `src/services/` owns validation and
-orchestration (ADR-0018); the gRPC server, the HTTP router and the CLI call into it,
-never into the database directly. The tray daemon builds the services once and hands
-the same instances, and the same database connection, to gRPC and HTTP. Its project
-scan writes through that connection too (ADR-0049).
+Two adapters over one service layer. `src/services/` owns validation and
+orchestration (ADR-0018); the HTTP router and the CLI call into it, never into the
+database directly. The tray daemon builds the services once and hands the same
+instances, and the same database connection, to the router. Its project scan writes
+through that connection too (ADR-0049).
 
 - **HTTP**: `src/http/`, JSON over axum, with Server-Sent Events for scan progress
   (ADR-0024). The frontend uses this one.
-- **gRPC**: 12 protos in `proto/services/`, one handler each in `src/grpc/handlers/`,
-  but `src/main.rs` registers 11: there is a config handler and no config service.
-- **CLI**: `src/cli/`, command groups mirroring the gRPC services.
+- **CLI**: `src/cli/`, command groups over the services. It opens the database itself.
 
-ADR-0046 retires gRPC and the CLI in favour of HTTP alone; not yet implemented.
+The gRPC server that once made a third adapter is gone (ADR-0046). ADR-0050 replaces the
+CLI with a client that talks to the daemon over HTTP; not yet implemented.
 
 ## Configuration
 
@@ -113,7 +112,9 @@ ADR-0046 retires gRPC and the CLI in favour of HTTP alone; not yet implemented.
 |---|---|
 | `#[cfg(test)]` in-module | Unit logic — e.g. `scan/plugins/discovery.rs`, `scan/parallel.rs` |
 | `tests/scan/` | Parser fixtures, real-corpus parsing |
-| `tests/database/`, `tests/grpc/` | Storage and API |
+| `tests/database/` | Storage |
+| `tests/services/` | Behaviour, against the service layer, with no transport in the way |
+| `tests/http/` | What the HTTP handlers add: status codes, response shapes, file serving |
 | `tests/integration/` | End-to-end against the configured project folders |
 | `tests/plugin_scanner_tests.rs` | Supervisor recovery, driven by `examples/stub_vst_worker.rs` |
 

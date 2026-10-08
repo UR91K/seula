@@ -42,7 +42,6 @@ fn test_config_loads_with_empty_paths_impl() {
     let config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -88,7 +87,6 @@ fn test_config_validation_with_empty_paths_impl() {
     let config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -138,7 +136,6 @@ fn test_config_with_valid_paths_impl() {
     let config_content = format!(
         r#"
 paths = ["{}"]
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -179,7 +176,6 @@ fn test_config_status_messages_impl() {
     let empty_config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -210,7 +206,6 @@ media_storage_dir = "{}"
     let config_with_paths = format!(
         r#"
 paths = ["{}", "{}"]
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -256,7 +251,6 @@ fn test_config_path_manipulation_impl() {
     let empty_config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -324,7 +318,6 @@ fn test_scanning_with_empty_paths_impl() {
     let empty_config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -360,7 +353,6 @@ fn test_config_reload_impl() {
     let empty_config_content = format!(
         r#"
 paths = []
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,
@@ -385,7 +377,6 @@ media_storage_dir = "{}"
     let updated_config_content = format!(
         r#"
 paths = ["{}"]
-grpc_port = 50051
 log_level = "info"
 media_storage_dir = "{}"
 "#,

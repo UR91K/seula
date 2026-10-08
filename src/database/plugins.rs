@@ -1,5 +1,5 @@
 use crate::error::DatabaseError;
-use crate::models::{GrpcPlugin, Plugin};
+use crate::models::{Plugin, PluginWithUsage};
 use rusqlite::params;
 
 use super::project_counts::ProjectScope;
@@ -118,7 +118,7 @@ impl ProjectDatabase {
         install_states: &[InstallState],
         min_usage_count: Option<i32>,
         scope: ProjectScope,
-    ) -> Result<(Vec<GrpcPlugin>, i32), DatabaseError> {
+    ) -> Result<(Vec<PluginWithUsage>, i32), DatabaseError> {
         let scope_join = scope.join("pp.project_id");
         let sort_column = match sort_by.as_deref() {
             Some("name") => "name",
@@ -272,15 +272,15 @@ impl ProjectDatabase {
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             let plugin = crate::database::helpers::row_to_plugin(row)?;
 
-            Ok(GrpcPlugin {
+            Ok(PluginWithUsage {
                 plugin,
                 usage_count: row.get("usage_count")?,
                 project_count: row.get("project_count")?,
             })
         })?;
 
-        let grpc_plugins: Result<Vec<GrpcPlugin>, _> = rows.collect();
-        Ok((grpc_plugins?, total_count))
+        let plugins_with_usage: Result<Vec<PluginWithUsage>, _> = rows.collect();
+        Ok((plugins_with_usage?, total_count))
     }
 
     /// Write a full rescan of the system's plugins and summarise what changed.
@@ -743,7 +743,7 @@ impl ProjectDatabase {
         &self,
         plugin_id: &str,
         scope: ProjectScope,
-    ) -> Result<Option<GrpcPlugin>, DatabaseError> {
+    ) -> Result<Option<PluginWithUsage>, DatabaseError> {
         let scope_join = scope.join("pp.project_id");
         // Parse the plugin ID as UUID
         let uuid = match uuid::Uuid::parse_str(plugin_id) {
@@ -775,7 +775,7 @@ impl ProjectDatabase {
         let result = stmt.query_row(params![uuid.to_string()], |row| {
             let plugin = crate::database::helpers::row_to_plugin(row)?;
 
-            Ok(GrpcPlugin {
+            Ok(PluginWithUsage {
                 plugin,
                 usage_count: row.get("usage_count")?,
                 project_count: row.get("project_count")?,

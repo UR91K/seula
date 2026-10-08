@@ -1,10 +1,10 @@
 //! System domain HTTP handlers (ADR-0024). Thin over `SystemService` and
-//! `AppState.system`, mirroring `src/grpc/handlers/system.rs`.
+//! `AppState.system`.
 //!
 //! The two streaming endpoints (scan progress, watcher events) are
 //! Server-Sent Events, per ADR-0024's Streaming section: both wrap the same
-//! callback-driven `SystemService` methods the gRPC handlers use, forwarding
-//! each update as an SSE `data:` event instead of a gRPC stream message.
+//! callback-driven `SystemService` methods, forwarding each update as an SSE
+//! `data:` event.
 
 use std::convert::Infallible;
 use std::path::PathBuf;
@@ -18,13 +18,14 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::http::dto::parse_project_scope;
 use crate::http::dto::projects::{project_to_dto, KeySignatureDto};
 use crate::http::dto::system::{
-    scan_status_name, AddMultipleProjectsRequest, AddMultipleProjectsResponse, AddProjectResponse,
+    AddMultipleProjectsRequest, AddMultipleProjectsResponse, AddProjectResponse,
     AddSingleProjectRequest, ExportStatisticsQuery, ScanProgressDto, ScanStatusResponse,
     StatisticsDto, StatisticsQuery, SystemInfoResponse, WatcherActionResponse, WatcherEventDto,
 };
 use crate::http::error::ApiError;
 use crate::http::state::AppState;
 use crate::services::system::send_scan_update;
+use crate::services::Statistics;
 
 pub async fn get_system_info(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let (version, watch_paths, watcher_active, uptime_seconds) = state
@@ -44,7 +45,7 @@ pub async fn get_system_info(State(state): State<AppState>) -> Result<impl IntoR
 pub async fn get_scan_status(State(state): State<AppState>) -> impl IntoResponse {
     let (status, progress) = state.system.get_scan_status().await;
     Json(ScanStatusResponse {
-        status: scan_status_name(status),
+        status: status.name().to_string(),
         current_progress: progress.map(ScanProgressDto::from),
     })
 }
@@ -52,8 +53,8 @@ pub async fn get_scan_status(State(state): State<AppState>) -> impl IntoResponse
 /// 409 when a scan, of projects or plugins, is already running (ADR-0038).
 pub async fn scan_directories(
     State(state): State<AppState>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+) -> Result<impl IntoResponse, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system
@@ -159,22 +160,14 @@ pub async fn stop_watcher(State(state): State<AppState>) -> Json<WatcherActionRe
 
 pub async fn get_watcher_events(
     State(state): State<AppState>,
-) -> Result<Sse<ReceiverStream<Result<Event, Infallible>>>, ApiError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+) -> Result<impl IntoResponse, ApiError> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(100);
 
     let started = state
         .system
         .start_watcher_event_stream(move |event| {
-            use crate::grpc::common::WatcherEventType;
-            let event_type = match WatcherEventType::try_from(event.event_type) {
-                Ok(WatcherEventType::WatcherCreated) => "created",
-                Ok(WatcherEventType::WatcherModified) => "modified",
-                Ok(WatcherEventType::WatcherDeleted) => "deleted",
-                Ok(WatcherEventType::WatcherRenamed) => "renamed",
-                _ => "unknown",
-            };
             let dto = WatcherEventDto {
-                event_type: event_type.to_string(),
+                event_type: event.event_type.name().to_string(),
                 path: event.path,
                 new_path: event.new_path,
                 timestamp: event.timestamp,
@@ -203,16 +196,19 @@ pub async fn get_statistics(
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
-    Ok(Json(StatisticsDto::from(stats)))
+    let db_arc = state.system.db_handle();
+    let mut db = db_arc.lock().await;
+    let dto = StatisticsDto::build(stats, &mut db)
+        .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
+    Ok(Json(dto))
 }
 
 pub async fn export_statistics(
     State(state): State<AppState>,
     Query(query): Query<ExportStatisticsQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Only CSV exists today, same as the gRPC handler's ExportFormat -- an
-    // unrecognised or missing format falls back to it rather than erroring,
-    // since it's the only variant that has ever existed.
+    // Only CSV exists today: an unrecognised or missing format falls back to it
+    // rather than erroring, since it's the only variant that has ever existed.
     let _ = query.format;
     let scope = parse_project_scope(query.scope.as_deref())?;
 
@@ -239,8 +235,7 @@ pub async fn export_statistics(
     Ok((headers, csv_data))
 }
 
-/// Ported verbatim from `src/grpc/handlers/system.rs::generate_csv_export`.
-fn generate_csv_export(stats: crate::grpc::system::GetStatisticsResponse) -> Vec<u8> {
+fn generate_csv_export(stats: Statistics) -> Vec<u8> {
     let mut csv_content = String::new();
 
     csv_content.push_str("Category,Value\n");
@@ -309,13 +304,13 @@ fn generate_csv_export(stats: crate::grpc::system::GetStatisticsResponse) -> Vec
 #[cfg(test)]
 mod tests {
     use super::generate_csv_export;
-    use crate::grpc::system::GetStatisticsResponse;
+    use crate::services::Statistics;
 
     /// Regression: the rate arrived as a percentage and was multiplied by 100 again,
     /// so half the tasks done exported as "5000.00%".
     #[test]
     fn csv_completion_rate_is_a_percentage_once() {
-        let stats = GetStatisticsResponse {
+        let stats = Statistics {
             task_completion_rate: 0.5,
             ..Default::default()
         };

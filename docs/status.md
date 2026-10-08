@@ -16,10 +16,10 @@ Last reviewed: 2026-10-04.
 | FTS5 search | **Done** | Operators: `name:`, `path:`, `plugin:`, `sample:`, `tag:`, `collection:`, `key:`, `bpm:`, `ts:`, `version:`, `dc:`, `dm:`. `collection:` filters by membership, not text. Quoted values keep their spaces |
 | CLI | **Done, to be replaced** | 33+ commands, table/JSON/CSV via `src/cli/output.rs`. Opens the database directly. To be replaced by a CLI client that talks to the daemon over HTTP (ADR-0050, which reverses this part of ADR-0046); `--config` and `--server` stay |
 | CLI client over HTTP | **Not started, decided** | ADR-0050. A separate small program on the `PATH`, no interactive mode. Lands before the old subcommands are deleted, which serve as its reference. A client that finds no daemon starts it; the daemon needs a single-instance guard first (none exists). Starting the daemon from the CLI is disabled if it trips antivirus before the executables are signed. Executables: `seula` is the CLI and the daemon is renamed `seula-service` (not done yet). Tray menu: Open, Rescan, Start with Windows (also in the GUI's settings), Quit |
-| gRPC API | **Done, to be removed** | 12 services in `proto/services/`. Retired by ADR-0046, once `tests/grpc/` is covered elsewhere |
-| HTTP API | **Done** | `src/http/`, axum, all 9 `Services` domains plus `system`. ADR-0024 |
+| gRPC API | **Removed** | ADR-0046. `src/grpc/`, `proto/`, `build.rs`, tonic and prost, and the `grpc_port` setting are gone. A config file that still has `grpc_port` loads fine; the key is ignored |
+| HTTP API | **Done** | `src/http/`, axum 0.8, all 9 `Services` domains plus `system`. ADR-0024 |
 | Tray mode | **Done** | `src/tray.rs`; default when run with no subcommand |
-| File watcher | **Done** | `src/watcher/`, streams over gRPC |
+| File watcher | **Done** | `src/watcher/`, streams over SSE |
 | Tags / collections / tasks / notes | **Done** | |
 | Media (cover art, audio) | **Done** | `src/media/`, size limits configurable |
 | Plugin metadata via Ableton DB | **Removed** | Retired 2026-09-15. ADR-0006 |
@@ -44,17 +44,20 @@ hand-written DTOs in `src/http/dto/`, independent of the generated proto types, 
 ADR.
 
 ADR-0046 (2026-09-24) decides what ADR-0028 left tentative: the gRPC server and the
-CLI, interactive mode included, are removed, and HTTP is the only surface. Not started.
-The order is in the ADR: move the behaviour `tests/grpc/` checks onto the service layer
-or HTTP first, then remove gRPC, then the CLI subcommands, then fold `SystemService`
-into `Services`. The frontend is a Tauri-only thin shell over that surface (ADR-0048).
+CLI, interactive mode included, are removed, and HTTP is the only surface. The gRPC half
+is done (2026-10-08): the behaviour `tests/grpc/` checked now lives in `tests/services/`
+and `tests/http/`, `SystemService` has native scan, watcher and statistics types instead
+of the generated ones, and the server, its protos and its dependencies are gone. Still to
+do from the ADR: the CLI subcommands and interactive mode (after the new client, below),
+and folding `SystemService` into `Services`. The frontend is a Tauri-only thin shell over
+that surface (ADR-0048).
 
 ADR-0050 (2026-10-03) reverses the CLI half of that. The shipped application is three
 parts: the tray daemon, the frontend launched from the tray or a shortcut, and a CLI
 client that talks to the daemon over HTTP, for scripts, people who prefer commands, and
 AI agents. Every client reaches the data through the daemon. The current in-process CLI
 subcommands and interactive mode are still removed, but only after the new client has
-landed, so they can be ported from. gRPC removal is unaffected.
+landed, so they can be ported from.
 
 The plugin migration is complete. Phase 1 (worker + supervisor) landed in `b261200`;
 phase 2 followed in three steps — schema and persistence, the first-run scan, and
@@ -280,7 +283,7 @@ Resolved, before `docs/bugs.md` existed (2026-10-07); new bugs are logged and ti
   background scan with progress, `POST /api/v1/plugins/scan` (ADR-0038). At the same time,
   a second scan no longer starts while one runs; before, a second project scan reset the
   first one's status. Regression test: `no_scan_starts_while_one_is_running`
-  (`tests/grpc/server_setup.rs`).
+  (`tests/services/system.rs`).
 - **Uploading a second audition audio lost the first** (found 2026-09-23, fixed
   2026-09-23). `store_audio_file` pointed `projects.audio_file_id` at the new upload,
   leaving the previous file referenced by nothing, so the next orphan cleanup deleted it.

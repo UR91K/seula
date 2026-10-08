@@ -40,7 +40,7 @@ pub struct Cli {
     #[arg(long)]
     pub cli: bool,
 
-    /// Run the gRPC and HTTP servers without the tray icon
+    /// Run the HTTP server without the tray icon
     #[arg(long, short = 's')]
     pub server: bool,
 

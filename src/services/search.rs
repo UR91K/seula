@@ -32,13 +32,6 @@ impl SearchService {
         let results = db.search_fts(&search_query)?;
         let total_count = results.len() as i32;
 
-        let iter = results.into_iter().skip(offset.unwrap_or(0) as usize);
-        let page = if let Some(limit) = limit {
-            iter.take(limit as usize).collect()
-        } else {
-            iter.collect()
-        };
-
-        Ok((page, total_count))
+        Ok((super::paginate(results, limit, offset)?, total_count))
     }
 }

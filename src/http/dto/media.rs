@@ -4,11 +4,8 @@
 //! parameters, not multipart -- axum's multipart support is an opt-in feature
 //! this crate doesn't otherwise need, and a raw-bytes body is simpler for any
 //! HTTP client (`fetch`, curl) to produce than a multipart envelope for a
-//! single file. Downloads read the whole file and return it as one response
-//! with `Content-Type`/`Content-Length` set, per ADR-0024's Streaming section
-//! -- which, note, is what the gRPC handler already does internally
-//! (`tokio::fs::read` loads the whole file before it re-chunks it for
-//! transmission), so this isn't a behavior change, just a simpler wire shape.
+//! single file. Downloads are served from disk with `Content-Type`/`Content-Length`
+//! set and `Range` support (ADR-0033).
 
 use serde::{Deserialize, Serialize};
 
@@ -56,14 +53,6 @@ pub struct UploadAudioFileQuery {
 #[derive(Serialize)]
 pub struct UploadResponse {
     pub media_file_id: String,
-    pub success: bool,
-    pub error_message: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct MutationResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -116,6 +105,4 @@ pub struct CleanupResponse {
     pub files_cleaned: i32,
     pub bytes_freed: i64,
     pub deleted_file_ids: Vec<String>,
-    pub success: bool,
-    pub error_message: Option<String>,
 }

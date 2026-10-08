@@ -13,7 +13,6 @@ pub mod task;
 use crate::cli::CliError;
 use crate::config::CONFIG;
 use crate::database::ProjectDatabase;
-use crate::grpc::handlers::*;
 use crate::media::{MediaConfig, MediaStorageManager};
 use crate::services::Services;
 use std::sync::Arc;

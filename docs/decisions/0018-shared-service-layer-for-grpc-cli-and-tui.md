@@ -4,7 +4,7 @@
 - **Decided:** 2026-09-16
 - **Recorded:** 2026-09-16
 - **Confidence:** decided now
-- **Evidence:** `src/services/` (new); `src/grpc/handlers/tags.rs`, `collections.rs`,
+- **Evidence:** `src/services/` (new); `a841a58^:src/grpc/handlers/tags.rs`, `collections.rs`,
   `projects.rs` (rewritten to call it); `src/cli/commands/mod.rs` (`CliContext` gains a
   `services: Services` field); ADR-0019 through ADR-0022 (the specific behavioral fixes
   this refactor surfaced and resolved)
@@ -45,7 +45,7 @@ the service layer, not the database layer — the database layer stays thin CRUD
 consistent with how it was already written.
 
 Added alongside this: `impl From<DatabaseError> for tonic::Status`
-(`src/grpc/error.rs`), so gRPC handlers use `?` instead of the ad hoc
+(`a841a58^:src/grpc/error.rs`), so gRPC handlers use `?` instead of the ad hoc
 `Status::new(Code::Internal, format!("Database error: {}", e))` every call site used to
 build by hand.
 
@@ -85,5 +85,5 @@ gets duplicated.
 
 Remaining domains to migrate, in no particular urgency: search, samples, tasks,
 plugins, media, config, system (stats/watcher — the largest and riskiest single
-handler, `src/grpc/handlers/system.rs`, deliberately not attempted in this pass beyond
+handler, `a841a58^:src/grpc/handlers/system.rs`, deliberately not attempted in this pass beyond
 the insertion-path fix in ADR-0022).

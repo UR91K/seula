@@ -7,7 +7,7 @@
 - **Recorded:** 2026-09-16
 - **Confidence:** decided now
 - **Evidence:** `df4ed4b` ("chore: rename all instances/variants of \"Studio Project
-  Manager\" to \"Seula\""); `src/grpc/server.rs` (`SeulaServer`); `src/config/mod.rs`
+  Manager\" to \"Seula\""); `a841a58^:src/grpc/server.rs` (`SeulaServer`); `src/config/mod.rs`
   (`SEULA_GRPC_PORT`, `SEULA_HTTP_PORT`, `SEULA_LOG_LEVEL`, `SEULA_DATABASE_PATH`,
   `SEULA_CONFIG`); `docs/architecture/overview.md`; `docs/codebase_patterns.md`
 
@@ -39,9 +39,9 @@ a rename with nobody on the other end of it.
 Rename every remaining instance of "Studio Project Manager" / `StudioProjectManager` to
 "Seula" / `Seula`, with no backward-compatible alias kept:
 
-- `StudioProjectManagerServer` → `SeulaServer` (`src/grpc/server.rs`, its trait impls,
-  and every reference in `src/main.rs`, `src/http/state.rs`, `src/grpc/mod.rs`,
-  `tests/grpc/server_setup.rs`, `tests/grpc/collections.rs`)
+- `StudioProjectManagerServer` → `SeulaServer` (`a841a58^:src/grpc/server.rs`, its trait impls,
+  and every reference in `src/main.rs`, `src/http/state.rs`, `a841a58^:src/grpc/mod.rs`,
+  `a841a58^:tests/grpc/server_setup.rs`, `a841a58^:tests/grpc/collections.rs`)
 - `STUDIO_PROJECT_MANAGER_GRPC_PORT` → `SEULA_GRPC_PORT`
 - `STUDIO_PROJECT_MANAGER_HTTP_PORT` → `SEULA_HTTP_PORT`
 - `STUDIO_PROJECT_MANAGER_LOG_LEVEL` → `SEULA_LOG_LEVEL`

@@ -402,7 +402,7 @@ impl ProjectDatabase {
             total_samples,
             present_samples,
             missing_samples: total_samples - present_samples,
-            // `path` is unique, so this always equals `total_samples`. Kept for gRPC.
+            // `path` is unique, so this always equals `total_samples`. Kept for the API.
             unique_paths: total_samples,
             samples_by_extension,
             total_size_bytes,

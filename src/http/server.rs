@@ -60,17 +60,17 @@ pub fn build_router(state: AppState) -> Router {
             post(tag_handlers::batch_untag_projects),
         )
         .route(
-            "/api/v1/tags/:tag_id",
+            "/api/v1/tags/{tag_id}",
             get(tag_handlers::get_tag)
                 .put(tag_handlers::update_tag)
                 .delete(tag_handlers::delete_tag),
         )
         .route(
-            "/api/v1/tags/:tag_id/projects",
+            "/api/v1/tags/{tag_id}/projects",
             get(tag_handlers::get_projects_by_tag),
         )
         .route(
-            "/api/v1/projects/:project_id/tags/:tag_id",
+            "/api/v1/projects/{project_id}/tags/{tag_id}",
             post(tag_handlers::tag_project).delete(tag_handlers::untag_project),
         )
         .route("/api/v1/projects", get(project_handlers::list_projects))
@@ -87,27 +87,27 @@ pub fn build_router(state: AppState) -> Router {
             post(project_handlers::batch_delete),
         )
         .route(
-            "/api/v1/projects/:project_id",
+            "/api/v1/projects/{project_id}",
             get(project_handlers::get_project).delete(project_handlers::mark_project_deleted),
         )
         .route(
-            "/api/v1/projects/:project_id/permanent",
+            "/api/v1/projects/{project_id}/permanent",
             axum::routing::delete(project_handlers::permanently_delete_project),
         )
         .route(
-            "/api/v1/projects/:project_id/notes",
+            "/api/v1/projects/{project_id}/notes",
             put(project_handlers::update_project_notes),
         )
         .route(
-            "/api/v1/projects/:project_id/name",
+            "/api/v1/projects/{project_id}/name",
             put(project_handlers::update_project_name),
         )
         .route(
-            "/api/v1/projects/:project_id/reactivate",
+            "/api/v1/projects/{project_id}/reactivate",
             post(project_handlers::reactivate_project),
         )
         .route(
-            "/api/v1/projects/:project_id/rescan",
+            "/api/v1/projects/{project_id}/rescan",
             post(project_handlers::rescan_project),
         )
         .route(
@@ -123,51 +123,51 @@ pub fn build_router(state: AppState) -> Router {
             post(collection_handlers::batch_create_collection_from),
         )
         .route(
-            "/api/v1/collections/:collection_id",
+            "/api/v1/collections/{collection_id}",
             get(collection_handlers::get_collection)
                 .put(collection_handlers::update_collection)
                 .delete(collection_handlers::delete_collection),
         )
         .route(
-            "/api/v1/collections/:collection_id/duplicate",
+            "/api/v1/collections/{collection_id}/duplicate",
             post(collection_handlers::duplicate_collection),
         )
         .route(
-            "/api/v1/collections/:collection_id/projects",
+            "/api/v1/collections/{collection_id}/projects",
             get(collection_handlers::get_collection_projects),
         )
         .route(
-            "/api/v1/collections/:collection_id/projects/:project_id",
+            "/api/v1/collections/{collection_id}/projects/{project_id}",
             post(collection_handlers::add_project_to_collection)
                 .delete(collection_handlers::remove_project_from_collection),
         )
         .route(
-            "/api/v1/collections/:collection_id/reorder",
+            "/api/v1/collections/{collection_id}/reorder",
             put(collection_handlers::reorder_collection),
         )
         .route(
-            "/api/v1/collections/:collection_id/tasks",
+            "/api/v1/collections/{collection_id}/tasks",
             get(collection_handlers::get_collection_tasks),
         )
         .route(
-            "/api/v1/collections/:collection_id/statistics",
+            "/api/v1/collections/{collection_id}/statistics",
             get(collection_handlers::get_collection_statistics),
         )
         .route(
-            "/api/v1/collections/:collection_id/batch-add",
+            "/api/v1/collections/{collection_id}/batch-add",
             post(collection_handlers::batch_add_to_collection),
         )
         .route(
-            "/api/v1/collections/:collection_id/batch-remove",
+            "/api/v1/collections/{collection_id}/batch-remove",
             post(collection_handlers::batch_remove_from_collection),
         )
         .route("/api/v1/search", get(search_handlers::search))
         .route(
-            "/api/v1/projects/:project_id/tasks",
+            "/api/v1/projects/{project_id}/tasks",
             get(task_handlers::get_project_tasks).post(task_handlers::create_task),
         )
         .route(
-            "/api/v1/projects/:project_id/tasks/search",
+            "/api/v1/projects/{project_id}/tasks/search",
             get(task_handlers::search_tasks),
         )
         .route(
@@ -183,7 +183,7 @@ pub fn build_router(state: AppState) -> Router {
             post(task_handlers::batch_delete_tasks),
         )
         .route(
-            "/api/v1/tasks/:task_id",
+            "/api/v1/tasks/{task_id}",
             put(task_handlers::update_task).delete(task_handlers::delete_task),
         )
         .route("/api/v1/plugins", get(plugin_handlers::get_all_plugins))
@@ -217,11 +217,11 @@ pub fn build_router(state: AppState) -> Router {
             get(plugin_handlers::get_failed_plugin_files),
         )
         .route(
-            "/api/v1/plugins/:plugin_id",
+            "/api/v1/plugins/{plugin_id}",
             get(plugin_handlers::get_plugin),
         )
         .route(
-            "/api/v1/plugins/:plugin_id/projects",
+            "/api/v1/plugins/{plugin_id}/projects",
             get(plugin_handlers::get_projects_by_plugin),
         )
         .route("/api/v1/samples", get(sample_handlers::get_all_samples))
@@ -258,11 +258,11 @@ pub fn build_router(state: AppState) -> Router {
             post(sample_handlers::check_samples),
         )
         .route(
-            "/api/v1/samples/:sample_id",
+            "/api/v1/samples/{sample_id}",
             get(sample_handlers::get_sample),
         )
         .route(
-            "/api/v1/samples/:sample_id/projects",
+            "/api/v1/samples/{sample_id}/projects",
             get(sample_handlers::get_projects_by_sample),
         )
         .route("/api/v1/config", get(config_handlers::get_config))
@@ -316,26 +316,26 @@ pub fn build_router(state: AppState) -> Router {
             post(media_handlers::cleanup_orphaned_media),
         )
         .route(
-            "/api/v1/media/:media_file_id",
+            "/api/v1/media/{media_file_id}",
             get(media_handlers::download_media).delete(media_handlers::delete_media),
         )
         .route(
-            "/api/v1/collections/:collection_id/cover-art",
+            "/api/v1/collections/{collection_id}/cover-art",
             put(media_handlers::set_collection_cover_art)
                 .delete(media_handlers::remove_collection_cover_art),
         )
         .route(
-            "/api/v1/projects/:project_id/audio-file",
+            "/api/v1/projects/{project_id}/audio-file",
             put(media_handlers::set_project_audio_file)
                 .delete(media_handlers::remove_project_audio_file),
         )
         .route(
-            "/api/v1/projects/:project_id/audio-files",
+            "/api/v1/projects/{project_id}/audio-files",
             get(media_handlers::list_project_audio_files)
                 .post(media_handlers::add_project_audio_file),
         )
         .route(
-            "/api/v1/projects/:project_id/audio-files/:media_file_id",
+            "/api/v1/projects/{project_id}/audio-files/{media_file_id}",
             delete(media_handlers::remove_project_audio_file_from_list),
         )
         .route("/api/v1/system/info", get(system_handlers::get_system_info))

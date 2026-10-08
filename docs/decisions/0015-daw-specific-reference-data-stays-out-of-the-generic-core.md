@@ -12,7 +12,7 @@
   `ableton_version_*` columns) and their use in `src/database/core.rs:404-406,436-438,558-560`
   (FTS triggers and search, string-concatenated inline), `src/database/stats.rs:454-457,
   576-587,826-832` (numeric filtering, sorting and grouping by version), and
-  `src/grpc/handlers/projects.rs:56-78` (public gRPC filter params named after Ableton's
+  `a841a58^:src/grpc/handlers/projects.rs:56-78` (public gRPC filter params named after Ableton's
   version shape); `src/models.rs:70-91` (`AbletonVersion`); ADR-0005 (`instr`/`audiofx` is
   Ableton's opinion, never identity); ADR-0009 (`plugin_refs` gets its own table);
   ADR-0014 (DAW generalisation is one phase in, not started)

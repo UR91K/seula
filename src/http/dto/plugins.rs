@@ -8,11 +8,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::database::plugins::InstallState;
-use crate::models::{GrpcPlugin, Plugin as DomainPlugin};
+use crate::models::{Plugin as DomainPlugin, PluginWithUsage};
 
 /// Parses a comma-separated `install_states` query value into the database
 /// layer's tri-state set (ADR-0025). Unrecognised values are dropped rather
-/// than rejected, matching `src/grpc/handlers/plugins.rs::install_states`: an
+/// than rejected: an
 /// empty set means "no filtering", which is what a request naming no state (or
 /// only invalid ones) is asking for.
 pub fn parse_install_states(raw: Option<&str>) -> Vec<InstallState> {
@@ -47,17 +47,17 @@ pub struct PluginDto {
     pub scan_error: Option<String>,
 }
 
-impl From<GrpcPlugin> for PluginDto {
-    fn from(grpc_plugin: GrpcPlugin) -> Self {
+impl From<PluginWithUsage> for PluginDto {
+    fn from(plugin_with_usage: PluginWithUsage) -> Self {
         Self {
-            id: grpc_plugin.plugin.id.to_string(),
-            dev_identifier: grpc_plugin.plugin.dev_identifier,
-            name: grpc_plugin.plugin.name,
-            format: grpc_plugin.plugin.plugin_format.to_string(),
-            installed: grpc_plugin.plugin.installed,
-            vendor: grpc_plugin.plugin.vendor,
-            version: grpc_plugin.plugin.version,
-            project_count: grpc_plugin.project_count,
+            id: plugin_with_usage.plugin.id.to_string(),
+            dev_identifier: plugin_with_usage.plugin.dev_identifier,
+            name: plugin_with_usage.plugin.name,
+            format: plugin_with_usage.plugin.plugin_format.to_string(),
+            installed: plugin_with_usage.plugin.installed,
+            vendor: plugin_with_usage.plugin.vendor,
+            version: plugin_with_usage.plugin.version,
+            project_count: plugin_with_usage.project_count,
             scan_error: None,
         }
     }

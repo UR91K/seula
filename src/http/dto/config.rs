@@ -1,11 +1,8 @@
 //! HTTP wire types for the config domain (ADR-0024).
 //!
-//! Mutations here follow `src/grpc/handlers/config.rs`'s convention, not the
-//! `ApiError`/`?` pattern the other domains use: a failed update is a normal
-//! 200 response with `success: false` and an `error_message`, not a 4xx/5xx.
-//! That's a deliberate existing choice (config errors are user-facing
-//! validation feedback, not exceptional failures) and preserved as-is rather
-//! than folded into the generic error mapping as part of this port.
+//! A mutation that fails is an HTTP error (400 for a path or setting that cannot be
+//! used, 500 for a config file that cannot be written); one that succeeds answers with
+//! any validation warnings.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +12,6 @@ use crate::config::Config;
 pub struct ConfigDto {
     pub paths: Vec<String>,
     pub database_path: Option<String>,
-    pub grpc_port: u32,
     pub log_level: String,
     pub media_storage_dir: String,
     pub max_cover_art_size_mb: Option<u32>,
@@ -29,7 +25,6 @@ impl From<&Config> for ConfigDto {
         Self {
             paths: config.paths.clone(),
             database_path: config.database_path.clone(),
-            grpc_port: config.grpc_port as u32,
             log_level: config.log_level.clone(),
             media_storage_dir: config.media_storage_dir.clone(),
             max_cover_art_size_mb: config.max_cover_art_size_mb,
@@ -70,22 +65,17 @@ pub struct RemovePathRequest {
 
 #[derive(Serialize)]
 pub struct PathMutationResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub validation_warnings: Vec<String>,
 }
 
 #[derive(Serialize)]
 pub struct RemovePathResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub remaining_paths_count: i32,
 }
 
 #[derive(Deserialize)]
 pub struct UpdateSettingsRequest {
     pub database_path: Option<String>,
-    pub grpc_port: Option<u16>,
     pub log_level: Option<String>,
     pub media_storage_dir: Option<String>,
     pub max_cover_art_size_mb: Option<Option<u32>>,
@@ -94,10 +84,8 @@ pub struct UpdateSettingsRequest {
 
 #[derive(Serialize)]
 pub struct ReloadConfigResponse {
-    pub success: bool,
-    pub error_message: Option<String>,
     pub validation_warnings: Vec<String>,
-    pub config: Option<ConfigDto>,
+    pub config: ConfigDto,
 }
 
 #[derive(Serialize)]

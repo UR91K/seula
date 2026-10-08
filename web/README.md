@@ -36,7 +36,7 @@ The apps read from the mock daemon that `mockup/data/generate.py` seeds, on port
 
 ```bash
 python mockup/data/generate.py seed          # once; builds mockup/data/seula-mock.db
-cargo build --bin seula                      # needs protoc (PROTOC=...)
+cargo build --bin seula
 target/debug/seula --config mockup/data/mock-config.toml --server
 ```
 

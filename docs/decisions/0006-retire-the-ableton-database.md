@@ -66,7 +66,7 @@ Implemented 2026-09-15, after ADR-0009 and ADR-0013. What actually went:
 - `Plugin::reparse`, the `INSTALLED_PLUGINS` cache, and `LiveSet::reparse_plugins`.
 - The transitional per-batch fallback added in phase 2 step 1.
 - `plugin_id`, `module_id`, `sdk_version`, `flags`, `scanstate` and `enabled` from
-  `Plugin`, the `plugins` table, and `Plugin` in `proto/common.proto` — field numbers
+  `Plugin`, the `plugins` table, and `Plugin` in `a841a58^:proto/common.proto` — field numbers
   reserved rather than recycled.
 - `live_database_dir` from the configuration, which pointed at Ableton's database
   directory and had no other purpose.

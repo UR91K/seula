@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 // Re-export constants from submodules for backward compatibility
 pub use defaults::{
-    DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
+    DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL, DEFAULT_MAX_AUDIO_FILE_SIZE_MB,
     DEFAULT_MAX_COVER_ART_SIZE_MB,
 };
 pub use loader::MAX_DIRECTORY_TRAVERSAL_DEPTH;
@@ -30,8 +30,8 @@ pub use paths::MAX_PATH_LENGTH;
 /// # database_path = "C:\\Users\\username\\AppData\\Roaming\\Seula\\seula.db"
 ///
 ///
-/// # gRPC server port (can be overridden by SEULA_GRPC_PORT env var)
-/// grpc_port = 50051
+/// # HTTP server port (can be overridden by SEULA_HTTP_PORT env var)
+/// http_port = 50052
 ///
 /// # Logging level: error, warn, info, debug, trace
 /// log_level = "info"
@@ -50,9 +50,6 @@ pub struct Config {
     /// Database file path (optional, defaults to user data directory)
     #[serde(default = "defaults::default_database_path")]
     pub database_path: Option<String>,
-    /// gRPC server port (can be overridden by SEULA_GRPC_PORT env var)
-    #[serde(default = "defaults::default_grpc_port")]
-    pub grpc_port: u16,
     /// HTTP server port (can be overridden by SEULA_HTTP_PORT env var)
     #[serde(default = "defaults::default_http_port")]
     pub http_port: u16,
@@ -79,14 +76,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Returns the gRPC port with environment variable override support
-    pub fn grpc_port(&self) -> u16 {
-        std::env::var("SEULA_GRPC_PORT")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(self.grpc_port)
-    }
-
     /// Returns the HTTP port with environment variable override support
     pub fn http_port(&self) -> u16 {
         std::env::var("SEULA_HTTP_PORT")
@@ -161,7 +150,6 @@ impl Config {
     pub fn update_settings(
         &mut self,
         database_path: Option<String>,
-        grpc_port: Option<u16>,
         log_level: Option<String>,
         media_storage_dir: Option<String>,
         max_cover_art_size_mb: Option<Option<u32>>,
@@ -169,9 +157,6 @@ impl Config {
     ) -> Result<Vec<String>, ConfigError> {
         if let Some(db_path) = database_path {
             self.database_path = Some(db_path);
-        }
-        if let Some(port) = grpc_port {
-            self.grpc_port = port;
         }
         if let Some(level) = log_level {
             self.log_level = level;

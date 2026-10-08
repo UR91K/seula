@@ -111,10 +111,8 @@ pub async fn get_all_tags_with_usage(
     }))
 }
 
-/// Mirrors `src/grpc/handlers/tags.rs::get_projects_by_tag`: the service
-/// returns every tagged project, and pagination is applied here rather than in
-/// SQL, matching the existing (gRPC) behavior rather than changing it as part
-/// of this port.
+/// The service returns every tagged project, and pagination is applied here rather
+/// than in SQL.
 pub async fn get_projects_by_tag(
     State(state): State<AppState>,
     Path(tag_id): Path<String>,
@@ -122,6 +120,7 @@ pub async fn get_projects_by_tag(
 ) -> Result<impl IntoResponse, ApiError> {
     let projects = state.services.tags.get_projects_by_tag(&tag_id).await?;
     let total_count = projects.len() as i32;
+    let projects = crate::services::paginate(projects, query.limit, query.offset)?;
 
     let db_arc = state.services.tags.db_handle();
     let mut db = db_arc.lock().await;
@@ -130,17 +129,6 @@ pub async fn get_projects_by_tag(
         .map(|p| project_to_dto(p, &mut db))
         .collect::<Result<Vec<_>, _>>()?;
     drop(db);
-
-    let offset = query.offset.unwrap_or(0) as usize;
-    let projects = if let Some(limit) = query.limit {
-        projects
-            .into_iter()
-            .skip(offset)
-            .take(limit as usize)
-            .collect()
-    } else {
-        projects.into_iter().skip(offset).collect()
-    };
 
     Ok(Json(ProjectListResponse {
         projects,

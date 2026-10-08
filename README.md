@@ -36,7 +36,7 @@ untested.
 
 ## Building
 
-Requires a recent stable Rust toolchain and `protoc` (`choco install protoc` on Windows).
+Requires a recent stable Rust toolchain.
 SQLite is bundled.
 
 ```bash
@@ -70,7 +70,6 @@ paths = ['{USER_HOME}/Documents/Ableton Projects']   # folders to scan
 
 # database_path = ''          # default: %APPDATA%\Seula\seula.db
 http_port = 50052
-grpc_port = 50051
 log_level = "error"           # error, warn, info, debug, trace
 media_storage_dir = '...'     # cover art and audio
 
@@ -82,7 +81,7 @@ vst_search_paths = []         # empty = the platform's usual plugin folders
 ```
 
 `{USER_HOME}` expands to your home folder. The environment variables
-`SEULA_HTTP_PORT`, `SEULA_GRPC_PORT`, `SEULA_LOG_LEVEL` and `SEULA_DATABASE_PATH`
+`SEULA_HTTP_PORT`, `SEULA_LOG_LEVEL` and `SEULA_DATABASE_PATH`
 override the matching settings. Restart Seula after you edit the file.
 
 ## CLI
@@ -103,10 +102,10 @@ details.
 > This is an early alpha preview. It works on the database directly, and it will be
 > replaced by a separate client that talks to the running service over HTTP, so expect
 > command names and flags to change
-> ([ADR-0050](docs/decisions/0050-a-cli-client-talks-to-the-daemon-over-http.md)). The
-> gRPC server is being removed
-> ([ADR-0046](docs/decisions/0046-retire-grpc-and-the-cli-for-a-pure-http-api.md)), so
-> don't build on it.
+> ([ADR-0050](docs/decisions/0050-a-cli-client-talks-to-the-daemon-over-http.md)).
+> There is no gRPC server any more
+> ([ADR-0046](docs/decisions/0046-retire-grpc-and-the-cli-for-a-pure-http-api.md)); the
+> HTTP API is the only one.
 
 ## API
 

@@ -2,7 +2,7 @@
 //! archived projects or not (ADR-0040).
 //!
 //! One query per page rather than a join in every list query, so the list functions
-//! keep their signatures and the gRPC and CLI callers are untouched. The junction
+//! keep their signatures and the callers are untouched. The junction
 //! tables hold one row per (project, item) pair, so a row count is a project count.
 
 use std::collections::HashMap;

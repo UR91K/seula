@@ -52,7 +52,7 @@ pub struct ScanCommand {
 impl crate::cli::commands::CliCommand for ScanCommand {
     async fn execute(&self, ctx: &CliContext) -> Result<(), CliError> {
         let formatter = OutputFormatter::new(ctx.output_format.clone(), ctx.no_color);
-        // If no explicit paths provided, use the shared scanning logic (same as gRPC)
+        // If no explicit paths provided, use the shared scanning logic
         if self.paths.is_empty() {
             formatter.print_message("Starting scan using configured paths", MessageType::Info);
 

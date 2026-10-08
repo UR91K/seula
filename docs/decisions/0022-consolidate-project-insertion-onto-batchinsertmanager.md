@@ -6,7 +6,7 @@
 - **Confidence:** decided now
 - **Evidence:** `src/database/batch.rs` (`BatchInsertManager`, unchanged — accepts any
   `Vec<Project>` length including 1); `src/cli/commands/scan.rs` (`store_results`);
-  `src/grpc/handlers/system.rs` (`add_single_project`, `add_multiple_projects`);
+  `a841a58^:src/grpc/handlers/system.rs` (`add_single_project`, `add_multiple_projects`);
   ADR-0005, ADR-0009 (why batch insert resolves plugin references the way it does);
   ADR-0018 (the service-layer audit this was found during)
 

@@ -1,7 +1,7 @@
 # Seula
 
 Ableton Live project manager. Scans `.als` files, extracts metadata into SQLite, and
-exposes it over a CLI and a gRPC API. Runs either as a system tray daemon or a CLI.
+exposes it over a CLI and an HTTP API. Runs either as a system tray daemon or a CLI.
 
 Rust, Windows-focused (macOS/Linux paths exist but are untested).
 
@@ -17,7 +17,8 @@ src/
     schema.sql     every table, index and trigger; include_str!'d by core.rs
     batch.rs       project batch insert; resolves plugin references (ADR-0005, 0009)
     plugin_scan.rs persists plugin scan results                     (ADR-0007, 0012)
-  grpc/          12 services, one handler each
+  services/      the behaviour: validation and orchestration, one module per domain
+  http/          the axum router: DTOs, handlers, SSE scan streams
   cli/           clap commands + interactive mode; output.rs owns table/JSON/CSV
   config/        config.toml loading, validation, platform paths
   media/         cover art and audio file storage
@@ -25,7 +26,6 @@ src/
 crates/
   vst-meta/      the plugin scanner worker — runs as a SUBPROCESS (ADR-0004)
                  the sole source of plugin metadata since ADR-0006
-proto/services/  gRPC definitions
 ```
 
 ## Commands

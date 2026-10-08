@@ -167,9 +167,8 @@ impl From<TaskAnalytics> for TaskStatisticsDto {
                         month,
                         completed_tasks,
                         total_tasks,
-                        // Matches src/grpc/handlers/tasks.rs: monthly trend rates are
-                        // converted to a percentage, unlike the top-level
-                        // completion_rate above, which isn't. Preserved as-is.
+                        // Monthly trend rates are converted to a percentage, unlike the
+                        // top-level completion_rate above, which isn't.
                         completion_rate: completion_rate * 100.0,
                     },
                 )
