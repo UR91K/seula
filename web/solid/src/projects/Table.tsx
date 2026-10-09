@@ -19,14 +19,15 @@ export interface Tracks {
   onReorder(ids: string[]): void;
 }
 
-function SortTh(props: { t: TableState; col: Col; last: boolean; label: string; num?: boolean }) {
+/** `prev` is the column to the left, if it resizes: the grip in this header drags it. */
+function SortTh(props: { t: TableState; col: Col; prev?: Col; last: boolean; label: string; num?: boolean }) {
   const sorted = () => props.t.sort()?.col === props.col.id;
   return (
     <th classList={{ num: props.num, sorted: sorted() }} style={props.t.widths.th(props.col, props.last)}
       onClick={() => props.t.sortBy(nextSort(props.t.sort(), props.col.id))}>
       {props.label}
       <Show when={sorted()}><Icon name={props.t.sort()!.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-      <Grip widths={props.t.widths} col={props.col} />
+      <Grip widths={props.t.widths} col={props.prev} />
     </th>
   );
 }
@@ -202,8 +203,8 @@ export function ProjectTable(props: { t: TableState; tracks?: Tracks }) {
           <th class="lead check" style={t().widths.th(CHECK, false)} title="Select all on this page" onClick={() => t().checkAll()}><Cb state={head()} /></th>
           <th class="lead" style={t().widths.th(AUDIO, false)} title="Audition audio" />
           <SortTh t={t()} col={NAME} last={last("name")} label="Name" />
-          <SortTh t={t()} col={TAGS} last={last("tags")} label="Tags" />
-          <For each={cols()}>{(c) => <SortTh t={t()} col={c} last={last(c.id)} label={c.label} num={c.num} />}</For>
+          <SortTh t={t()} col={TAGS} prev={NAME} last={last("tags")} label="Tags" />
+          <For each={cols()}>{(c, i) => <SortTh t={t()} col={c} prev={i() ? cols()[i() - 1] : TAGS} last={last(c.id)} label={c.label} num={c.num} />}</For>
         </tr>
       </thead>
       <tbody>

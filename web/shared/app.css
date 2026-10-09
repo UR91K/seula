@@ -33,13 +33,11 @@ html, body, #app { height: 100%; }
 table.grid.fixed { width: 100%; }
 table.grid.fixed th { box-sizing: border-box; }
 table.grid .num { text-align: left; }
-/* The grip straddles the column edge, centred on the border, and is wide enough to hit. The
- * next header paints over its outer half, so a header under the pointer is raised: it is
- * the one whose grip is being aimed at. The last header has no neighbour, and its grip
- * stays inside it. */
-table.grid th .grip { right: calc(var(--u) * -3); width: calc(var(--u) * 6); }
-table.grid th:last-child .grip { right: 0; width: calc(var(--u) * 3); }
-table.grid th:hover { z-index: 2; }
+/* The grip drags the column to its left. It starts at this header's left edge, on the
+ * border, and reaches 10px (5 --u at the default scale) into the header. It stays inside
+ * its own header because the headers clip their overflow for the ellipsis: a grip
+ * straddling the border lost its outer half. */
+table.grid th .grip { left: 0; right: auto; width: calc(var(--u) * 5); }
 
 /* Nothing is selectable except what a person might copy: fields, and the inspector's
  * text. The mockup stylesheets set no user-select anywhere but on icons. */

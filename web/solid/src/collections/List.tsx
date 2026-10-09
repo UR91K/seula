@@ -96,7 +96,7 @@ export function Details() {
               onClick={() => { if (c.key) sortByColumn(c.key); }}>
               {c.label}
               <Show when={sorted(c.key)}><Icon name={cui.sort.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-              <Grip widths={widths} col={c} />
+              <Grip widths={widths} col={COLLECTION_COLUMNS[COLLECTION_COLUMNS.indexOf(c) - 1]} />
             </th>
           )}</For>
         </tr>

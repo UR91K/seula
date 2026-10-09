@@ -28,7 +28,7 @@ function Head() {
             <th classList={{ num: c.num, sorted: sorted() }} style={widths.th(c, last(c.id))} onClick={() => sortBy(c.id)}>
               {c.label}
               <Show when={sorted()}><Icon name={pui.sort!.desc ? "arrow_downward" : "arrow_upward"} /></Show>
-              <Grip widths={widths} col={c} />
+              <Grip widths={widths} col={PLUGIN_COLUMNS[PLUGIN_COLUMNS.indexOf(c) - 1]} />
             </th>
           );
         }}</For>

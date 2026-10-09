@@ -5,6 +5,7 @@
 // grip drags its column's width. Widths are kept in memory, per table, until the
 // preferences endpoint exists (as the collections layout is, ADR-0062).
 
+import { Show } from "solid-js";
 import { createStore } from "solid-js/store";
 
 /** A column's id, and its default width in `--u`. */
@@ -25,14 +26,15 @@ export function createWidths() {
     /** The table's style: as wide as the pane, and never narrower than its columns. */
     table: (cols: Col[]) => ({ "min-width": `calc(${cols.map(width).join(" + ")})` }),
 
-    /** Drag `c`'s width from its grip. It starts from the column's drawn width, so the
-     *  last column, drawn wider than its default, does not jump when grabbed. */
+    /** Drag `c`'s width from its grip, which sits at the left edge of the next header. It
+     *  starts from the column's drawn width, so the last column, drawn wider than its
+     *  default, does not jump when grabbed. */
     grab(c: Col, e: PointerEvent) {
       if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       const grip = e.currentTarget as HTMLElement;
-      const start = grip.closest("th")!.getBoundingClientRect().width;
+      const start = grip.closest("th")!.previousElementSibling!.getBoundingClientRect().width;
       const x0 = e.clientX;
       grip.setPointerCapture(e.pointerId);
       const move = (ev: PointerEvent) => setPx(c.id, Math.max(MIN, Math.round(start + ev.clientX - x0)));
@@ -50,11 +52,16 @@ export function createWidths() {
 
 export type Widths = ReturnType<typeof createWidths>;
 
-/** A header's resize handle. It swallows its own click, so a drag never sorts. */
-export function Grip(props: { widths: Widths; col: Col }) {
+/** The resize handle for `col`, the column to the left of the header it is placed in: it
+ *  starts at this header's left edge and reaches into it, clear of the clipping that the
+ *  headers' ellipsis needs. No `col` (the first column, or one that does not resize), no
+ *  handle. It swallows its own click, so a drag never sorts. */
+export function Grip(props: { widths: Widths; col?: Col }) {
   return (
-    <span class="grip"
-      onPointerDown={(e) => props.widths.grab(props.col, e)}
-      onClick={(e) => e.stopPropagation()} />
+    <Show when={props.col}>{(col) => (
+      <span class="grip"
+        onPointerDown={(e) => props.widths.grab(col(), e)}
+        onClick={(e) => e.stopPropagation()} />
+    )}</Show>
   );
 }
