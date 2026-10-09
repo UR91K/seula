@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Seula (solid)",
-  "version": "0.0.0",
-  "identifier": "app.seula.shell.solid",
+  "productName": "Seula",
+  "version": "0.2.0-alpha.1",
+  "identifier": "app.seula.shell",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,13 +12,13 @@
   "app": {
     "withGlobalTauri": true,
     "windows": [
-      { "title": "Seula (solid)", "width": 1280, "height": 800, "decorations": false }
+      { "title": "Seula", "width": 1280, "height": 800, "decorations": false }
     ],
     "security": { "csp": null }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": ["icons/icon.ico"]
   }
 }
