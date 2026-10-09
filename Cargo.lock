@@ -2580,6 +2580,7 @@ dependencies = [
  "notify",
  "once_cell",
  "parking_lot",
+ "png",
  "quick-xml 0.37.5",
  "rand",
  "regex",

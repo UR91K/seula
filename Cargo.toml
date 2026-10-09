@@ -52,6 +52,7 @@ async-trait = "0.1"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 tray-icon = "0.21"        # System tray functionality
+png = "0.17"              # Decodes the tray icon (assets/tray-icon.png)
 
 # CLI dependencies
 clap = { version = "4.0", features = ["derive", "color"] }
