@@ -53,7 +53,6 @@ export function Viewbar() {
           <TbBtn icon="view_column" title="Columns" keep on={shell.popover === "columns"}
             onClick={() => setShell("popover", shell.popover === "columns" ? null : "columns")} />
           <TbBtn icon="refresh" label="Scan" title="Scan the project folders" disabled={!!scan()} onClick={() => runScan("projects", load)} />
-          <TbBtn icon="speed" label="Simulate" title="A stand-in scan of 600 events at 40 a second" disabled={!!scan()} onClick={() => runScan("simulated", load)} />
           <span class="grow" />
           <Pager page={t.page()} total={t.total()} pages={t.pageCount()} onPage={t.goPage} onSize={t.firstPage} />
         </>}>

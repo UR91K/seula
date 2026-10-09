@@ -102,8 +102,7 @@ The figures are fetched each time the view is opened.
 
 **Push-speed state** is a scan's progress in the status bar, for the project scan, the
 plugin scan and the sample check alike. The daemon's real scan
-finishes at once on the mock library (it has no project folders), so **Simulate** streams
-600 events at about 40 a second in the real stream's shape. **Scan** runs the real one.
+finishes at once on the mock library (it has no project folders). **Scan** runs the real one.
 
 Not built: tag, collection and archive edits (the batch buttons are the mockup's, disabled),
 audition playback and drag to reorder columns. The CSP is `null` and the icon font loads
