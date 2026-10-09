@@ -1,3 +1,14 @@
+/* The icon font ships with the app: the shell must work offline and must not call a third party on
+ * every launch. Material Symbols Outlined (Apache-2.0), fetched once from Google Fonts with only the
+ * axes the UI uses: FILL 0..1, wght 300..600, opsz 20, GRAD 0 (shell.css, components.css). */
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: block;
+  src: url("./fonts/material-symbols-outlined.woff2") format("woff2");
+}
+
 /* What the app needs on top of the approved mockup stylesheets (colors.css, shell.css,
  * components.css), which are imported unchanged: the window fills the viewport instead
  * of a board frame. */
