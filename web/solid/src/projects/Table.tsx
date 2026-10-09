@@ -77,10 +77,11 @@ function DataCell(props: { t: TableState; p: Project; c: Column }) {
   return (
     <td classList={{ dim: props.c.dim, num: props.c.num, count: !!props.c.count, hot: hot() }}
       data-hover={props.c.count}
-      onMouseEnter={() => {
-        if (props.c.count && props.c.text(props.p, shell.spelling)) { props.t.holdHover(); props.t.setHot({ id: props.p.id, kind: props.c.count }); }
-      }}
-      onMouseLeave={() => { if (props.c.count) props.t.releaseHover(); }}>
+      onClick={() => {
+        const kind = props.c.count;
+        if (!kind || !props.c.text(props.p, shell.spelling)) return;
+        props.t.setHot(hot() ? null : { id: props.p.id, kind });
+      }}>
       {props.c.text(props.p, shell.spelling)}
       <Show when={missing()}><span class="miss" title={`${missing()} missing`}><Icon name="error" /></span></Show>
     </td>

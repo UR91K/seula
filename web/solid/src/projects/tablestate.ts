@@ -69,12 +69,6 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
   const toggleColumn = (id: string) =>
     setColumns((cols) => (cols.includes(id) ? cols.filter((c) => c !== id) : [...cols, id]));
 
-  // ------------------------------------------------------------ hover list
-
-  let hideTimer: ReturnType<typeof setTimeout> | undefined;
-  const holdHover = () => clearTimeout(hideTimer);
-  const releaseHover = () => { clearTimeout(hideTimer); hideTimer = setTimeout(() => setHot(null), 150); };
-
   // ------------------------------------------------------------ edits
 
   let notesTimer: ReturnType<typeof setTimeout> | undefined;
@@ -101,7 +95,7 @@ export function createTableState(opts: { sort: Sort | null; paged: boolean }) {
     sort, sortBy, page, goPage, firstPage: () => setPage(0), pageSize, pageCount, total, sorted, rows, rowIds,
     columns, toggleColumn, widths,
     renaming, setRenaming, renameProject, editNotes,
-    hot, setHot, holdHover, releaseHover,
+    hot, setHot,
     isSelected, selectedCount, selectedProjects, clearSelection, rowClick, rowCheck, checkAll, selectOnly, pruneSelection,
     reset,
   };

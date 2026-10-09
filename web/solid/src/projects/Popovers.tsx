@@ -1,7 +1,7 @@
 // Popovers: the row context menu, the plugins/samples hover list and the column chooser.
 // Each is placed against the window once it is in the DOM (shared/place.ts).
 
-import { For, Show, onMount, type JSX } from "solid-js";
+import { For, Show, onCleanup, onMount, type JSX } from "solid-js";
 import { COLUMNS, missingPlugins, missingSamples } from "../../../shared/projects";
 import { place, type Placement } from "../../../shared/place";
 import type { Project } from "../../../shared/types";
@@ -46,8 +46,18 @@ export function ContextMenu(props: { t: TableState; menu: { id: string; x: numbe
   );
 }
 
+/** The plugins/samples list opens on a click on its cell and stays until a click lands
+ *  outside it. A click on the cell itself is left to the cell, which toggles the list. */
 export function HoverList(props: { t: TableState; hot: { id: string; kind: "plugins" | "samples" } }) {
   const hot = () => props.hot;
+  onMount(() => {
+    const away = (e: PointerEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest(".hoverlist") && !el.closest("td[data-hover]")) props.t.setHot(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    onCleanup(() => document.removeEventListener("pointerdown", away, true));
+  });
   const p = (): Project | undefined => props.t.find(hot().id);
   return (
     <Show when={p()}>{(proj) => {
@@ -55,7 +65,7 @@ export function HoverList(props: { t: TableState; hot: { id: string; kind: "plug
       const items = () => (plugins() ? proj().plugins : proj().samples);
       const missing = () => (plugins() ? missingPlugins(proj()) : missingSamples(proj()));
       return (
-        <div class="pop hoverlist" onMouseEnter={props.t.holdHover} onMouseLeave={props.t.releaseHover}
+        <div class="pop hoverlist"
           ref={placed(() => {
             const cell = document.querySelector(`tr[data-id="${hot().id}"] td[data-hover="${hot().kind}"]`);
             return cell ? { anchor: cell, align: "right" } : null;

@@ -26,12 +26,12 @@ function Section(props: { title: string; count?: JSX.Element; children: JSX.Elem
   return <div class="insp-sec"><h3>{props.title} <span class="count">{props.count}</span></h3>{props.children}</div>;
 }
 
+/** Every item, scrolling once the list is taller than `max` rows. */
 function Listing<T>(props: { items: T[]; max?: number; render: (x: T) => JSX.Element }) {
   const max = () => props.max ?? 8;
   return (
-    <ul class="plain">
-      <For each={props.items.slice(0, max())}>{(x) => props.render(x)}</For>
-      <Show when={props.items.length > max()}><li class="faint">and {props.items.length - max()} more</li></Show>
+    <ul class="plain" style={{ "max-height": `calc(var(--row) * ${max()})`, "overflow-y": "auto" }}>
+      <For each={props.items}>{(x) => props.render(x)}</For>
     </ul>
   );
 }
