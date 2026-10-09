@@ -2,3 +2,6 @@ node_modules/
 target/
 dist/
 **/src-tauri/gen/
+
+# sidecars staged by `just release` (ADR-0068)
+solid/src-tauri/binaries/

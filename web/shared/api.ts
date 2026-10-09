@@ -6,9 +6,10 @@ import type {
   Project, SampleFile, SampleFormat, SampleRow, ScanProgress, Scope, Statistics, StatsScope, SystemInfo, VendorRollup,
 } from "./types";
 
-/** The mock daemon `mockup/data/generate.py` seeds (its HTTP_PORT). The real default is
- *  50052; override with VITE_SEULA_URL. */
-export const DEFAULT_URL = "http://127.0.0.1:50152";
+/** The daemon's default `http_port` (src/config/defaults.rs), which is where an installed
+ *  build finds it. `just dev` and `just tauri` set VITE_SEULA_URL, to the mock daemon
+ *  `mockup/data/generate.py` seeds (its HTTP_PORT, 50152) or to this one. */
+export const DEFAULT_URL = "http://127.0.0.1:50052";
 
 /** Rows per request when reading a whole list. The list routes page, and most answer 1000
  *  rows when no limit is given (`limit.unwrap_or(1000)` in src/database), so leaving the

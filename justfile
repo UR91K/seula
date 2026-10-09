@@ -15,7 +15,8 @@ python := if os_family() == "windows" { "python" } else { "python3" }
 exe := if os_family() == "windows" { ".exe" } else { "" }
 mock_db := "mockup/data/seula-mock.db"
 mock_config := "mockup/data/mock-config.toml"
-# generate.py's HTTP_PORT; the frontend's DEFAULT_URL (web/shared/api.ts) points here.
+# generate.py's HTTP_PORT. Not the frontend's DEFAULT_URL (web/shared/api.ts), which is the
+# real port: the recipes below pass this one in VITE_SEULA_URL.
 mock_url := "http://127.0.0.1:50152"
 # The default http_port. A config.toml that sets another one needs this changed too.
 real_url := "http://127.0.0.1:50052"
@@ -53,6 +54,30 @@ reseed:
 # Build the daemon
 build:
     cargo build --bin seula
+
+# Build the Windows installer (ADR-0068): web/target/release/bundle/nsis/*-setup.exe
+#
+# The daemon and the scanner worker are built apart on purpose. Built together, Cargo
+# unifies vst-meta's features and links the VST hosts into the daemon (ADR-0004). Both
+# get a static C runtime so the installer needs no Visual C++ redistributable.
+[windows]
+[script("powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File")]
+[extension(".ps1")]
+release: _npm
+    $ErrorActionPreference = 'Stop'
+    function Run { param([string]$what, [scriptblock]$cmd) & $cmd; if ($LASTEXITCODE -ne 0) { throw "$what failed ($LASTEXITCODE)" } }
+    $triple = ((rustc -vV) -match '^host: (.+)$' | Select-Object -First 1) -replace '^host: ', ''
+    if (-not $triple) { throw 'could not read the host triple from rustc -vV' }
+    $env:RUSTFLAGS = '-C target-feature=+crt-static'
+    Run 'daemon build' { cargo build --release -p seula }
+    Run 'worker build' { cargo build --release -p vst-meta }
+    $bin = 'web/solid/src-tauri/binaries'
+    New-Item -ItemType Directory -Force $bin | Out-Null
+    Copy-Item target/release/seula.exe "$bin/seula-$triple.exe" -Force
+    Copy-Item target/release/vst-meta.exe "$bin/vst-meta-$triple.exe" -Force
+    Set-Location web/solid
+    Run 'tauri build' { npx tauri build --config src-tauri/tauri.release.conf.json }
+    Get-ChildItem ../target/release/bundle/nsis/*-setup.exe | ForEach-Object { Write-Host "$($_.FullName)  $([math]::Round($_.Length / 1MB, 1)) MB" }
 
 # Typecheck and lint the frontend
 check: _npm

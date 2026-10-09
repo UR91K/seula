@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "externalBin": ["binaries/seula", "binaries/vst-meta"],
+    "resources": {
+      "../../../LICENSE": "LICENSE",
+      "../../../LICENSE-EXCEPTIONS.md": "LICENSE-EXCEPTIONS.md",
+      "../../../crates/vst-meta/LICENSE": "vst-meta-LICENSE"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "embedBootstrapper" },
+      "nsis": { "installMode": "currentUser", "installerHooks": "windows/hooks.nsh" }
+    }
+  }
+}
